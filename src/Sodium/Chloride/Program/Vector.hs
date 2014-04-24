@@ -23,9 +23,15 @@ data Func
 
 data Body
 	= Body
-	{ _bodyVars :: Vars
-	, _bodyStatements :: [(IndicesList, Statement)]
+	{ _bodyVars  :: Vars
+	, _bodyBinds :: [Bind]
 	, _bodyResults :: [Expression]
+	} deriving (Show)
+
+data Bind
+	= Bind
+	{ _bindIndices :: IndicesList
+	, _bindStatement :: Statement
 	} deriving (Show)
 
 data Statement
@@ -74,6 +80,7 @@ type IndicesList
 	= [(Name, Index)]
 
 makeLenses ''Func
+makeLenses ''Bind
 makeLenses ''Body
 makeLenses ''ForCycle
 makeLenses ''MultiIfBranch

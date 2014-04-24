@@ -104,8 +104,8 @@ instance Conv S.MultiIfBranch D.Expression where
 		return $ foldr ($) hsBodyElse leafGens
 
 --TODO: Bind/Let inference
-instance Conv (S.IndicesList, S.Statement) D.DoStatement where
-	conv (retIndices, S.Execute (S.OpReadLn t) [])
+instance Conv S.Bind D.DoStatement where
+	conv (S.Bind retIndices (S.Execute (S.OpReadLn t) []))
 		 =  D.DoBind
 		<$> (D.PatTuple <$> conv (IndicesList retIndices))
 		<*> if t == S.ClString
@@ -113,8 +113,7 @@ instance Conv (S.IndicesList, S.Statement) D.DoStatement where
 			else do
 				hsType <- conv t
 				return $ D.Access "readLn" `D.Typed` D.HsIO hsType
-	conv (retIndices, S.Execute S.OpPrintLn args)
-		| null retIndices
+	conv (S.Bind [] (S.Execute S.OpPrintLn args))
 		= case args of
 			[S.Call S.OpShow [arg]]
 				-> D.DoExecute . D.Beta (D.Access "print") <$> conv arg
@@ -126,19 +125,19 @@ instance Conv (S.IndicesList, S.Statement) D.DoStatement where
 					 $ D.Beta (D.Access "putStrLn")
 					 $ foldl1 (\x y -> beta [D.Access "++", x, y])
 					 $ hsExprs
-	conv (retIndices, S.Assign expr)
+	conv (S.Bind retIndices (S.Assign expr))
 		 =  D.DoLet
 		<$> (D.PatTuple <$> conv (IndicesList retIndices))
 		<*> conv expr
-	conv (retIndices, S.ForStatement forCycle)
+	conv (S.Bind retIndices (S.ForStatement forCycle))
 		 =  D.DoBind
 		<$> (D.PatTuple <$> conv (IndicesList retIndices))
 		<*> conv forCycle
-	conv (retIndices, S.MultiIfStatement multiIfBranch)
+	conv (S.Bind retIndices (S.MultiIfStatement multiIfBranch))
 		 =  D.DoBind
 		<$> (D.PatTuple <$> conv (IndicesList retIndices))
 		<*> conv multiIfBranch
-	conv (retIndices, S.BodyStatement body)
+	conv (S.Bind retIndices (S.BodyStatement body))
 		 =  D.DoBind
 		<$> (D.PatTuple <$> conv (IndicesList retIndices))
 		<*> conv body
@@ -173,7 +172,7 @@ instance Conv (Pure S.Body) D.Expression where
 			let extractIndex = \case
 				[(name, i)] -> return (Name name i)
 				_ -> mzero
-			let convStatement (indices, statement)
+			let convStatement (S.Bind indices statement)
 				 =  (,)
 				<$> extractIndex indices
 				<*> case statement of
@@ -212,8 +211,8 @@ instance Conv (Pure S.ForCycle) D.Expression where
 		return $ beta [D.Access "foldl", hsFoldLambda, hsArgExpr, hsRange]
 
 
-instance Conv (Pure (S.IndicesList, S.Statement)) D.ValueDef where
-	conv (Pure (retIndices, statement))
+instance Conv (Pure S.Bind) D.ValueDef where
+	conv (Pure (S.Bind retIndices statement))
 		 =  D.ValueDef
 		<$> (D.PatTuple <$> conv (IndicesList retIndices))
 		<*> case statement of

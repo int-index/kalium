@@ -14,7 +14,7 @@ extractBodyStatement statement@(BodyStatement body)
 extractBodyStatement statement = statement
 
 bodyMatch body
-	| M.null (body ^. bodyVars) && null (body ^. bodyStatements)
+	| M.null (body ^. bodyVars) && null (body ^. bodyBinds)
 	= case body ^. bodyResults of
 		[expr] -> Just expr
 		_ -> Nothing

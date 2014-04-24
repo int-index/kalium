@@ -76,7 +76,7 @@ instance Recmap Body where
 	recmapmod rm = recmapBody rm
 	recmapdiv rm body
 		= local (M.union $ body ^. bodyVars)
-		$ (bodyStatements . traversed . _2) rm body
+		$ (bodyBinds . traversed . bindStatement) rm body
 
 instance Recmap Statement where
 	recmapper rm = defaultRecmapper { recmapStatement = rm }

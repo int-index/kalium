@@ -54,7 +54,7 @@ vectorizeBodyR body closure = (changed, vecBodyGen) where
 		$ M.intersectionWith (/=)
 		indices indices'
 	vecBodyGen results
-		= Vec.Body (body ^. bodyVars) vecStatements
+		= Vec.Body (body ^. bodyVars) (map (uncurry Vec.Bind) vecStatements)
 		$ runReader (mapM vectorizeExpression results) indices'
 
 vectorizeBody' :: Body -> Reader Vec.Indices ([Name], Vec.Body)

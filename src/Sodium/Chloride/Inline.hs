@@ -14,28 +14,28 @@ inline = recmapProgram' (recmapper' inlineBody)
 
 inlineBody body
 	= update body $ eliminateAssign
-		(body ^. bodyResults, body ^. bodyStatements)
-	where update body (subResults, subStatements)
+		(body ^. bodyResults, body ^. bodyBinds)
+	where update body (subResults, subBinds)
 		= body
 		& bodyResults .~ subResults
-		& bodyStatements .~ subStatements
+		& bodyBinds .~ subBinds
 
 eliminateAssign
-	:: ([Expression], [(IndicesList, Statement)])
-	-> ([Expression], [(IndicesList, Statement)])
-eliminateAssign (bodyResults, (statement:statements))
+	:: ([Expression], [Bind])
+	-> ([Expression], [Bind])
+eliminateAssign (bodyResults, (bind:binds))
 	= maybe follow id $ do
-		([name], Assign expr) <- Just statement
+		Bind [name] (Assign expr) <- Just bind
 		let subSingle = (,)
 			<$> traversed subOnce bodyResults
-			<*> (traversed . _2) subOnce statements
+			<*> traversed subOnce binds
 		case runReaderT subSingle (name, expr) of
 			Once bodyPair -> Just (eliminateAssign bodyPair)
 			None bodyPair -> Just (eliminateAssign bodyPair)
 			Ambiguous -> Nothing
 	where follow
-		= over _2 (statement:)
-		$ eliminateAssign (bodyResults, statements)
+		= over _2 (bind:)
+		$ eliminateAssign (bodyResults, binds)
 eliminateAssign bodyPair = bodyPair
 
 type SubOnceEnv = ((Name, Index), Expression)
@@ -70,6 +70,9 @@ instance SubOnce Statement where
 		>=> _ForStatement     subOnce
 		>=> _MultiIfStatement subOnce
 
+instance SubOnce Bind where
+	subOnce = bindStatement subOnce
+
 instance SubOnce ForCycle where
 	subOnce
 		 =  forRange subOnce
@@ -89,7 +92,7 @@ instance SubOnce Body where
 		unsafeBodySubOnce
 
 unsafeBodySubOnce
-	 =  (bodyStatements . traversed . _2) subOnce
+	 =  (bodyBinds   . traversed) subOnce
 	>=> (bodyResults . traversed) subOnce
 
 shadowedBy :: Monad m => [Name] -> ReaderT SubOnceEnv m Bool

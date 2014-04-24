@@ -18,7 +18,7 @@ cleanBody body = (bodyVars %~ M.filterWithKey cc) body where
 
 unsafeBodyCheckRef body = checkRef
 	[ CheckRef' (body ^. bodyResults)
-	, CheckRef' (body ^.. bodyStatements . traversed . _2)
+	, CheckRef' (body ^. bodyBinds)
 	]
 
 data CheckRef' = forall a . CheckRef a => CheckRef' a
@@ -52,6 +52,9 @@ instance CheckRef Statement where
 		BodyStatement body -> checkRef body
 		ForStatement forCycle -> checkRef forCycle
 		MultiIfStatement multiIfBranch -> checkRef multiIfBranch
+
+instance CheckRef Bind where
+	checkRef = checkRef . view bindStatement
 
 instance CheckRef ForCycle where
 	checkRef forCycle = do
