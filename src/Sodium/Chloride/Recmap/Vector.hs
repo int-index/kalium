@@ -1,88 +1,76 @@
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes, ConstraintKinds #-}
 module Sodium.Chloride.Recmap.Vector
 	( Recmapper
 	, Recmap
 	, recmapper
 	, recmapper'
-	, defaultRecmapper
 	, recmap
 	, recmapProgram
 	, recmapProgram'
 	, recmapFunc
 	, recmapBody
 	, recmapStatement
-	, RecmapEnv
+	, localizer
 	) where
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Reader
 import Control.Monad.Identity
 import Control.Lens
 import Sodium.Chloride.Program.Vector
-import qualified Data.Map as M
+import Data.Monoid
 
-type RecmapEnv = ReaderT Vars
+type Monad' a = (Applicative a, Monad a)
 
 recmapProgram' :: Recmapper Identity -> Program -> Program
 recmapProgram' rm = runIdentity . recmapProgram rm
 
-recmapProgram
-	:: (Applicative m, Monad m)
-	=> Recmapper m -> Program -> m Program
-recmapProgram rm
-	= (programFuncs . traversed) (recmapFunc rm)
+recmapProgram :: Monad' m => Recmapper m -> Program -> m Program
+recmapProgram rm = (programFuncs . traversed) (recmapFunc rm)
 
-recmapFunc
-	:: (Applicative m, Monad m)
-	=> Recmapper m -> Func -> m Func
-recmapFunc rm func = runReaderT
-	(funcBody (recmap rm) func)
-	(func ^. funcSig . funcParams)
+recmapFunc :: Monad' m => Recmapper m -> Func -> m Func
+recmapFunc rm func
+	= localizer rm (func ^. funcSig . funcParams)
+	$ funcBody (recmap rm) func
 
 data Recmapper m = Recmapper
-	{ recmapStatement :: Statement -> RecmapEnv m Statement
-	, recmapBody :: Body -> RecmapEnv m Body
+	{ recmapStatement :: Statement -> m Statement
+	, recmapBody :: Body -> m Body
+	, localizer :: forall a. Vars -> m a -> m a
 	}
 
-defaultRecmapper :: (Applicative m, Monad m) => Recmapper m
-defaultRecmapper = Recmapper return return
+instance Monad m => Monoid (Recmapper m) where
+	mappend rm1 rm2 = Recmapper
+		{ recmapStatement = recmapStatement rm1 <=< recmapStatement rm2
+		, recmapBody = recmapBody rm1 <=< recmapBody rm2
+		, localizer = \vars -> localizer rm1 vars . localizer rm2 vars
+		}
+	mempty = Recmapper return return (const id)
 
 class Recmap a where
-	recmapper
-		:: (Applicative m, Monad m)
-		=> (a -> RecmapEnv m a) -> Recmapper m
-	recmapmod
-		:: (Applicative m, Monad m)
-		=> Recmapper m -> (a -> RecmapEnv m a)
-	recmapdiv
-		:: (Applicative m, Monad m)
-		=> (forall b. Recmap b => b -> RecmapEnv m b) -> (a -> RecmapEnv m a)
+	recmapper :: Monad' m => (a -> m a) -> Recmapper m
+	recmapmod :: Monad' m => Recmapper m -> (a -> m a)
+	recmapdiv :: Monad' m => Recmapper m -> (a -> m a)
 
-recmap
-	:: (Applicative m, Monad m)
-	=> Recmapper m -> (forall a. Recmap a => a -> RecmapEnv m a)
-recmap rm
-	= recmapmod rm <=< recmapdiv (recmap rm)
+recmap :: Monad' m => Recmapper m -> (forall a. Recmap a => a -> m a)
+recmap rm = recmapmod rm <=< recmapdiv rm
 
-recmapper'
-	:: (Applicative m, Monad m)
-	=> Recmap a => (a -> a) -> Recmapper m
-recmapper' rm
-	= recmapper (return . rm)
+recmapper' :: Monad' m => Recmap a => (a -> a) -> Recmapper m
+recmapper' rm = recmapper (return . rm)
 
 instance Recmap Body where
-	recmapper rm = defaultRecmapper { recmapBody = rm }
+	recmapper rm = mempty { recmapBody = rm }
 	recmapmod rm = recmapBody rm
 	recmapdiv rm body
-		= local (M.union $ body ^. bodyVars)
-		$ (bodyBinds . traversed . bindStatement) rm body
+		= localizer rm (body ^. bodyVars)
+		$ (bodyBinds . traversed . bindStatement) (recmap rm) body
 
 instance Recmap Statement where
-	recmapper rm = defaultRecmapper { recmapStatement = rm }
+	recmapper rm = mempty { recmapStatement = rm }
 	recmapmod rm = recmapStatement rm
 	recmapdiv rm = onMultiIf <=< onBody <=< onFor where
+		rr = recmap rm
 		onMultiIf = _MultiIfStatement
-			$ (multiIfLeafs . traversed . _2) rm <=< multiIfElse rm
-		onFor = _ForStatement (forBody rm)
-		onBody = _BodyStatement rm
+			$ (multiIfLeafs . traversed . _2) rr <=< multiIfElse rr
+		onFor = _ForStatement (forBody rr)
+		onBody = _BodyStatement rr
