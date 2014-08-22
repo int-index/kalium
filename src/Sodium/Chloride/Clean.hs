@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 module Sodium.Chloride.Clean (clean) where
 
 import Control.Applicative
@@ -14,69 +13,62 @@ clean = recmapProgram' (recmapper' cleanBody)
 
 cleanBody :: Body -> Body
 cleanBody body = (bodyVars %~ M.filterWithKey cc) body where
-	cc name _ = runReader (unsafeBodyCheckRef body) name
+    cc name _ = runReader (checkRef $ bodyComponents body) name
 
-unsafeBodyCheckRef body = checkRef
-	[ CheckRef' (body ^. bodyResults)
-	, CheckRef' (body ^. bodyBinds)
-	]
-
-data CheckRef' = forall a . CheckRef a => CheckRef' a
-
-pairCheckRef' (a, b) = CheckRef' [CheckRef' a, CheckRef' b]
 
 class CheckRef a where
-	checkRef :: a -> Reader Name Bool
+    checkRef :: a -> Reader Name Bool
 
-instance CheckRef CheckRef' where
-	checkRef (CheckRef' a) = checkRef a
+
+-- Helper instances
 
 instance CheckRef a => CheckRef [a] where
-	checkRef as = or <$> traversed checkRef as
+    checkRef as = or <$> traversed checkRef as
+
+instance (CheckRef a, CheckRef b) => CheckRef (a, b) where
+    checkRef (a, b) = (||) <$> checkRef a <*> checkRef b
+
+
+-- Actual instances
 
 instance CheckRef Expression where
-	checkRef = \case
-		Primary _ -> return False
-		Access name' _ -> do
-			name <- ask
-			return (name == name')
-		Call _ exprs -> -- Check the operator?
-			checkRef exprs
-		Fold _ exprs range -> checkRef
-			[CheckRef' exprs, CheckRef' range]
+    checkRef = \case
+        Primary _ -> return False
+        Access name' _ -> do
+            name <- ask
+            return (name == name')
+        Call _ exprs -> -- Check the operator?
+            checkRef exprs
+        Fold _ exprs range -> checkRef (exprs, range)
 
 instance CheckRef Statement where
-	checkRef = \case
-		Execute _ exprs -> checkRef exprs
-		Assign expr -> checkRef expr
-		BodyStatement body -> checkRef body
-		ForStatement forCycle -> checkRef forCycle
-		MultiIfStatement multiIfBranch -> checkRef multiIfBranch
+    checkRef = \case
+        Execute _ exprs -> checkRef exprs
+        Assign expr -> checkRef expr
+        BodyStatement body -> checkRef body
+        ForStatement forCycle -> checkRef forCycle
+        MultiIfStatement multiIfBranch -> checkRef multiIfBranch
 
 instance CheckRef Bind where
-	checkRef = checkRef . view bindStatement
+    checkRef = checkRef . view bindStatement
 
 instance CheckRef ForCycle where
-	checkRef forCycle = do
-		shadowed <- shadowedBy (forCycle ^.. forArgIndices . traversed . _1)
-		let base =
-			[ CheckRef' (forCycle ^. forRange)
-			, CheckRef' (forCycle ^. forArgExprs)
-			]
-		let unsh = bool [CheckRef' (forCycle ^. forBody) ] [] shadowed
-		checkRef (base ++ unsh)
+    checkRef forCycle = do
+        shadowed <- shadowedBy (forCycle ^.. forArgIndices . traversed . _1)
+        let base = (forCycle ^. forRange, forCycle ^. forArgExprs)
+        let unsh = bool [forCycle ^. forBody] [] shadowed
+        checkRef (base, unsh)
 
 instance CheckRef MultiIfBranch where
-	checkRef multiIfBranch = checkRef
-		[ CheckRef' . map pairCheckRef'
-			$ (multiIfBranch ^. multiIfLeafs)
-		, CheckRef' (multiIfBranch ^. multiIfElse)
-		]
+    checkRef multiIfBranch = checkRef 
+        (multiIfBranch ^. multiIfLeafs, multiIfBranch ^. multiIfElse)
+
+bodyComponents body = (body ^. bodyResults, body ^. bodyBinds)
 
 instance CheckRef Body where
-	checkRef body = do
-		shadowed <- shadowedBy (body ^. bodyVars . to M.keys)
-		bool (unsafeBodyCheckRef body) (return False) shadowed
+    checkRef body = do
+        shadowed <- shadowedBy (body ^. bodyVars . to M.keys)
+        checkRef $ bool [bodyComponents body] [] shadowed
 
 shadowedBy :: [Name] -> Reader Name Bool
 shadowedBy names = (`elem` names) <$> ask
