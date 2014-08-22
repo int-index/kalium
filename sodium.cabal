@@ -35,11 +35,11 @@ library
                        Data.Stack
 
   build-depends:       base >=4.7 && <4.8,
-                       mtl >=2.1 && <2.2,
+                       mtl >=2.2 && <2.3,
                        containers >=0.5 && <0.6,
                        pretty >=1.1 && <1.2,
-                       lens >=4.0 && <4.2,
-                       profunctors >=4.0 && <4.1
+                       lens >=4.3 && <4.4,
+                       profunctors >=4.2 && <4.3
   ghc-options:         -W -O2
   default-extensions:  LambdaCase,
                        TupleSections,
