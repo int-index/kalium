@@ -65,5 +65,5 @@ localizer lc = mempty { localize = lc }
 
 -- Be careful! Not a valid setter:
 -- over recmapped f . over recmapped g /= over recmapped (f . g)
-recmapped :: (Monad' m, Recmappable t, RecmapMk a) => (a -> m a) -> (t -> m t)
+recmapped :: (Monad' m, Recmappable t, RecmapMk a) => LensLike' m t a
 recmapped = recmap . recmapper
