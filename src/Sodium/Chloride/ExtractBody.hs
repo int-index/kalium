@@ -6,7 +6,7 @@ import Sodium.Chloride.Program.Vector
 import Sodium.Chloride.Recmap.Vector
 
 extractBody :: Program -> Program
-extractBody = recmapProgram' (recmapper' extractBodyStatement)
+extractBody = over recmapped extractBodyStatement
 
 extractBodyStatement :: Statement -> Statement
 extractBodyStatement statement@(BodyStatement body)

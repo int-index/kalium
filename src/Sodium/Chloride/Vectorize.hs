@@ -120,7 +120,7 @@ vectorizeExpression = \case
 	Primary a -> return (Vec.Primary a)
 	Access name -> Vec.Access name <$> lookupIndex name
 	Call name exprs
-		 -> trace "WARNING: Call expressions are to be removed!"
+		 -> trace ("WARNING: Call expressions are to be removed!\n\t" ++ show (Call name exprs))
 		 $  Vec.Call name
 		<$> mapM vectorizeExpression exprs
 

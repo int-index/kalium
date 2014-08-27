@@ -10,7 +10,7 @@ import Sodium.ApplyOnce
 import Data.Bool
 
 inline :: Program -> Program
-inline = recmapProgram' (recmapper' inlineBody)
+inline = over recmapped inlineBody
 
 inlineBody body
 	= update body $ eliminateAssign

@@ -9,7 +9,7 @@ import Sodium.Chloride.Program.Vector
 import Sodium.Chloride.Recmap.Vector
 
 clean :: Program -> Program
-clean = recmapProgram' (recmapper' cleanBody)
+clean = over recmapped cleanBody
 
 cleanBody :: Body -> Body
 cleanBody body = (bodyVars %~ M.filterWithKey cc) body where
