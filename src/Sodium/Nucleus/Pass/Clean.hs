@@ -1,12 +1,12 @@
-module Sodium.Chloride.Clean (clean) where
+module Sodium.Nucleus.Pass.Clean (clean) where
 
 import Control.Applicative
 import Control.Lens hiding (Index, Fold)
 import Control.Monad.Reader
 import qualified Data.Map as M
 import Data.Bool
-import Sodium.Chloride.Program.Vector
-import Sodium.Chloride.Recmap.Vector
+import Sodium.Nucleus.Program.Vector
+import Sodium.Nucleus.Recmap.Vector
 
 clean :: Program -> Program
 clean = over recmapped cleanBody

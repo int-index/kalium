@@ -16,21 +16,21 @@ library
                        Sodium.Haskell.Program
                        Sodium.Haskell.Convert
                        Sodium.Haskell.Render
-                       Sodium.Chloride.Program
-                       Sodium.Chloride.Program.Scalar
-                       Sodium.Chloride.Program.Vector
-                       Sodium.Chloride.Vectorize
-                       Sodium.Chloride.Flatten
-                       Sodium.Chloride.JoinMultiIf
-                       Sodium.Chloride.IOMagic
-                       Sodium.Chloride.Inline
-                       Sodium.Chloride.FoldMatch
-                       Sodium.Chloride.ExtractBody
-                       Sodium.Chloride.Clean
-                       Sodium.Chloride.Side
-                       Sodium.Chloride.Recmap.Scalar
-                       Sodium.Chloride.Recmap.Vector
-                       Sodium.Chloride.Recmap
+                       Sodium.Nucleus.Program
+                       Sodium.Nucleus.Program.Scalar
+                       Sodium.Nucleus.Program.Vector
+                       Sodium.Nucleus.Vectorize
+                       Sodium.Nucleus.IOMagic
+                       Sodium.Nucleus.Side
+                       Sodium.Nucleus.Pass.Flatten
+                       Sodium.Nucleus.Pass.JoinMultiIf
+                       Sodium.Nucleus.Pass.Inline
+                       Sodium.Nucleus.Pass.FoldMatch
+                       Sodium.Nucleus.Pass.ExtractBody
+                       Sodium.Nucleus.Pass.Clean
+                       Sodium.Nucleus.Recmap.Scalar
+                       Sodium.Nucleus.Recmap.Vector
+                       Sodium.Nucleus.Recmap
                        Sodium.ApplyOnce
                        Data.Stack
 

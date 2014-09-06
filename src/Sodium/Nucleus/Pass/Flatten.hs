@@ -1,9 +1,9 @@
-module Sodium.Chloride.Flatten (flatten) where
+module Sodium.Nucleus.Pass.Flatten (flatten) where
 
 import Control.Lens
 import qualified Data.Map as M
-import Sodium.Chloride.Program.Scalar
-import Sodium.Chloride.Recmap.Scalar
+import Sodium.Nucleus.Program.Scalar
+import Sodium.Nucleus.Recmap.Scalar
 
 flatten :: Program -> Program
 flatten = over recmapped flattenBody

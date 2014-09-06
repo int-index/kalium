@@ -1,11 +1,11 @@
-module Sodium.Chloride.IOMagic (uncurse) where
+module Sodium.Nucleus.IOMagic (uncurse) where
 
 import Control.Monad.Reader
 import Control.Lens
 import qualified Data.Map as M
 import Data.Monoid
-import Sodium.Chloride.Program.Scalar
-import Sodium.Chloride.Recmap.Scalar
+import Sodium.Nucleus.Program.Scalar
+import Sodium.Nucleus.Recmap.Scalar
 
 data Error
     = NoAccess Name

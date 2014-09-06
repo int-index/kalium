@@ -1,9 +1,9 @@
-module Sodium.Chloride.ExtractBody (extractBody) where
+module Sodium.Nucleus.Pass.ExtractBody (extractBody) where
 
 import Control.Lens
 import qualified Data.Map as M
-import Sodium.Chloride.Program.Vector
-import Sodium.Chloride.Recmap.Vector
+import Sodium.Nucleus.Program.Vector
+import Sodium.Nucleus.Recmap.Vector
 
 extractBody :: Program -> Program
 extractBody = over recmapped extractBodyStatement

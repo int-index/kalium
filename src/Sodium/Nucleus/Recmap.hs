@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes, ConstraintKinds, TypeFamilies #-}
-module Sodium.Chloride.Recmap where
+module Sodium.Nucleus.Recmap where
 
 import Control.Applicative
 import Control.Monad

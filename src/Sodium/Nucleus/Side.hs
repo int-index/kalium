@@ -1,10 +1,10 @@
-module Sodium.Chloride.Side (side) where
+module Sodium.Nucleus.Side (side) where
 
 import Control.Lens (over)
 import Control.Monad.Writer
 import qualified Data.Map as M
-import Sodium.Chloride.Program.Scalar
-import Sodium.Chloride.Recmap.Scalar
+import Sodium.Nucleus.Program.Scalar
+import Sodium.Nucleus.Recmap.Scalar
 import Data.Stack
 
 side :: Program -> Program

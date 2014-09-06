@@ -1,14 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Sodium.Chloride.Program.Scalar
-	( module Sodium.Chloride.Program.Scalar
-	, module Sodium.Chloride.Program
+module Sodium.Nucleus.Program.Vector
+	( module Sodium.Nucleus.Program.Vector
+	, module Sodium.Nucleus.Program
 	) where
 
 import Control.Lens (prism', Simple, Prism)
 import Control.Lens.TH
 import qualified Data.Map as M
 
-import Sodium.Chloride.Program
+import Sodium.Nucleus.Program
 
 data Program
 	= Program
@@ -19,19 +19,24 @@ data Func
 	= Func
 	{ _funcSig :: FuncSig
 	, _funcBody :: Body
-	, _funcResults :: [Expression]
 	} deriving (Show)
 
 data Body
 	= Body
-	{ _bodyVars :: Vars
-	, _bodyStatements :: [Statement]
+	{ _bodyVars  :: Vars
+	, _bodyBinds :: [Bind]
+	, _bodyResults :: [Expression]
+	} deriving (Show)
+
+data Bind
+	= Bind
+	{ _bindIndices :: IndicesList
+	, _bindStatement :: Statement
 	} deriving (Show)
 
 data Statement
-	= Assign Name Expression
-	| SideCall Name Operator [Expression]
-	| Execute (Maybe Name) Operator [Expression]
+	= Assign Expression
+	| Execute Operator [Expression]
 	| ForStatement ForCycle
 	| MultiIfStatement MultiIfBranch
 	| BodyStatement Body
@@ -39,7 +44,9 @@ data Statement
 
 data ForCycle
 	= ForCycle
-	{ _forName :: Name
+	{ _forArgIndices :: IndicesList
+	, _forArgExprs :: [Expression]
+	, _forName :: Name
 	, _forRange :: Expression
 	, _forBody :: Body
 	} deriving (Show)
@@ -51,22 +58,29 @@ data MultiIfBranch
 	} deriving (Show)
 
 data Expression
-	= Access Name
+	= Access Name Index
+	| Fold Operator [Expression] Expression
 	| Call Operator [Expression]
 	| Primary Literal
-	deriving (Show)
+	deriving (Eq, Show)
 
-bodyEmpty :: Body
-bodyEmpty = Body M.empty []
+call OpId [arg] = arg
+call op args = Call op args
 
-bodySingleton :: Simple Prism Body Statement
-bodySingleton
-	= prism' (\s -> Body M.empty [s])
-	$ \case
-		Body vars [statement] | M.null vars -> Just statement
-		_ -> Nothing
+data Index
+	= Index Integer
+	| Immutable
+	| Uninitialized
+	deriving (Eq, Show)
+
+type Indices
+	= M.Map Name Index
+
+type IndicesList
+	= [(Name, Index)]
 
 makeLenses ''Func
+makeLenses ''Bind
 makeLenses ''Body
 makeLenses ''ForCycle
 makeLenses ''MultiIfBranch

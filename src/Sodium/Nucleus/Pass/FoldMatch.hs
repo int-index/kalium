@@ -1,7 +1,7 @@
-module Sodium.Chloride.FoldMatch (foldMatch) where
+module Sodium.Nucleus.Pass.FoldMatch (foldMatch) where
 
-import Sodium.Chloride.Program.Vector
-import Sodium.Chloride.Recmap.Vector
+import Sodium.Nucleus.Program.Vector
+import Sodium.Nucleus.Recmap.Vector
 import Control.Lens (over)
 import qualified Data.Map as M
 

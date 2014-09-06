@@ -1,11 +1,11 @@
-module Sodium.Chloride.Inline (inline) where
+module Sodium.Nucleus.Pass.Inline (inline) where
 
 import Control.Applicative
 import Control.Monad.Reader
 import Control.Lens hiding (Index, Fold)
 import qualified Data.Map as M
-import Sodium.Chloride.Program.Vector
-import Sodium.Chloride.Recmap.Vector
+import Sodium.Nucleus.Program.Vector
+import Sodium.Nucleus.Recmap.Vector
 import Sodium.ApplyOnce
 import Data.Bool
 

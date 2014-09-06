@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-module Sodium.Chloride.Vectorize (vectorize) where
+module Sodium.Nucleus.Vectorize (vectorize) where
 
 import Data.List
 import Control.Applicative
@@ -7,8 +7,8 @@ import Control.Monad.Reader
 import Control.Monad.State.Lazy
 import Control.Lens hiding (Index)
 import qualified Data.Map as M
-import Sodium.Chloride.Program.Scalar
-import qualified Sodium.Chloride.Program.Vector as Vec
+import Sodium.Nucleus.Program.Scalar
+import qualified Sodium.Nucleus.Program.Vector as Vec
 
 import Control.Exception
 import Data.Typeable

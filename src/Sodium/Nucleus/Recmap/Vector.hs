@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, RankNTypes, ConstraintKinds #-}
 
-module Sodium.Chloride.Recmap.Vector
+module Sodium.Nucleus.Recmap.Vector
     ( Recmapper
     , Recmap
     , recmapper
@@ -12,8 +12,8 @@ module Sodium.Chloride.Recmap.Vector
 import Control.Monad
 import Control.Lens
 import Data.Monoid
-import Sodium.Chloride.Recmap
-import Sodium.Chloride.Program.Vector
+import Sodium.Nucleus.Recmap
+import Sodium.Nucleus.Program.Vector
 
 data Vector
 

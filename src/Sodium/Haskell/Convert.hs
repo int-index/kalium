@@ -6,7 +6,7 @@ import Control.Monad
 import Control.Applicative
 import qualified Data.Map as M
 -- S for Src, D for Dest
-import qualified Sodium.Chloride.Program.Vector as S
+import qualified Sodium.Nucleus.Program.Vector as S
 import qualified Sodium.Haskell.Program as D
 
 convert :: S.Program -> D.Program

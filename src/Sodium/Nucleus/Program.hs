@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Sodium.Chloride.Program where
+module Sodium.Nucleus.Program where
 
 import Control.Lens.TH
 import qualified Data.Map as M

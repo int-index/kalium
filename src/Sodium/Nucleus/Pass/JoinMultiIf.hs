@@ -1,8 +1,8 @@
-module Sodium.Chloride.JoinMultiIf (joinMultiIf) where
+module Sodium.Nucleus.Pass.JoinMultiIf (joinMultiIf) where
 
 import Control.Lens
-import Sodium.Chloride.Program.Scalar
-import Sodium.Chloride.Recmap.Scalar
+import Sodium.Nucleus.Program.Scalar
+import Sodium.Nucleus.Recmap.Scalar
 
 joinMultiIf :: Program -> Program
 joinMultiIf = over recmapped joinMultiIfStatement
