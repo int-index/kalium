@@ -5,7 +5,6 @@ import Control.Applicative
 import Control.Monad
 import Data.Maybe (fromMaybe)
 import Control.Monad.State
-import Sodium.Tr (head, before, fallback, expect)
 import qualified Sodium.Pascal.Tokenize as T
 import Sodium.Pascal.Program
 
@@ -26,13 +25,36 @@ parse cs
 
 -- Useful combinators
 
-sepr elemTr opTr = tr where
-	tr = elemTr >>= next
-	next a = fallback a $ opTr <*> return a <*> tr
+head :: MonadPlus m => StateT [x] m x
+head = StateT $ \case
+	(x:xs) -> return (x, xs)
+	[] -> mzero
+
+fallback :: Alternative f => a -> f a -> f a
+fallback = flip (<|>) . pure
+
+expect :: (Eq x, MonadPlus m) => x -> StateT [x] m x
+expect x = mfilter (==x) head
 
 sepl elemTr opTr = elemTr >>= next where
 	next a = fallback a $ (opTr <*> return a <*> elemTr) >>= next
 
+sepb septok endtok elemTr = end <|> next where
+	end = expect endtok *> return []
+	next
+		 =  (:)
+		<$> elemTr
+		<*> (expect septok *> next <|> end)
+
+sepn elem1Tr elem2Tr opTr = do
+	elem1 <- elem1Tr
+	mOpf <- optional opfTr
+	return $ fromMaybe id mOpf elem1
+	where
+		opfTr = do
+			op <- opTr
+			elem2 <- elem2Tr
+			return $ flip (Binary op) elem2
 
 -- Syntactic definitions
 
@@ -152,26 +174,6 @@ caseBranchTr
 			 =  expect T.KwElse
 			 *> statementTr
 
-sodiumTr
-	=  expect T.SodiumSpecial
-	*> (snd <$> before nameTr (expect T.RBrace))
-
-sepb septok endtok elemTr = end <|> next where
-	end = expect endtok *> return []
-	next
-		 =  (:)
-		<$> elemTr
-		<*> (expect septok *> next <|> end)
-
-sepn elem1Tr elem2Tr opTr = do
-	elem1 <- elem1Tr
-	mOpf <- optional opfTr
-	return $ fromMaybe id mOpf elem1
-	where
-		opfTr = do
-			op <- opTr
-			elem2 <- elem2Tr
-			return $ flip (Binary op) elem2
 
 conditionTr
 	= sepn expressionTr expressionTr

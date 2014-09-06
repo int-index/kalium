@@ -31,7 +31,6 @@ library
                        Sodium.Chloride.Recmap.Scalar
                        Sodium.Chloride.Recmap.Vector
                        Sodium.Chloride.Recmap
-                       Sodium.Tr
                        Sodium.ApplyOnce
                        Data.Stack
 
