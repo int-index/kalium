@@ -31,7 +31,7 @@ library
                        Sodium.Nucleus.Recmap.Scalar
                        Sodium.Nucleus.Recmap.Vector
                        Sodium.Nucleus.Recmap
-                       Sodium.ApplyOnce
+                       Control.Monad.Counter
                        Data.Stack
 
   build-depends:       base >=4.7 && <4.8,

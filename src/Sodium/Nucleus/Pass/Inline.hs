@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 module Sodium.Nucleus.Pass.Inline (inline) where
 
 import Control.Applicative
@@ -6,7 +7,7 @@ import Control.Lens hiding (Index, Fold)
 import qualified Data.Map as M
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
-import Sodium.ApplyOnce
+import Control.Monad.Counter
 import Data.Bool
 
 inline :: Program -> Program
@@ -30,9 +31,8 @@ eliminateAssign (bodyResults, (bind:binds))
 			<$> traversed subOnce bodyResults
 			<*> traversed subOnce binds
 		case runReaderT subSingle (name, expr) of
-			Once bodyPair -> Just (eliminateAssign bodyPair)
-			None bodyPair -> Just (eliminateAssign bodyPair)
-			Ambiguous -> Nothing
+			Counter _ bodyPair -> Just (eliminateAssign bodyPair)
+			Done -> Nothing
 	where follow
 		= over _2 (bind:)
 		$ eliminateAssign (bodyResults, binds)
@@ -41,7 +41,7 @@ eliminateAssign bodyPair = bodyPair
 type SubOnceEnv = ((Name, Index), Expression)
 
 class SubOnce a where
-	subOnce :: a -> ReaderT SubOnceEnv ApplyOnce a
+	subOnce :: a -> ReaderT SubOnceEnv (Counter 1) a
 
 apUnless :: Monad m => (a -> m Bool) -> (a -> m a) -> (a -> m a)
 apUnless p f = \a -> p a >>= bool (f a) (return a)
@@ -52,7 +52,7 @@ instance SubOnce Expression where
 		Access name' j -> do
 			(name, expr) <- ask
 			if name == (name', j)
-				then lift (Once expr)
+				then lift (Counter 1 expr)
 				else return (Access name' j)
 		Call op exprs
 			 -> Call op
