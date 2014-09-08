@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, FunctionalDependencies #-}
 module Sodium.Haskell.Convert (convert) where
 
 import Data.List (genericReplicate)

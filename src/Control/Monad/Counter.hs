@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, DataKinds, ScopedTypeVariables #-}
+{-# LANGUAGE KindSignatures, DataKinds #-}
 module Control.Monad.Counter where
 
 import GHC.TypeLits
