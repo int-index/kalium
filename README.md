@@ -23,12 +23,14 @@ Then build the project itself with `cabal build`.
 extremely small command-line tool. There are three parts of the library:
 
 * Front-end: `Sodium.Pascal`
-* Core: `Sodium.Chloride`
+* Core: `Sodium.Nucleus`
 * Back-end: `Sodium.Haskell`
 
 The distinction between these parts is kept clear to allow front/back-ends for
 other languages in the future. The command-line tool isn't ready for use yet,
 and for now it's suitable for debug purposes only.
+
+There are also some helper modules, such as `Control.Monad.Counter`.
 
 
 ## Contributing
