@@ -8,20 +8,24 @@ import Control.Monad.State
 import qualified Sodium.Pascal.Tokenize as T
 import Sodium.Pascal.Program
 
+import qualified Text.Parsec as P
+
+-- temporary!
+
+tokenize :: String -> Either P.ParseError [T.Token]
+tokenize = P.parse tokenizer ""
+
+tokenizer :: P.Parsec String () [T.Token]
+tokenizer = T.lexer cont where
+    cont T.EOF = return []
+    cont token = (token:) <$> tokenizer
+
 parse :: String -> Program
-parse cs
-	= either error id
-	$ maybe abort verify (runStateT programTr xs)
-	where
-		(csBad, xs) = T.tokenize cs
-		isDot (T.Dot:_) = True
-		isDot _ = False
-		verify (program, xs)
-			| isDot xs  = Right program
-			| otherwise = abort
-		abort
-			| null csBad = Left "Sodium.Pascal.Parse"
-			| otherwise  = Left "Sodium.Pascal.Tokenize"
+parse cs = case tokenize cs of
+    Left msg -> error (show msg)
+    Right ts -> maybe (error "no parse") verify (runStateT programTr ts)
+    where verify (program, (T.Dot:_)) = program
+          verify _ = error "not a dot"
 
 -- Useful combinators
 

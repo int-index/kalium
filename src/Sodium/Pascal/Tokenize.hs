@@ -1,12 +1,12 @@
-module Sodium.Pascal.Tokenize (tokenize, Token(..)) where
+module Sodium.Pascal.Tokenize (tokenCC, Token(..)) where
 
-import Prelude hiding (head)
-import Control.Applicative
+import Data.Functor
 import Control.Monad
-import Control.Monad.Writer
-import Control.Monad.State
-import Control.Lens (Cons, uncons)
-import qualified Data.Char as C
+
+import Data.Char (toLower)
+import qualified Data.HashMap.Strict as M
+
+import Text.Parsec
 
 data Token
     = KwVar
@@ -47,104 +47,120 @@ data Token
     | Quote String
     | LSqBrace
     | RSqBrace
+    | EOF
     deriving (Eq, Show)
 
--- Useful combinators
+type P u a = Parsec String u a
 
-head :: (Cons xs xs x x, MonadPlus m) => StateT xs m x
-head = StateT $ \xs -> maybe mzero return (uncons xs)
+tokenCC :: (Token -> P u a) -> P u a
+tokenCC cont = pToken' >>= cont
 
-fallback :: Alternative f => a -> f a -> f a
-fallback = flip (<|>) . pure
+pToken' :: P u Token
+pToken' = do pSkip
+             pToken <|> pEOF
 
-expect :: (Cons xs xs x x, Eq x, MonadPlus m) => x -> StateT xs m x
-expect x = mfilter (==x) head
+pEOF :: P u Token
+pEOF = EOF <$ eof
 
+pToken :: P u Token
+pToken = choice [pPunct, pNumber, pName, pQuote] <?> "token"
 
--- Lexical definitions
-
-tokenize :: String -> (String, [Token])
-tokenize = runWriter . tokenize'
-
-tokenize' :: String -> Writer [Token] String
-tokenize' cs
-    = maybe (return cs) (uncurry k) (runStateT token' cs)
-    where k x cs = tell x >> tokenize' cs
-
-token' :: Alternative f => StateT String Maybe (f Token)
-token' = (pure <$> token) <|> (empty <$ ignored)
-
-token :: StateT String Maybe Token
-token
-     =  LParen <$ expect '('
-    <|> RParen <$ expect ')'
-    <|> LSqBrace <$ expect '['
-    <|> RSqBrace <$ expect ']'
-    <|> Plus  <$ expect '+'
-    <|> Minus <$ expect '-'
-    <|> Asterisk <$ expect '*'
-    <|> Slash <$ expect '/'
-    <|> Comma <$ expect ','
-    <|> Semicolon <$ expect ';'
-    <|> EqSign <$ expect '='
-    <|> Suck <$ expect '<'
-    <|> Blow <$ expect '>'
-    <|> expect '.' *> fallback Dot (DoubleDot <$ expect '.')
-    <|> expect ':' *> fallback Colon (Assign <$ expect '=')
-    <|> number
-    <|> name
-    <|> quote
-
-ignored = void (some whitespace) <|> comment
-
-name = mangle <$> some (letter <|> expect '_') where
-    mangle cs = maybe (Name cs) id (lookup cs keywords)
-    keywords =
-        [ ("var", KwVar)
-        , ("begin", KwBegin)
-        , ("end", KwEnd)
-        , ("for", KwFor)
-        , ("to", KwTo)
-        , ("do", KwDo)
-        , ("function", KwFunction)
-        , ("true", KwTrue)
-        , ("false", KwFalse)
-        , ("and", KwAnd)
-        , ("or", KwOr)
-        , ("if", KwIf)
-        , ("then", KwThen)
-        , ("else", KwElse)
-        , ("case", KwCase)
-        , ("of", KwOf)
+pPunct :: P u Token
+pPunct = choice
+   [ char '(' >> choice
+        [ char '.' $> LSqBrace
+        , return LParen
         ]
+   , char ')' $> RParen
+   , char '[' $> LSqBrace
+   , char ']' $> RSqBrace
+   , char '+' $> Plus
+   , char '-' $> Minus
+   , char '*' $> Asterisk
+   , char '/' $> Slash
+   , char ',' $> Comma
+   , char ';' $> Semicolon
+   , char '=' $> EqSign
+   , char '<' $> Suck
+   , char '>' $> Blow
+   , char '.' >> choice
+        [ char '.' $> DoubleDot
+        , char ')' $> RSqBrace
+        , return Dot
+        ]
+   , char ':' >> choice
+        [ char '=' $> Assign
+        , return Colon
+        ]
+   ]
 
-number = do
-    let sign = fallback True
-             $ (True <$ expect '+') <|> (False <$ expect '-')
-    intSection <- some digit
-    fallback (INumber intSection) $ do
-        expect '.'
-        fracSection <- some digit
-        fallback (FNumber intSection fracSection) $ do
-            expect 'e'
-            eSign <- sign
-            eSection <- some digit
-            return (ENumber intSection fracSection eSign eSection)
+pSign :: P u Bool
+pSign = choice
+      [ char '+' $> True
+      , char '-' $> False
+      , return True
+      ]
 
-quote = Quote <$> (qmark *> quote') where
-    qmark = expect '\''
-    quote'
-         =  qmark *> fallback "" (next qmark)
-        <|> next head
-    next x = (:) <$> x <*> quote'
+pNumber :: P u Token
+pNumber = do
+    intSection <- many1 digit
+    try (pFloat intSection)
+        <|> return (INumber intSection)
 
-comment = expect '{' *> comment' where
-    comment'
-         =  void (expect '}')
-        <|> (comment <|> void head) *> comment'
+pFloat :: String -> P u Token
+pFloat intSection = do
+    char '.'
+    fracSection <- many1 digit
+    try (pExp intSection fracSection)
+        <|> return (FNumber intSection fracSection)
 
-whitespace = mfilter C.isSpace head
+pExp :: String -> String -> P u Token
+pExp intSection fracSection = do
+    char 'e' <|> char 'E'
+    eSign <- pSign
+    eSection <- many1 digit
+    return (ENumber intSection fracSection eSign eSection)
 
-letter = C.toLower <$> mfilter C.isAlphaNum head
+pName :: P u Token
+pName = let gen p = char '_' <|> fmap toLower p
+            ident = liftM2 (:) (gen letter) (many $ gen alphaNum)
+        in fmap mangle ident
 
-digit = mfilter C.isDigit head
+mangle :: String -> Token
+mangle cs = maybe (Name cs) id (M.lookup cs keywords)
+
+keywords :: M.HashMap String Token
+keywords = M.fromList
+    [ ("var"     , KwVar)
+    , ("begin"   , KwBegin)
+    , ("end"     , KwEnd)
+    , ("for"     , KwFor)
+    , ("to"      , KwTo)
+    , ("do"      , KwDo)
+    , ("function", KwFunction)
+    , ("true"    , KwTrue)
+    , ("false"   , KwFalse)
+    , ("and"     , KwAnd)
+    , ("or"      , KwOr)
+    , ("if"      , KwIf)
+    , ("then"    , KwThen)
+    , ("else"    , KwElse)
+    , ("case"    , KwCase)
+    , ("of"      , KwOf)
+    ]
+
+pQuote :: P u Token
+pQuote = fmap Quote (char qmark >> quote') where
+    qmark  = '\''
+    quote' = anyChar >>= next
+    next c | c == qmark = liftM2 (:) (char qmark) quote' <|> return ""
+           | otherwise  = liftM2 (:) (return c)   quote'
+
+pSkip :: P u ()
+pSkip = skipMany (void space <|> pComment)
+
+pComment :: P u ()
+pComment = void comment <?> "comment"
+         where comment = open >> manyTill anyChar close
+               open  = void (char '{') <|> void (try $ string "(*")
+               close = void (char '}') <|> void (try $ string "*)")
