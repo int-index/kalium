@@ -47,6 +47,7 @@ data Token
     | Quote String
     | LSqBrace
     | RSqBrace
+    | Unknown Char
     | EOF
     deriving (Eq, Show)
 
@@ -57,10 +58,13 @@ tokenCC cont = pToken' >>= cont
 
 pToken' :: P u Token
 pToken' = do pSkip
-             pToken <|> pEOF
+             pToken <|> pEOF <|> pUnknown
 
 pEOF :: P u Token
 pEOF = EOF <$ eof
+
+pUnknown :: P u Token
+pUnknown = Unknown <$> anyChar
 
 pToken :: P u Token
 pToken = choice [pPunct, pNumber, pName, pQuote] <?> "token"
