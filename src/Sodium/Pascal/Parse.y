@@ -58,6 +58,11 @@ import qualified Text.Parsec as P
     quote    { T.Quote $$  }
     unknown  { T.Unknown _ }
 
+%nonassoc '<' '>' '='
+%left     '+' '-' or
+%left     '*' '/' and
+%left     NEG POS
+
 %%
 
 Program : Funcs Vars Body '.' { Program (reverse $1) $2 $3 }
@@ -135,8 +140,39 @@ CaseClause : Ranges ':' Statement_ ';' { (reverse $1, $3) }
 Ranges : Range            { $1 : [] }
        | Ranges ',' Range { $3 : $1 }
 
-Range :                 Expression { $1 }
-      | Expression '..' Expression { Binary OpRange $1 $3 }
+Range :                  Expression_ { $1 }
+      | Expression_ '..' Expression_ { Binary OpRange $1 $3 }
+
+Expression : Expression '<' Expression { Binary OpLess   $1 $3 }
+           | Expression '>' Expression { Binary OpMore   $1 $3 }
+           | Expression '=' Expression { Binary OpEquals $1 $3 }
+           | Expression_ { $1 }
+
+Expression_ : Expression '+' Expression { Binary OpAdd      $1 $3 }
+            | Expression '-' Expression { Binary OpSubtract $1 $3 }
+            | Expression  or Expression { Binary OpOr       $1 $3 }
+
+            | Expression '*' Expression { Binary OpMultiply $1 $3 }
+            | Expression '/' Expression { Binary OpDivide   $1 $3 }
+            | Expression and Expression { Binary OpAnd      $1 $3 }
+
+            | '-' Expression %prec NEG  { Unary UOpNegate $2 }
+            | '+' Expression %prec POS  { Unary UOpPlus   $2 }
+
+            | '(' Expression ')' { $2 }
+            |     Atom           { $1 }
+
+            | Call { $1 }
+
+Atom : name  { Access $1 }
+     | true  { BTrue     }
+     | false { BFalse    }
+     | inumber { match_inumber $1 }
+     | fnumber { match_fnumber $1 }
+     | enumber { match_enumber $1 }
+     | quote   { Quote $1 }
+
+Call : name Arguments { Call $1 $2 }
 
 {-
 TODO:
@@ -145,7 +181,6 @@ TODO:
     Type
 -}
 
-Expression: name { Access $1 }
 Arguments : '(' ')' { [] }
 Type      : name { PasType $1 }
 
@@ -153,6 +188,11 @@ Type      : name { PasType $1 }
 parseErr _ = mzero
 
 parse = either (error.show) id . P.parse parser ""
+
+match_inumber (T.INumber i      ) = INumber i
+match_fnumber (T.FNumber i f    ) = FNumber i f
+match_enumber (T.ENumber i f s e) = ENumber i f s e
+
 
 tokenize :: String -> Either P.ParseError [T.Token]
 tokenize = P.parse tokenizer "" where
