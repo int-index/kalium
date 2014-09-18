@@ -129,8 +129,11 @@ ThenClause : then Statement_ { $2 }
 ElseClause :                 { Nothing }
            | else Statement_ { Just $2 }
 
-CaseStatement : case       Expression of CaseClauses  ElseClause end
+CaseStatement : case       Expression of CaseClauses  CaseElseClause end
               { CaseBranch $2            (reverse $4) $5 }
+
+CaseElseClause :                 { Nothing }
+               | else Statements { Just (BodyStatement $2) }
 
 CaseClauses :                        {      [] }
             | CaseClauses CaseClause { $2 : $1 }
@@ -174,15 +177,12 @@ Atom : name  { Access $1 }
 
 Call : name Arguments { Call $1 $2 }
 
-{-
-TODO:
-    Expression
-    Arguments
-    Type
--}
+Type : name { match_type $1 }
 
-Arguments : '(' ')' { [] }
-Type      : name { PasType $1 }
+Arguments  : '(' Arguments_ ')' { reverse $2 }
+Arguments_ :                           {      [] }
+           |                Expression { $1 : [] }
+           | Arguments_ ',' Expression { $3 : $1 }
 
 {
 parseErr _ = mzero
@@ -193,6 +193,13 @@ match_inumber (T.INumber i      ) = INumber i
 match_fnumber (T.FNumber i f    ) = FNumber i f
 match_enumber (T.ENumber i f s e) = ENumber i f s e
 
+match_type t = case t of
+    "integer" -> PasInteger
+    "longint" -> PasLongInt
+    "real"    -> PasReal
+    "boolean" -> PasBoolean
+    "string"  -> PasString
+    _         -> PasType t
 
 tokenize :: String -> Either P.ParseError [T.Token]
 tokenize = P.parse tokenizer "" where
