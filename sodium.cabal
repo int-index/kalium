@@ -38,7 +38,7 @@ library
                        mtl >=2.2 && <2.3,
                        containers >=0.5 && <0.6,
                        pretty >=1.1 && <1.2,
-                       lens >=4.3 && <4.4,
+                       lens >=4.4 && <4.5,
                        profunctors >=4.2 && <4.3
   ghc-options:         -W -O2
   default-extensions:  LambdaCase,
