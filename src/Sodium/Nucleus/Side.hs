@@ -45,22 +45,10 @@ sideExpression = \case
 
 sideMultiIf :: MultiIfBranch -> Stack Name Body
 sideMultiIf multiIfBranch = do
-    (leafs, xs) <- runWriterT (sideMultiIfLeafs $ view multiIfLeafs multiIfBranch)
+    (leafs, xs) <- runWriterT (mapM (_1 sideExpression) $ view multiIfLeafs multiIfBranch)
     let (vardecls, assigns) = partitionEithers xs
     let statements = assigns ++ [MultiIfStatement $ set multiIfLeafs leafs multiIfBranch]
     return $ Body (M.fromList vardecls) statements
-
-sideMultiIfLeafs
-    :: [(Expression, Body)]
-    -> WriterT [Either VarDecl Statement] (Stack Name) [(Expression, Body)]
-sideMultiIfLeafs leafs = do
-    forM leafs  $ \(expr, body) -> do
-        name <- pop
-        let vardecl = (name, ClVoid) -- TODO: the real type
-        tell [Left vardecl]
-        assign <- lift (sideAssign name expr)
-        tell [Right $ BodyStatement assign]
-        return (Access name, body)
 
 sideExecute :: Maybe Name -> Operator -> [Expression] -> Stack Name Body
 sideExecute mname op exprs = do
