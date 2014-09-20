@@ -20,7 +20,7 @@ translate = dimap fromPascal toHaskell onNucleus where
     fromPascal = P.convert . parse
     toHaskell  = render . H.convert
     onNucleus = dimap onScalar onVector vectorize
-    onScalar = uncurse . fff (flatten . joinMultiIf) . side
+    onScalar = fff (flatten . joinMultiIf) . side . uncurse
     onVector = fff (inline . foldMatch . extractBody . clean)
 
 fff f = (!!42) . iterate f

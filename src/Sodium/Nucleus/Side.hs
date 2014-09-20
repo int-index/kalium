@@ -18,6 +18,7 @@ sideStatement :: Statement -> Stack Name Statement
 sideStatement = \case
     Assign name expr -> BodyStatement <$> sideAssign name expr
     MultiIfStatement multiIfBranch -> BodyStatement <$> sideMultiIf multiIfBranch
+    Execute mname op exprs -> BodyStatement <$> sideExecute mname op exprs
     statement -> return statement
 
 sideAssign :: Name -> Expression -> Stack Name Body
@@ -59,3 +60,10 @@ sideMultiIfLeafs leafs = do
         assign <- lift (sideAssign name expr)
         tell [Right $ BodyStatement assign]
         return (Access name, body)
+
+sideExecute :: Maybe Name -> Operator -> [Expression] -> Stack Name Body
+sideExecute mname op exprs = do
+    (exprs', xs) <- runWriterT $ mapM sideExpression exprs
+    let (vardecls, sidecalls) = partitionEithers xs
+    let statements = sidecalls ++ [Execute mname op exprs']
+    return $ Body (M.fromList vardecls) statements
