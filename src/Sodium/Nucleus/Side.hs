@@ -19,6 +19,7 @@ sideStatement = \case
     Assign name expr -> BodyStatement <$> sideAssign name expr
     MultiIfStatement multiIfBranch -> BodyStatement <$> sideMultiIf multiIfBranch
     Execute mname op exprs -> BodyStatement <$> sideExecute mname op exprs
+    ForStatement forCycle -> BodyStatement <$> sideForCycle forCycle
     statement -> return statement
 
 sideAssign :: Name -> Expression -> Stack Name Body
@@ -66,4 +67,11 @@ sideExecute mname op exprs = do
     (exprs', xs) <- runWriterT $ mapM sideExpression exprs
     let (vardecls, sidecalls) = partitionEithers xs
     let statements = sidecalls ++ [Execute mname op exprs']
+    return $ Body (M.fromList vardecls) statements
+
+sideForCycle :: ForCycle -> Stack Name Body
+sideForCycle forCycle = do
+    (expr, xs) <- runWriterT (sideExpression $ view forRange forCycle)
+    let (vardecls, sidecalls) = partitionEithers xs
+    let statements = sidecalls ++ [ForStatement $ set forRange expr forCycle]
     return $ Body (M.fromList vardecls) statements
