@@ -10,12 +10,14 @@ extractBody = over recmapped extractBodyStatement
 
 extractBodyStatement :: Statement -> Statement
 extractBodyStatement statement@(BodyStatement body)
-	= maybe statement Assign (bodyMatch body)
+    = maybe statement Assign (bodyMatch body)
 extractBodyStatement statement = statement
 
 bodyMatch body
-	| M.null (body ^. bodyVars) && null (body ^. bodyBinds)
-	= case body ^. bodyResults of
-		[expr] -> Just expr
-		_ -> Nothing
+    | M.null (body ^. bodyVars) && null (body ^. bodyBinds)
+    = case body ^. bodyResults of
+        [expr] -> Just expr
+        _ -> Nothing
+        -- TODO: just wrap bodyResults in a tuple
+        --       to allow multiple expressions
 bodyMatch _ = Nothing

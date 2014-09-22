@@ -24,6 +24,7 @@ lambda pats expr = H.Lambda H.noLoc pats (matchExpression expr)
 
 typed expr ty = H.ExpTypeSig H.noLoc (matchExpression expr) ty
 
+patTuple []     = H.PWildCard
 patTuple [name] = H.PVar (H.Ident name)
 patTuple names  = H.PTuple H.Boxed . map H.PVar $ map H.Ident names
 
@@ -73,6 +74,7 @@ ifExpression expr1 expr2 expr3 = H.If
 doexpr [H.Qualifier exp] = exp
 doexpr stmts = H.Do stmts
 
+doBind H.PWildCard expr = doExecute expr
 doBind pat expr = H.Generator H.noLoc pat (matchExpression expr)
 doExecute  expr = H.Qualifier (matchExpression expr)
 doLet  pat expr = H.LetStmt (H.BDecls [valueDef pat expr])
