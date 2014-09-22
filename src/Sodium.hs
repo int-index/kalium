@@ -10,7 +10,7 @@ import Sodium.Nucleus.Pass.FoldMatch   (foldMatch)
 import Sodium.Nucleus.Pass.ExtractBody (extractBody)
 import Sodium.Nucleus.Pass.Clean       (clean)
 import Sodium.Pascal.Parse   (parse)
-import Sodium.Haskell.Render (render)
+import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified  Sodium.Pascal.Convert as P (convert)
 import qualified Sodium.Haskell.Convert as H (convert)
 import Data.Profunctor
@@ -18,7 +18,7 @@ import Data.Profunctor
 translate :: String -> String
 translate = dimap fromPascal toHaskell onNucleus where
     fromPascal = P.convert . parse
-    toHaskell  = render . H.convert
+    toHaskell  = prettyPrint . H.convert
     onNucleus = dimap onScalar onVector vectorize
     onScalar = fff (flatten . joinMultiIf) . side . uncurse
     onVector = fff (inline . foldMatch . extractBody . clean)

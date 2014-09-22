@@ -8,23 +8,20 @@ import qualified Data.Map as M
 -- S for Src, D for Dest
 import qualified Sodium.Nucleus.Program.Vector as S
 import qualified Sodium.Haskell.Program as D
+import qualified Language.Haskell.Exts as H
 
-convert :: S.Program -> D.Program
+convert :: S.Program -> H.Module
 convert = maybe (error "Sodium.Haskell.Convert") id . conv
 
 class Conv s d | s -> d where
 	conv :: s -> Maybe d
 
-instance Conv S.Program D.Program where
+instance Conv S.Program H.Module where
 	conv (S.Program funcs) = do
 		funcDefs <- mapM conv funcs
-		return $ D.Program (map D.Def funcDefs)
-			[ "Control.Monad"
-			, "Control.Applicative"
-			]
-			[ "LambdaCase"
-			, "TupleSections"
-			]
+		return $ D.program funcDefs
+			(D.extensions ["LambdaCase", "TupleSections"])
+			(map D.importDecl ["Control.Monad", "Control.Applicative"])
 
 transformName :: S.Name -> D.Name
 transformName = \case
@@ -61,42 +58,42 @@ instance Conv Name D.Name where
 		S.Immutable -> return $ "const'" ++ transformName name
 		S.Uninitialized -> return "undefined"
 
-instance Conv S.ClType D.HsType where
+instance Conv S.ClType H.Type where
 	conv = return . \case
-		S.ClInteger -> D.HsType "Int"
-		S.ClDouble  -> D.HsType "Double"
-		S.ClBoolean -> D.HsType "Bool"
-		S.ClString  -> D.HsType "String"
-		S.ClVoid -> D.HsUnit
+		S.ClInteger -> D.hsType "Int"
+		S.ClDouble  -> D.hsType "Double"
+		S.ClBoolean -> D.hsType "Bool"
+		S.ClString  -> D.hsType "String"
+		S.ClVoid -> D.hsUnit
 
 newtype Pure a = Pure a
 
-instance Conv S.Body D.Expression where
+instance Conv S.Body H.Exp where
 	conv (S.Body _ statements resultExprs) = do
 		hsStatements <- mapM conv statements
 		hsRetValues <- mapM conv resultExprs
 		let hsStatement
-			= D.DoExecute
-			$ D.Beta (D.Access "return")
-			$ D.Tuple hsRetValues
-		return $ D.DoExpression (hsStatements ++ [hsStatement])
+			= D.doExecute
+			$ D.beta (D.access "return")
+			$ D.expTuple hsRetValues
+		return $ D.doexpr (hsStatements ++ [hsStatement])
 
-instance Conv S.ForCycle D.Expression where
+instance Conv S.ForCycle H.Exp where
 	conv (S.ForCycle argIndices argExprs name exprRange clBody) = do
 		hsRange <- conv exprRange
-		hsArgExpr <- D.Tuple <$> mapM conv argExprs
+		hsArgExpr <- D.expTuple <$> mapM conv argExprs
 		hsFoldLambda <- conv (FoldLambda argIndices name) <*> conv clBody
-		return $ beta
-			[ D.Access "foldM"
+		return $ betaL
+			[ D.access "foldM"
 			, hsFoldLambda
 			, hsArgExpr
 			, hsRange
 			]
 
-instance Conv S.MultiIfBranch D.Expression where
+instance Conv S.MultiIfBranch H.Exp where
 	conv (S.MultiIfBranch leafs bodyElse) = do
 		let convLeaf (expr, body)
-			 =  D.IfExpression
+			 =  D.ifExpression
 			<$> conv expr
 			<*> conv body
 		leafGens <- mapM convLeaf leafs
@@ -104,63 +101,63 @@ instance Conv S.MultiIfBranch D.Expression where
 		return $ foldr ($) hsBodyElse leafGens
 
 --TODO: Bind/Let inference
-instance Conv S.Bind D.DoStatement where
+instance Conv S.Bind H.Stmt where
 	conv (S.Bind retIndices (S.Execute (S.OpReadLn t) []))
-		 =  D.DoBind
-		<$> (D.PatTuple <$> conv (IndicesList retIndices))
+		 =  D.doBind
+		<$> (D.patTuple <$> conv (IndicesList retIndices))
 		<*> if t == S.ClString
-			then return $ D.Access "getLine"
+			then return $ D.access "getLine"
 			else do
 				hsType <- conv t
-				return $ D.Access "readLn" `D.Typed` D.HsIO hsType
+				return $ D.access "readLn" `D.typed` D.hsIO hsType
 	conv (S.Bind [] (S.Execute S.OpPrintLn args))
 		= case args of
 			[S.Call S.OpShow [arg]]
-				-> D.DoExecute . D.Beta (D.Access "print") <$> conv arg
+				-> D.doExecute . D.beta (D.access "print") <$> conv arg
 			args -> (<$> mapM conv args) $ \case
-				[] -> D.DoExecute
-					$ D.Beta (D.Access "putStrLn") (D.Primary (D.Quote ""))
+				[] -> D.doExecute
+					$ D.beta (D.access "putStrLn") (D.primary (D.quote ""))
 				hsExprs
-					-> D.DoExecute
-					 $ D.Beta (D.Access "putStrLn")
-					 $ foldl1 (\x y -> beta [D.Access "++", x, y])
+					-> D.doExecute
+					 $ D.beta (D.access "putStrLn")
+					 $ foldl1 (\x y -> betaL [D.access "++", x, y])
 					 $ hsExprs
 	conv (S.Bind retIndices (S.Assign expr))
-		 =  D.DoLet
-		<$> (D.PatTuple <$> conv (IndicesList retIndices))
+		 =  D.doLet
+		<$> (D.patTuple <$> conv (IndicesList retIndices))
 		<*> conv expr
 	conv (S.Bind retIndices (S.ForStatement forCycle))
-		 =  D.DoBind
-		<$> (D.PatTuple <$> conv (IndicesList retIndices))
+		 =  D.doBind
+		<$> (D.patTuple <$> conv (IndicesList retIndices))
 		<*> conv forCycle
 	conv (S.Bind retIndices (S.MultiIfStatement multiIfBranch))
-		 =  D.DoBind
-		<$> (D.PatTuple <$> conv (IndicesList retIndices))
+		 =  D.doBind
+		<$> (D.patTuple <$> conv (IndicesList retIndices))
 		<*> conv multiIfBranch
 	conv (S.Bind retIndices (S.BodyStatement body))
-		 =  D.DoBind
-		<$> (D.PatTuple <$> conv (IndicesList retIndices))
+		 =  D.doBind
+		<$> (D.patTuple <$> conv (IndicesList retIndices))
 		<*> conv body
 
-instance Conv S.Func D.ValueDef where
+instance Conv S.Func H.Decl where
 	conv (S.Func (S.FuncSig S.NameMain params S.ClVoid) clBody) = do
 		guard $ M.null params
 		hsBody <- conv clBody
-		return $ D.ValueDef (D.PatFunc "main" []) hsBody
+		return $ D.funcDef "main" [] hsBody
 	conv (S.Func (S.FuncSig name params _) clBody)
-		 =  D.ValueDef (D.PatFunc (transformName name) paramNames)
+		 = D.funcDef (transformName name) paramNames
 		<$> conv (Pure clBody)
 		where paramNames = map transformName (M.keys params)
 
 data FoldLambda = FoldLambda S.IndicesList S.Name
 
-instance Conv FoldLambda (D.Expression -> D.Expression) where
+instance Conv FoldLambda (H.Exp -> H.Exp) where
 	conv (FoldLambda indices name) = do
 		hsNames <- conv (IndicesList indices)
 		hsName <- conv (Name name S.Immutable)
-		return $ D.Lambda [D.PatTuple hsNames, D.PatTuple [hsName]]
+		return $ D.lambda [D.patTuple hsNames, D.patTuple [hsName]]
 
-instance Conv (Pure S.Body) D.Expression where
+instance Conv (Pure S.Body) H.Exp where
 	conv (Pure (S.Body _ statements resultExprs)) = msum
 		[ do
 			name1 <- case resultExprs of
@@ -188,33 +185,33 @@ instance Conv (Pure S.Body) D.Expression where
 		, do
 			hsValueDefs <- mapM conv (map Pure statements)
 			hsRetValues <- mapM conv resultExprs
-			return $ pureLet hsValueDefs (D.Tuple hsRetValues)
+			return $ pureLet hsValueDefs (D.expTuple hsRetValues)
 		]
 
-instance Conv (Pure S.MultiIfBranch) D.Expression where
+instance Conv (Pure S.MultiIfBranch) H.Exp where
 	conv (Pure (S.MultiIfBranch leafs bodyElse)) = do
 		let convLeaf (expr, body)
-			 =  D.IfExpression
+			 =  D.ifExpression
 			<$> conv expr
 			<*> conv (Pure body)
 		leafGens <- mapM convLeaf leafs
 		hsBodyElse <- conv (Pure bodyElse)
 		return $ foldr ($) hsBodyElse leafGens
 
-instance Conv (Pure S.ForCycle) D.Expression where
+instance Conv (Pure S.ForCycle) H.Exp where
 	conv (Pure (S.ForCycle argIndices argExprs name exprRange clBody)) = do
 		hsRange <- conv exprRange
-		hsArgExpr <- D.Tuple <$> mapM conv argExprs
+		hsArgExpr <- D.expTuple <$> mapM conv argExprs
 		hsFoldLambda
 			<-  conv (FoldLambda argIndices name)
 			<*> conv (Pure clBody)
-		return $ beta [D.Access "foldl", hsFoldLambda, hsArgExpr, hsRange]
+		return $ betaL [D.access "foldl", hsFoldLambda, hsArgExpr, hsRange]
 
 
-instance Conv (Pure S.Bind) D.ValueDef where
+instance Conv (Pure S.Bind) H.Decl where
 	conv (Pure (S.Bind retIndices statement))
-		 =  D.ValueDef
-		<$> (D.PatTuple <$> conv (IndicesList retIndices))
+		 =  D.valueDef
+		<$> (D.patTuple <$> conv (IndicesList retIndices))
 		<*> case statement of
 			S.Assign expr -> conv expr
 			S.ForStatement forCycle -> conv (Pure forCycle)
@@ -222,35 +219,36 @@ instance Conv (Pure S.Bind) D.ValueDef where
 			S.BodyStatement body -> conv (Pure body)
 			_ -> mzero
 
-beta = foldl1 D.Beta
+betaL = foldl1 D.beta
 
 pureLet [] = id
-pureLet defs = D.PureLet defs
+--pureLet defs = D.PureLet defs
+pureLet _ = error "currently not supported"
 
 newtype IndicesList = IndicesList S.IndicesList
 
 instance Conv IndicesList [D.Name] where
 	conv (IndicesList xs) = mapM (conv . uncurry Name) xs
 
-instance Conv S.Expression D.Expression where
+instance Conv S.Expression H.Exp where
 	conv (S.Primary prim) = return $ case prim of
-		S.Quote cs -> D.Primary (D.Quote cs)
-		S.INumber intSection -> D.Primary (D.INumber intSection)
+		S.Quote cs -> D.primary (D.quote cs)
+		S.INumber intSection -> D.primary (D.inumber intSection)
 		S.FNumber intSection fracSection
-			-> D.Primary (D.FNumber intSection fracSection)
+			-> D.primary (D.fnumber intSection fracSection)
 		S.ENumber intSection fracSection eSign eSection
-			-> D.Primary (D.ENumber intSection fracSection eSign eSection)
-		S.BTrue  -> D.Access "True"
-		S.BFalse -> D.Access "False"
-		S.Void   -> D.Tuple []
-	conv (S.Access name i) = D.Access <$> conv (Name name i)
+			-> D.primary (D.enumber intSection fracSection eSign eSection)
+		S.BTrue  -> D.access "True"
+		S.BFalse -> D.access "False"
+		S.Void   -> D.expTuple []
+	conv (S.Access name i) = D.access <$> conv (Name name i)
 	conv (S.Call op exprs) = do
 		hsExprs <- mapM conv exprs
-		return $ beta (D.Access (convOp op) : hsExprs)
+		return $ betaL (D.access (convOp op) : hsExprs)
 	conv (S.Fold op exprs range) = do
-		hsArgExpr <- D.Tuple <$> mapM conv exprs
+		hsArgExpr <- D.expTuple <$> mapM conv exprs
 		hsRange <- conv range
-		return $ beta [D.Access "foldl", D.Access (convOp op), hsArgExpr, hsRange]
+		return $ betaL [D.access "foldl", D.access (convOp op), hsArgExpr, hsRange]
 
 convOp = \case
 	S.OpNegate -> "negate"
