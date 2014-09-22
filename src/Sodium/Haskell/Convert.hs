@@ -181,11 +181,11 @@ instance Conv (Pure S.Body) H.Exp where
 			((name2, hsExpr), statements) <- appToLast convStatement statements
 			guard $ name1 == name2
 			hsValueDefs <- mapM conv (map Pure statements)
-			return $ pureLet hsValueDefs hsExpr
+			return $ D.pureLet hsValueDefs hsExpr
 		, do
 			hsValueDefs <- mapM conv (map Pure statements)
 			hsRetValues <- mapM conv resultExprs
-			return $ pureLet hsValueDefs (D.expTuple hsRetValues)
+			return $ D.pureLet hsValueDefs (D.expTuple hsRetValues)
 		]
 
 instance Conv (Pure S.MultiIfBranch) H.Exp where
@@ -220,10 +220,6 @@ instance Conv (Pure S.Bind) H.Decl where
 			_ -> mzero
 
 betaL = foldl1 D.beta
-
-pureLet [] = id
---pureLet defs = D.PureLet defs
-pureLet _ = error "currently not supported"
 
 newtype IndicesList = IndicesList S.IndicesList
 

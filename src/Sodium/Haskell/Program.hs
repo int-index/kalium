@@ -5,8 +5,6 @@ import qualified Data.Char as C
 import qualified Language.Haskell.Exts        as H
 import qualified Language.Haskell.Exts.SrcLoc as H
 
-import Debug.Trace
-
 type Name = String
 
 program decls pragmas imports = H.Module H.noLoc (H.ModuleName "Main") pragmas Nothing Nothing imports decls
@@ -15,20 +13,23 @@ extensions names = [H.LanguagePragma H.noLoc (map H.Ident names)]
 
 importDecl s = H.ImportDecl H.noLoc (H.ModuleName s) False False Nothing Nothing Nothing
 
-funcDef name args exp = H.FunBind [H.Match H.noLoc (H.Ident name) (map (H.PVar . H.Ident) args) Nothing (H.UnGuardedRhs exp) (H.BDecls [])]
+funcDef name args exp = H.FunBind [H.Match H.noLoc (H.Ident name) (map (H.PVar . H.Ident) args) Nothing (H.UnGuardedRhs (matchExpression exp)) (H.BDecls [])]
 
-valueDef pat exp = H.PatBind H.noLoc pat Nothing (H.UnGuardedRhs exp) (H.BDecls [])
+valueDef pat exp = H.PatBind H.noLoc pat Nothing (H.UnGuardedRhs (matchExpression exp)) (H.BDecls [])
+
+pureLet []   expr = matchExpression expr
+pureLet defs expr = H.Let (H.BDecls defs) (matchExpression expr)
 
 lambda pats expr = H.Lambda H.noLoc pats (matchExpression expr)
 
-typed expr ty = (H.ExpTypeSig H.noLoc (matchExpression expr) ty)
+typed expr ty = H.ExpTypeSig H.noLoc (matchExpression expr) ty
 
 patTuple [name] = H.PVar (H.Ident name)
 patTuple names  = H.PTuple H.Boxed . map H.PVar $ map H.Ident names
 
 expTuple []    = H.Con $ H.Special $ H.UnitCon
-expTuple [exp] = exp
-expTuple exps  = H.Tuple H.Unboxed (map (matchExpression) exps)
+expTuple [exp] = matchExpression exp
+expTuple exps  = H.Tuple H.Boxed (map (matchExpression) exps)
 
 primary = H.Lit
 
@@ -74,7 +75,7 @@ doexpr stmts = H.Do stmts
 
 doBind pat expr = H.Generator H.noLoc pat (matchExpression expr)
 doExecute  expr = H.Qualifier (matchExpression expr)
-doLet  pat expr = error "doLet"
+doLet  pat expr = H.LetStmt (H.BDecls [valueDef pat expr])
 
 
 -- MATCHING MAGIC
@@ -83,7 +84,7 @@ data Fixity = LFix | RFix | NFix deriving (Eq)
 
 data Level = ALevel Integer Fixity | BLevel | HLevel | SLevel
 
-beta x y = (H.App (x) (y))
+beta = H.App
 
 matchExpression (H.App (H.App (H.Var (H.UnQual (H.Ident "enumFromTo")))expr1)expr2)
     = H.EnumFromTo (wrap $ matchExpression $ expr1) (wrap $ matchExpression $ expr2)
