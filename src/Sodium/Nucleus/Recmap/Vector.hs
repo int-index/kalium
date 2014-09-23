@@ -25,11 +25,12 @@ instance Recmap Vector where
         = localize rm (body ^. bodyVars)
         $ (bodyBinds . traversed . bindStatement) (recmap_second rm) body
     recmap_children_second rm = onMultiIf <=< onBody <=< onFor where
-        rr = recmap_first rm
+        r1 = recmap_first  rm
+        r2 = recmap_second rm
         onMultiIf = _MultiIfStatement
-            $ (multiIfLeafs . traversed . _2) rr <=< multiIfElse rr
-        onFor = _ForStatement (forBody rr)
-        onBody = _BodyStatement rr
+            $ (multiIfLeafs . traversed . _2) r2 <=< multiIfElse r2
+        onFor = _ForStatement (forBody r1)
+        onBody = _BodyStatement r1
 
 
 class Recmappable a where

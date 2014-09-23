@@ -75,9 +75,12 @@ doexpr [H.Qualifier exp] = exp
 doexpr stmts = H.Do stmts
 
 doBind H.PWildCard expr = doExecute expr
-doBind pat expr = H.Generator H.noLoc pat (matchExpression expr)
+doBind pat expr =
+    case matchExpression expr of
+        H.App (H.Var (H.UnQual (H.Ident "return"))) expr'
+            -> H.LetStmt (H.BDecls [valueDef pat expr'])
+        expr' -> H.Generator H.noLoc pat expr'
 doExecute  expr = H.Qualifier (matchExpression expr)
-doLet  pat expr = H.LetStmt (H.BDecls [valueDef pat expr])
 
 
 -- MATCHING MAGIC

@@ -52,10 +52,10 @@ data ForCycle
 	} deriving (Show)
 
 data MultiIfBranch
-	= MultiIfBranch
-	{ _multiIfLeafs :: [(Expression, Body)]
-	, _multiIfElse  :: Body
-	} deriving (Show)
+    = MultiIfBranch
+    { _multiIfLeafs :: [(Expression, Statement)]
+    , _multiIfElse  :: Statement
+    } deriving (Show)
 
 data Expression
 	= Access Name Index

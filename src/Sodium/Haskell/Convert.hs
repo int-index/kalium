@@ -30,6 +30,9 @@ instance Conv S.Program where
             (D.extensions ["LambdaCase", "TupleSections"])
             (map D.importDecl ["Control.Monad", "Control.Applicative"])
 
+    type Pure S.Program = ()
+    pureconv _ = Nothing
+
 transformName :: S.Name -> D.Name
 transformName = \case
     S.NameMain -> "main"
@@ -137,77 +140,70 @@ instance Conv S.ForCycle where
 instance Conv S.MultiIfBranch where
 
     type Norm S.MultiIfBranch = H.Exp
-    conv (S.MultiIfBranch leafs bodyElse) = do
-        let convLeaf (expr, body)
+    conv (S.MultiIfBranch leafs statementElse) = do
+        let convLeaf (expr, statement)
               =  D.ifExpression
              <$> conv expr
-             <*> conv body
+             <*> conv statement
         leafGens <- mapM convLeaf leafs
-        hsBodyElse <- conv bodyElse
-        return $ foldr ($) hsBodyElse leafGens
+        hsStatementElse <- conv statementElse
+        return $ foldr ($) hsStatementElse leafGens
 
     type Pure S.MultiIfBranch = H.Exp
-    pureconv (S.MultiIfBranch leafs bodyElse) = do
-        let convLeaf (expr, body)
+    pureconv (S.MultiIfBranch leafs statementElse) = do
+        let convLeaf (expr, statement)
               =  D.ifExpression
              <$> pureconv expr
-             <*> pureconv body
+             <*> pureconv statement
         leafGens <- mapM convLeaf leafs
-        hsBodyElse <- pureconv bodyElse
-        return $ foldr ($) hsBodyElse leafGens
+        hsStatementElse <- pureconv statementElse
+        return $ foldr ($) hsStatementElse leafGens
 
---TODO: Bind/Let inference
 instance Conv S.Bind where
 
     type Norm S.Bind = H.Stmt
-    conv (S.Bind retIndices (S.Execute (S.OpReadLn t) []))
+    conv (S.Bind [] statement) = D.doExecute <$> conv statement
+    conv (S.Bind retIndices statement)
          =  D.doBind
         <$> (D.patTuple <$> conv (IndicesList retIndices))
-        <*> if t == S.ClString
-            then return $ D.access "getLine"
-            else do
-                hsType <- conv t
-                return $ D.access "readLn" `D.typed` D.hsIO hsType
-    conv (S.Bind [] (S.Execute S.OpPrintLn args))
-        = case args of
-            [S.Call S.OpShow [arg]]
-                -> D.doExecute . D.beta (D.access "print") <$> conv arg
-            args -> (<$> mapM conv args) $ \case
-                [] -> D.doExecute
-                    $ D.beta (D.access "putStrLn") (D.primary (D.quote ""))
-                hsExprs
-                    -> D.doExecute
-                     $ D.beta (D.access "putStrLn")
-                     $ foldl1 (\x y -> betaL [D.access "++", x, y])
-                     $ hsExprs
-    conv (S.Bind retIndices (S.Assign expr))
-         =  D.doLet
-        <$> (D.patTuple <$> conv (IndicesList retIndices))
-        <*> conv expr
-    conv (S.Bind retIndices (S.ForStatement forCycle))
-         =  D.doBind
-        <$> (D.patTuple <$> conv (IndicesList retIndices))
-        <*> conv forCycle
-    conv (S.Bind retIndices (S.MultiIfStatement multiIfBranch))
-         =  D.doBind
-        <$> (D.patTuple <$> conv (IndicesList retIndices))
-        <*> conv multiIfBranch
-    conv (S.Bind retIndices (S.BodyStatement body))
-         =  D.doBind
-        <$> (D.patTuple <$> conv (IndicesList retIndices))
-        <*> conv body
+        <*> conv statement
 
     type Pure S.Bind = H.Decl
     pureconv (S.Bind retIndices statement)
          =  D.valueDef
         <$> (D.patTuple <$> pureconv (IndicesList retIndices))
-        <*> case statement of
+        <*> pureconv statement
+
+instance Conv S.Statement where
+
+    type Norm S.Statement = H.Exp
+    conv (S.Execute (S.OpReadLn t) [])
+        | t == S.ClString = return (D.access "getLine")
+        | otherwise = do
+                hsType <- conv t
+                return $ D.access "readLn" `D.typed` D.hsIO hsType
+    conv (S.Execute S.OpPrintLn args)
+        = case args of
+            [S.Call S.OpShow [arg]] -> D.beta (D.access "print") <$> conv arg
+            args -> (<$> mapM conv args) $ \case
+                [] -> D.beta (D.access "putStrLn") (D.primary (D.quote ""))
+                hsExprs
+                    -> D.beta (D.access "putStrLn")
+                     $ foldl1 (\x y -> betaL [D.access "++", x, y])
+                     $ hsExprs
+    conv (S.Execute op args) = error ("Execute " ++ show op ++ " " ++ show args)
+    conv (S.ForStatement  forCycle) = conv forCycle
+    conv (S.MultiIfStatement multiIfBranch) = conv multiIfBranch
+    conv (S.BodyStatement body) = conv body
+    conv (S.Assign expr) = D.beta (D.access "return") <$> conv expr
+
+    type Pure S.Statement = H.Exp
+    pureconv = \case
             S.Assign expr -> pureconv expr
             S.ForStatement forCycle -> pureconv forCycle
             S.MultiIfStatement multiIfBranch -> pureconv multiIfBranch
             S.BodyStatement body -> pureconv body
             _ -> mzero
-
 
 instance Conv S.Func where
     type Norm S.Func = H.Decl
@@ -293,3 +289,5 @@ convOp = \case
     S.OpRange -> "enumFromTo"
     S.OpId -> "id"
     S.OpName name -> transformName name
+    S.OpPrintLn  -> "print"
+    S.OpReadLn _ -> "readLn"

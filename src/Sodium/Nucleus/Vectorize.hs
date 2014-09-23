@@ -105,7 +105,7 @@ vectorizeStatement =  \case
                  (changed, vecBodyGen) <- vectorizeBody body
                  let vecLeafGen = \results -> do
                          vecBody <- vecBodyGen results
-                         return (vecExpr, vecBody)
+                         return (vecExpr, Vec.BodyStatement vecBody)
                  return (changed, vecLeafGen)
         (changedElse, vecBodyElseGen)
             <- vectorizeBody (multiIfBranch ^. multiIfElse)
@@ -114,7 +114,7 @@ vectorizeStatement =  \case
         vecMultiIfBranch <- lift
              $  Vec.MultiIfBranch
             <$> mapM ($ accessChanged) vecLeafGens
-            <*> vecBodyElseGen accessChanged
+            <*> fmap Vec.BodyStatement (vecBodyElseGen accessChanged)
         return $ (changed, vecMultiIfBranch)
     _ -> throwError InvalidOperation
 
