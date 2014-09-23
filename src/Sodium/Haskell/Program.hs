@@ -42,23 +42,6 @@ access name
     | otherwise = (H.Var $ H.UnQual $ H.Symbol name)
 
 quote = H.String
-inumber intSection = H.Int $ parseInt intSection
-fnumber intSection fracSection = H.Frac $ parseFrac intSection fracSection
-enumber intSection fracSection eSign eSection
-    = H.Frac $ parseExp intSection fracSection eSign eSection
-
-parseInt :: String -> Integer
-parseInt = foldl (\acc c -> fromIntegral (C.digitToInt c) + acc * 10) 0
-
-parseFrac :: String -> String -> Rational
-parseFrac intSection fracSection = parseInt (intSection ++ fracSection)
-                                 % 10 ^ length fracSection
-
-parseExp :: String -> String -> Bool -> String -> Rational
-parseExp intSection fracSection eSign eSection
-    = (if eSign then (*) else (/))
-        (parseFrac intSection fracSection)
-        (10 ^ parseInt eSection)
 
 hsType cs = H.TyCon (H.UnQual (H.Ident cs))
 hsUnit = H.TyCon (H.Special H.UnitCon)

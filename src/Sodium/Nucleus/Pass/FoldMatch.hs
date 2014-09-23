@@ -19,13 +19,13 @@ forCycleMatch
     = Just (foldMatchOn op argExprs range)
 forCycleMatch _ = Nothing
 
-foldMatchOn OpMultiply [Primary (INumber "1")] range
+foldMatchOn OpMultiply [Primary (LitInteger 1)] range
     = Call OpProduct [range]
-foldMatchOn OpAdd [Primary (INumber "1")] range
+foldMatchOn OpAdd [Primary (LitInteger 0)] range
     = Call OpSum [range]
-foldMatchOn OpAnd [Primary BTrue] range
+foldMatchOn OpAnd [Primary (LitBoolean True)] range
     = Call OpAnd' [range]
-foldMatchOn OpOr [Primary BFalse] range
+foldMatchOn OpOr [Primary (LitBoolean False)] range
     = Call OpOr' [range]
 foldMatchOn op argExprs range
     = Fold op argExprs range

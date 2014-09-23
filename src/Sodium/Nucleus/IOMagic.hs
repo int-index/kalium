@@ -37,7 +37,7 @@ uncurseArgument = \case
     Access name
          -> lookupType name
         <&> \case
-            ClString -> Access name
+            TypeString -> Access name
             _ -> Call OpShow [Access name]
     expr -> return expr
 

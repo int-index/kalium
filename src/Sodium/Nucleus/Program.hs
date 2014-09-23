@@ -15,18 +15,8 @@ data FuncSig
 	= FuncSig
 	{ _funcName :: Name
 	, _funcParams :: Vars
-	, _funcRetType :: ClType
+	, _funcRetType :: Type
 	} deriving (Show)
-
-data Literal
-	= INumber String
-	| FNumber String String
-	| ENumber String String Bool String
-	| Quote String
-	| BTrue
-	| BFalse
-	| Void
-	deriving (Eq, Show)
 
 data Operator
 	= OpAdd
@@ -47,20 +37,28 @@ data Operator
 	| OpAnd'
 	| OpOr'
 	| OpPrintLn
-	| OpReadLn ClType
+	| OpReadLn Type
 	| OpId
 	| OpName Name
 	deriving (Eq, Show)
 
-data ClType
-	= ClInteger
-	| ClDouble
-	| ClBoolean
-	| ClString
-	| ClVoid
-	deriving (Eq, Show)
+data Literal
+    = LitInteger Integer
+    | LitDouble  Rational
+    | LitBoolean Bool
+    | LitString  String
+    | LitUnit
+    deriving (Eq, Show)
+
+data Type
+    = TypeInteger
+    | TypeDouble
+    | TypeBoolean
+    | TypeString
+    | TypeUnit
+    deriving (Eq, Show)
 
 type Vars
-	= M.Map Name ClType
+	= M.Map Name Type
 
 makeLenses ''FuncSig

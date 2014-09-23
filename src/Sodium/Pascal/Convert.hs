@@ -5,7 +5,9 @@ module Sodium.Pascal.Convert (convert) where
 import Prelude hiding (mapM)
 import Control.Applicative
 import Control.Monad.Reader hiding (mapM)
-import qualified Data.Map as M
+import qualified Data.Map  as M
+import qualified Data.Char as C
+import Data.Ratio
 import Data.Traversable
 import Control.Lens
 -- S for Src, D for Dest
@@ -24,7 +26,7 @@ instance Conv S.Program D.Program where
 	conv (S.Program funcs vars body) = do
 		clMain <- do
 			clBody <- conv (VB vars body)
-			let clFuncSig = D.FuncSig D.NameMain M.empty D.ClVoid
+			let clFuncSig = D.FuncSig D.NameMain M.empty D.TypeUnit
 			return $ D.Func clFuncSig clBody []
 		clFuncs <- mapM conv funcs
 		return $ D.Program (clMain:clFuncs)
@@ -72,17 +74,17 @@ splitVarDecls vardecls
 
 data VarDecl = VarDecl S.Name S.PasType
 
-instance Conv VarDecl (D.Name, D.ClType) where
+instance Conv VarDecl (D.Name, D.Type) where
 	conv (VarDecl name pasType)
 		 = (,) <$> conv name <*> conv pasType
 
-instance Conv S.PasType D.ClType where
+instance Conv S.PasType D.Type where
 	conv = \case
-		S.PasInteger -> return D.ClInteger
-		S.PasLongInt -> return D.ClInteger
-		S.PasReal    -> return D.ClDouble
-		S.PasBoolean -> return D.ClBoolean
-		S.PasString  -> return D.ClString
+		S.PasInteger -> return D.TypeInteger
+		S.PasLongInt -> return D.TypeInteger
+		S.PasReal    -> return D.TypeDouble
+		S.PasBoolean -> return D.TypeBoolean
+		S.PasString  -> return D.TypeString
 		S.PasType cs -> error "Custom types are not implemented"
 
 binary op a b = D.Call op [a,b]
@@ -142,6 +144,24 @@ instance Conv S.Statement D.Statement where
 				<*> (maybeBodySingleton <$> mapM conv mBodyElse)
 			wrap <$> (D.MultiIfStatement <$> multiIfBranch)
 
+inumber intSection = D.LitInteger $ parseInt intSection
+fnumber intSection fracSection = D.LitDouble $ parseFrac intSection fracSection
+enumber intSection fracSection eSign eSection
+    = D.LitDouble $ parseExp intSection fracSection eSign eSection
+
+parseInt :: String -> Integer
+parseInt = foldl (\acc c -> fromIntegral (C.digitToInt c) + acc * 10) 0
+
+parseFrac :: String -> String -> Rational
+parseFrac intSection fracSection = parseInt (intSection ++ fracSection)
+                                 % 10 ^ length fracSection
+
+parseExp :: String -> String -> Bool -> String -> Rational
+parseExp intSection fracSection eSign eSection
+    = (if eSign then (*) else (/))
+        (parseFrac intSection fracSection)
+        (10 ^ parseInt eSection)
+
 instance Conv S.Expression D.Expression where
 	conv = \case
 		S.Access name -> D.Access <$> nameHook name
@@ -149,21 +169,14 @@ instance Conv S.Expression D.Expression where
 			 -> D.Call
 			<$> (D.OpName <$> conv name)
 			<*> mapM conv exprs
-		S.INumber intSection
-			-> return
-			 $ D.Primary
-			 $ D.INumber intSection
+		S.INumber intSection -> return (D.Primary $ inumber intSection)
 		S.FNumber intSection fracSection
-			-> return
-			 $ D.Primary
-			 $ D.FNumber intSection fracSection
+			-> return (D.Primary $ fnumber intSection fracSection)
 		S.ENumber intSection fracSection eSign eSection
-			-> return
-			 $ D.Primary
-			 $ D.ENumber intSection fracSection eSign eSection
-		S.Quote cs -> return $ D.Primary (D.Quote cs)
-		S.BTrue  -> return $ D.Primary D.BTrue
-		S.BFalse -> return $ D.Primary D.BFalse
+			-> return (D.Primary $ enumber intSection fracSection eSign eSection)
+		S.Quote cs -> return $ D.Primary (D.LitString  cs)
+		S.BTrue  -> return $ D.Primary (D.LitBoolean True)
+		S.BFalse -> return $ D.Primary (D.LitBoolean False)
 		S.Binary op x y -> binary <$> conv op <*> conv x <*> conv y
 		S.Unary op x -> case op of
 			S.UOpPlus -> conv x

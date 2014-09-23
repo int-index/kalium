@@ -60,17 +60,17 @@ instance Conv Name where
         S.Immutable -> return $ "const'" ++ transformName name
         S.Uninitialized -> return "undefined"
 
-instance Conv S.ClType where
-    type Norm S.ClType = H.Type
+instance Conv S.Type where
+    type Norm S.Type = H.Type
     conv = pureconv
 
-    type Pure S.ClType = H.Type
+    type Pure S.Type = H.Type
     pureconv = return . \case
-        S.ClInteger -> D.hsType "Int"
-        S.ClDouble  -> D.hsType "Double"
-        S.ClBoolean -> D.hsType "Bool"
-        S.ClString  -> D.hsType "String"
-        S.ClVoid -> D.hsUnit
+        S.TypeInteger -> D.hsType "Int"
+        S.TypeDouble  -> D.hsType "Double"
+        S.TypeBoolean -> D.hsType "Bool"
+        S.TypeString  -> D.hsType "String"
+        S.TypeUnit    -> D.hsUnit
 
 instance Conv S.Body where
 
@@ -178,7 +178,7 @@ instance Conv S.Statement where
 
     type Norm S.Statement = H.Exp
     conv (S.Execute (S.OpReadLn t) [])
-        | t == S.ClString = return (D.access "getLine")
+        | t == S.TypeString = return (D.access "getLine")
         | otherwise = do
                 hsType <- conv t
                 return $ D.access "readLn" `D.typed` D.hsIO hsType
@@ -207,7 +207,7 @@ instance Conv S.Statement where
 
 instance Conv S.Func where
     type Norm S.Func = H.Decl
-    conv (S.Func (S.FuncSig S.NameMain params S.ClVoid) clBody) = do
+    conv (S.Func (S.FuncSig S.NameMain params S.TypeUnit) clBody) = do
         guard $ M.null params
         hsBody <- conv clBody
         return $ D.funcDef "main" [] hsBody
@@ -251,15 +251,11 @@ instance Conv S.Expression where
 
     type Pure S.Expression = H.Exp
     pureconv (S.Primary prim) = return $ case prim of
-        S.Quote cs -> D.primary (D.quote cs)
-        S.INumber intSection -> D.primary (D.inumber intSection)
-        S.FNumber intSection fracSection
-            -> D.primary (D.fnumber intSection fracSection)
-        S.ENumber intSection fracSection eSign eSection
-            -> D.primary (D.enumber intSection fracSection eSign eSection)
-        S.BTrue  -> D.access "True"
-        S.BFalse -> D.access "False"
-        S.Void   -> D.expTuple []
+        S.LitInteger n -> D.primary (H.Int  n)
+        S.LitDouble  x -> D.primary (H.Frac x)
+        S.LitBoolean a -> D.access (if a then "True" else "False")
+        S.LitString cs -> D.primary (D.quote cs)
+        S.LitUnit -> D.expTuple []
     pureconv (S.Access name i) = D.access <$> pureconv (Name name i)
     pureconv (S.Call op exprs) = do
         hsExprs <- mapM pureconv exprs

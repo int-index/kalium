@@ -9,7 +9,7 @@ import Sodium.Nucleus.Program.Scalar
 import Sodium.Nucleus.Recmap.Scalar
 import Data.Stack
 
-type VarDecl = (Name, ClType)
+type VarDecl = (Name, Type)
 
 side :: Program -> Program
 side = flip evalStack (map NameGen [0..]) . recmapped sideStatement
@@ -38,7 +38,7 @@ sideExpression = \case
     Call op args -> do
         eArgs <- mapM sideExpression args
         name <- pop
-        let vardecl = (name, ClVoid) -- TODO: the real type
+        let vardecl = (name, TypeUnit) -- TODO: the real type
         tell [Left vardecl]
         tell [Right $ SideCall name op eArgs]
         return (Access name)
