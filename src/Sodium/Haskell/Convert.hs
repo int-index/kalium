@@ -27,7 +27,7 @@ instance Conv S.Program where
     conv (S.Program funcs) = do
         funcDefs <- mapM conv funcs
         return $ D.program funcDefs
-            (D.extensions ["LambdaCase", "TupleSections"])
+            (D.extensions ["LambdaCase", "TupleSections", "MultiWayIf"])
             (map D.importDecl ["Control.Monad", "Control.Applicative"])
 
     type Pure S.Program = ()
@@ -142,22 +142,22 @@ instance Conv S.MultiIfBranch where
     type Norm S.MultiIfBranch = H.Exp
     conv (S.MultiIfBranch leafs statementElse) = do
         let convLeaf (expr, statement)
-              =  D.ifExpression
+              =  (,)
              <$> conv expr
              <*> conv statement
         leafGens <- mapM convLeaf leafs
-        hsStatementElse <- conv statementElse
-        return $ foldr ($) hsStatementElse leafGens
+        hsStatementElse <- (D.access "otherwise",) <$> conv statementElse
+        return $ D.multiIf (leafGens ++ [hsStatementElse])
 
     type Pure S.MultiIfBranch = H.Exp
     pureconv (S.MultiIfBranch leafs statementElse) = do
         let convLeaf (expr, statement)
-              =  D.ifExpression
+              =  (,)
              <$> pureconv expr
              <*> pureconv statement
         leafGens <- mapM convLeaf leafs
-        hsStatementElse <- pureconv statementElse
-        return $ foldr ($) hsStatementElse leafGens
+        hsStatementElse <- (D.access "otherwise",) <$> pureconv statementElse
+        return $ D.multiIf (leafGens ++ [hsStatementElse])
 
 instance Conv S.Bind where
 

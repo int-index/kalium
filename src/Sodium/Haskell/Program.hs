@@ -64,12 +64,8 @@ hsType cs = H.TyCon (H.UnQual (H.Ident cs))
 hsUnit = H.TyCon (H.Special H.UnitCon)
 hsIO = H.TyApp (hsType "IO")
 
-ifExpression expr1 expr2 expr3 = H.If
-    (matchExpression expr1)
-    (matchExpression expr2)
-    (matchExpression expr3)
-
-
+multiIf alts = H.MultiIf (map conv alts) where
+    conv (cond, rhs) = H.IfAlt (matchExpression cond) (matchExpression rhs)
 
 doexpr [H.Qualifier exp] = exp
 doexpr stmts = H.Do stmts
