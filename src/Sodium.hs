@@ -15,13 +15,18 @@ import qualified  Sodium.Pascal.Convert as P (convert)
 import qualified Sodium.Haskell.Convert as H (convert)
 import Data.Profunctor
 
+import Debug.Trace
+
 translate :: String -> String
 translate = dimap fromPascal toHaskell onNucleus where
     fromPascal = P.convert . parse
     toHaskell  = prettyPrint . H.convert
     onNucleus = dimap onScalar onVector vectorize
     onScalar = side . uncurse
-    onVector = fff pass
+    onVector = closure pass
     pass = flatten . inline . foldMatch . joinMultiIf . extractBody . clean
 
-fff f = (!!42) . iterate f
+closure :: Eq a => (a -> a) -> a -> a
+closure f = match 0 . iterate f
+  where match n (a:b:_) | a == b = trace ("Pass amount: " ++ show n) a
+        match n (_:c) = match (succ n) c

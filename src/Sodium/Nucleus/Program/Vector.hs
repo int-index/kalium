@@ -11,36 +11,36 @@ import qualified Data.Map as M
 import Sodium.Nucleus.Program
 
 data Program
-	= Program
-	{ _programFuncs :: [Func]
-	} deriving (Show)
+    = Program
+    { _programFuncs :: [Func]
+    } deriving (Eq, Show)
 
 data Func
-	= Func
-	{ _funcSig :: FuncSig
-	, _funcBody :: Body
-	} deriving (Show)
+    = Func
+    { _funcSig :: FuncSig
+    , _funcBody :: Body
+    } deriving (Eq, Show)
 
 data Body
-	= Body
-	{ _bodyVars  :: Vars
-	, _bodyBinds :: [Bind]
-	, _bodyResults :: [Expression]
-	} deriving (Show)
+    = Body
+    { _bodyVars  :: Vars
+    , _bodyBinds :: [Bind]
+    , _bodyResults :: [Expression]
+    } deriving (Eq, Show)
 
 data Bind
-	= Bind
-	{ _bindIndices :: IndicesList
-	, _bindStatement :: Statement
-	} deriving (Show)
+    = Bind
+    { _bindIndices :: IndicesList
+    , _bindStatement :: Statement
+    } deriving (Eq, Show)
 
 data Statement
-	= Assign Expression
-	| Execute Operator [Expression]
-	| ForStatement ForCycle
-	| MultiIfStatement MultiIfBranch
-	| BodyStatement Body
-	deriving (Show)
+    = Assign Expression
+    | Execute Operator [Expression]
+    | ForStatement ForCycle
+    | MultiIfStatement MultiIfBranch
+    | BodyStatement Body
+    deriving (Eq, Show)
 
 data ForCycle
     = ForCycle
@@ -49,35 +49,35 @@ data ForCycle
     , _forName   :: Name
     , _forRange  :: Expression
     , _forAction :: Statement
-    } deriving (Show)
+    } deriving (Eq, Show)
 
 data MultiIfBranch
     = MultiIfBranch
     { _multiIfLeafs :: [(Expression, Statement)]
     , _multiIfElse  :: Statement
-    } deriving (Show)
+    } deriving (Eq, Show)
 
 data Expression
-	= Access Name Index
-	| Fold Operator [Expression] Expression
-	| Call Operator [Expression]
-	| Primary Literal
-	deriving (Eq, Show)
+    = Access Name Index
+    | Fold Operator [Expression] Expression
+    | Call Operator [Expression]
+    | Primary Literal
+    deriving (Eq, Show)
 
 call OpId [arg] = arg
 call op args = Call op args
 
 data Index
-	= Index Integer
-	| Immutable
-	| Uninitialized
-	deriving (Eq, Show)
+    = Index Integer
+    | Immutable
+    | Uninitialized
+    deriving (Eq, Show)
 
 type Indices
-	= M.Map Name Index
+    = M.Map Name Index
 
 type IndicesList
-	= [(Name, Index)]
+    = [(Name, Index)]
 
 makeLenses ''Func
 makeLenses ''Bind

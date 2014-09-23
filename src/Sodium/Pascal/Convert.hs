@@ -122,7 +122,7 @@ instance Conv S.Statement D.Statement where
 				expr -> do
 					clExpr <- conv expr
 					let clName = D.Name "__CASE'__" -- generate a name?
-					let clType = undefined -- typeof(expr)
+					let clType = D.TypeUnit -- typeof(expr)
 					let wrap statement
 						= D.BodyStatement
 						$ D.Body
