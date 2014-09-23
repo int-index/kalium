@@ -79,7 +79,7 @@ instance SubOnce ForCycle where
 		>=> (forArgExprs . traversed) subOnce
 		>=> apUnless
 			(shadowedBy . toListOf (forArgIndices . traversed . _1))
-			(forBody subOnce)
+			(forAction subOnce)
 
 instance SubOnce MultiIfBranch where
 	subOnce

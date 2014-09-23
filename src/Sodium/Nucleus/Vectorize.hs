@@ -95,7 +95,7 @@ vectorizeStatement =  \case
                 (uncurry Vec.Access `map` argIndices)
                 (forCycle ^. forName)
                 vecRange
-                vecBody
+                (Vec.BodyStatement vecBody)
         return (changed, vecForCycle)
     MultiIfStatement multiIfBranch -> over _2 Vec.MultiIfStatement <$> do
         (unzip -> (changedList, vecLeafGens))

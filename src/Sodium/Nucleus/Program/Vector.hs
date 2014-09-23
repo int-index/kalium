@@ -43,13 +43,13 @@ data Statement
 	deriving (Show)
 
 data ForCycle
-	= ForCycle
-	{ _forArgIndices :: IndicesList
-	, _forArgExprs :: [Expression]
-	, _forName :: Name
-	, _forRange :: Expression
-	, _forBody :: Body
-	} deriving (Show)
+    = ForCycle
+    { _forArgIndices :: IndicesList
+    , _forArgExprs   :: [Expression]
+    , _forName   :: Name
+    , _forRange  :: Expression
+    , _forAction :: Statement
+    } deriving (Show)
 
 data MultiIfBranch
     = MultiIfBranch

@@ -14,8 +14,8 @@ foldMatchStatement statement@(ForStatement forCycle)
 foldMatchStatement statement = statement
 
 forCycleMatch
-    (ForCycle [(name1, j)] argExprs name2 range (Body vars [] [Call op args]))
-    | M.null vars && args == [Access name1 j, Access name2 Immutable]
+    (ForCycle [(name1, j)] argExprs name2 range (Assign (Call op args)))
+    | args == [Access name1 j, Access name2 Immutable]
     = Just (foldMatchOn op argExprs range)
 forCycleMatch _ = Nothing
 

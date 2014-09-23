@@ -56,7 +56,7 @@ instance CheckRef ForCycle where
     checkRef forCycle = do
         shadowed <- shadowedBy (forCycle ^.. forArgIndices . traversed . _1)
         let base = (forCycle ^. forRange, forCycle ^. forArgExprs)
-        let unsh = bool [forCycle ^. forBody] [] shadowed
+        let unsh = bool [forCycle ^. forAction] [] shadowed
         checkRef (base, unsh)
 
 instance CheckRef MultiIfBranch where
