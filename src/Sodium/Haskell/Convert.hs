@@ -5,7 +5,6 @@ module Sodium.Haskell.Convert (convert) where
 import Data.List (genericReplicate)
 import Control.Monad
 import Control.Applicative
-import qualified Data.Map as M
 -- S for Src, D for Dest
 import qualified Sodium.Nucleus.Program.Vector as S
 import qualified Sodium.Haskell.Program as D
@@ -208,7 +207,7 @@ instance Conv S.Statement where
 instance Conv S.Func where
     type Norm S.Func = H.Decl
     conv (S.Func (S.FuncSig S.NameMain params S.TypeUnit) clBody) = do
-        guard $ M.null params
+        guard $ null params
         hsBody <- conv clBody
         return $ D.funcDef "main" [] hsBody
     conv fun = pureconv fun
@@ -217,7 +216,7 @@ instance Conv S.Func where
     pureconv (S.Func (S.FuncSig name params _) clBody)
          = D.funcDef (transformName name) paramNames
         <$> pureconv clBody
-        where paramNames = map transformName (M.keys params)
+        where paramNames = map transformName (map fst params)
 
 data FoldLambda = FoldLambda S.IndicesList S.Name
 

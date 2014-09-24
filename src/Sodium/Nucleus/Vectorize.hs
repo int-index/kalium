@@ -12,8 +12,10 @@ import Sodium.Nucleus.Program.Scalar
 import qualified Sodium.Nucleus.Program.Vector as Vec
 
 data VectorizerException
-    = NoAccess Name
+    = NoAccess Name Vec.Indices
+    | NoFunction Operator
     | UpdateImmutable Name
+    | NoReference
     | InvalidOperation
     deriving (Show)
 
@@ -23,27 +25,35 @@ type S m a = StateT  Vec.Indices m a
 
 vectorize :: Program -> Vec.Program
 vectorize program = fromExcept $ do
-    vecFuncs <- mapM vectorizeFunc (program ^. programFuncs)
+    let funcSigs = program ^.. programFuncs . traversed . funcSig
+    vecFuncs <- mapM (vectorizeFunc funcSigs) (program ^. programFuncs)
     return $ Vec.Program vecFuncs
     where fromExcept = either (error.show) id . runExcept
 
-vectorizeFunc :: Func -> E Vec.Func
-vectorizeFunc func = do
+references :: FuncSig -> [Name]
+references funcSig = do
+    (name, (by, _)) <- funcSig ^. funcParams
+    guard (by == ByReference)
+    return name
+
+vectorizeFunc :: [FuncSig] -> Func -> E Vec.Func
+vectorizeFunc funcSigs func = do
     (_, vecBodyGen)
-            <- runReaderT (vectorizeBody (func ^. funcBody))
-            $ initIndices (Vec.Index 0) (func ^. funcSig . funcParams)
-    vecBody <- vecBodyGen (func ^. funcResults)
+            <- runReaderT (vectorizeBody funcSigs (func ^. funcBody))
+            $ initIndices (Vec.Index 0) (func ^. funcSig . funcParams . to M.fromList)
+    let refs = map Access (func ^. funcSig . to references)
+    vecBody <- vecBodyGen (func ^. funcResults ++ refs)
     return $ Vec.Func (func ^. funcSig) vecBody
 
-vectorizeBody :: Body -> R E ([Name], [Expression] -> E Vec.Body)
-vectorizeBody body = do
+vectorizeBody :: [FuncSig] -> Body -> R E ([Name], [Expression] -> E Vec.Body)
+vectorizeBody funcSigs body = do
     closure <- ask
     lift $ do
         let isLocal = flip elem (body ^. bodyVars . to M.keys)
         let indices = initIndices Vec.Uninitialized (body ^. bodyVars) `M.union` closure
         (vecStatements, indices')
                 <- flip runStateT indices
-                 $ mapM vectorizeStatement' (body ^. bodyStatements)
+                 $ mapM (vectorizeStatement' funcSigs) (body ^. bodyStatements)
         let changed
                 = M.keys
                 $ M.filterWithKey ((&&) . not . isLocal)
@@ -54,41 +64,49 @@ vectorizeBody body = do
                 <$> runReaderT (mapM vectorizeExpression results) indices'
         return (changed, vecBodyGen)
 
-vectorizeBody' :: Body -> R E ([Name], Vec.Body)
-vectorizeBody' body = do
-    (changed, vecBodyGen) <- vectorizeBody body
+vectorizeBody' :: [FuncSig] -> Body -> R E ([Name], Vec.Body)
+vectorizeBody' funcSigs body = do
+    (changed, vecBodyGen) <- vectorizeBody funcSigs body
     vecBody <- lift $ vecBodyGen (map Access changed)
     return (changed, vecBody)
 
-vectorizeStatement' :: Statement -> S E (Vec.IndicesList, Vec.Statement)
-vectorizeStatement' statement
+vectorizeStatement' :: [FuncSig] -> Statement -> S E (Vec.IndicesList, Vec.Statement)
+vectorizeStatement' funcSigs statement
     = _1 (mapM registerIndexUpdate)
-    =<< readerToState (vectorizeStatement statement)
+    =<< readerToState (vectorizeStatement funcSigs statement)
 
-vectorizeStatement :: Statement -> R E ([Name], Vec.Statement)
-vectorizeStatement =  \case
+vectorizeStatement :: [FuncSig] -> Statement -> R E ([Name], Vec.Statement)
+vectorizeStatement funcSigs = \case
     BodyStatement body
          -> over _2 Vec.BodyStatement
-        <$> vectorizeBody' body
-    SideCall res op args -> do
-        vecArgs <- mapM vectorizeExpression args
-        -- TODO: typecheck in order to find out
-        -- what lvalues can actually get changed
-        let sidenames = []
-        let resnames = [res]
-        return $ (resnames ++ sidenames, Vec.Assign (Vec.call op vecArgs))
+        <$> vectorizeBody' funcSigs body
     Execute mres name args -> do
         vecArgs <- mapM vectorizeExpression args
-        -- TODO: typecheck in order to find out
-        -- what lvalues can actually get changed
-        let sidenames = []
+        let byReference (_, (ByReference, _)) = \case
+              Vec.Access name _ -> Just [name]
+              _                 -> Nothing
+            byReference (_, (ByValue, _)) = const (Just [])
+        funcSig <- lift (lookupFuncSig funcSigs name)
+        sidenames <- case zipWith byReference (funcSig ^. funcParams) vecArgs
+                          & sequence
+                     of Nothing -> throwError NoReference
+                        Just ns -> return (concat ns)
         let resnames = maybe empty pure mres
-        return $ (resnames ++ sidenames, Vec.Execute name vecArgs)
+
+        -- TODO: purity flag in function signature
+        let impure = case name of
+              OpReadLn _ -> True
+              OpPrintLn  -> True
+              _ -> False
+        let vecExecute
+              | impure    = Vec.Execute name vecArgs
+              | otherwise = Vec.Assign (Vec.call name vecArgs)
+        return $ (resnames ++ sidenames, vecExecute)
     ForStatement forCycle -> over _2 Vec.ForStatement <$> do
         vecRange <- vectorizeExpression (forCycle ^. forRange)
         (changed, vecBody)
             <- local (M.insert (forCycle ^. forName) Vec.Immutable)
-             $ vectorizeBody' (forCycle ^. forBody)
+             $ vectorizeBody' funcSigs (forCycle ^. forBody)
         argIndices <- closedIndices changed
         let vecForCycle = Vec.ForCycle
                 argIndices
@@ -102,13 +120,13 @@ vectorizeStatement =  \case
             <- forM (multiIfBranch ^. multiIfLeafs)
              $ \(expr, body) -> do
                  vecExpr <- vectorizeExpression expr
-                 (changed, vecBodyGen) <- vectorizeBody body
+                 (changed, vecBodyGen) <- vectorizeBody funcSigs body
                  let vecLeafGen = \results -> do
                          vecBody <- vecBodyGen results
                          return (vecExpr, Vec.BodyStatement vecBody)
                  return (changed, vecLeafGen)
         (changedElse, vecBodyElseGen)
-            <- vectorizeBody (multiIfBranch ^. multiIfElse)
+            <- vectorizeBody funcSigs (multiIfBranch ^. multiIfElse)
         let changed = nub $ changedElse ++ concat changedList
         let accessChanged = map Access changed
         vecMultiIfBranch <- lift
@@ -131,7 +149,14 @@ lookupIndex :: Name -> R E Vec.Index
 lookupIndex name = do
     indices <- ask
     M.lookup name indices
-       & maybe (throwError $ NoAccess name) return
+       & maybe (throwError $ NoAccess name indices) return
+
+lookupFuncSig :: [FuncSig] -> Operator -> E FuncSig
+lookupFuncSig funcSigs op@(OpName name)
+    = find (\funcSig -> view funcName funcSig == name) funcSigs
+    & maybe (throwError $ NoFunction op) return
+-- TODO: real signatures for builtin operators
+lookupFuncSig _ _ = return $ FuncSig (Name "") [] (TypeUnit)
 
 registerIndexUpdate :: Name -> S E (Name, Vec.Index)
 registerIndexUpdate name = do
@@ -148,5 +173,5 @@ closedIndices = mapM $ \name -> do
     index <- lookupIndex name
     return (name, index)
 
-initIndices :: Vec.Index -> Vars -> Vec.Indices
+initIndices :: Vec.Index -> M.Map Name a -> Vec.Indices
 initIndices n = M.map (const n)

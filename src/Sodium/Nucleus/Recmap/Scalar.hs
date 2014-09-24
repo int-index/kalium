@@ -9,6 +9,8 @@ module Sodium.Nucleus.Recmap.Scalar
     , recmapped
     ) where
 
+import qualified Data.Map as M
+
 import Control.Monad
 import Control.Lens
 import Data.Monoid
@@ -43,7 +45,7 @@ instance Recmappable Statement where
 
 instance Recmappable Func where
     recmap rm func
-        = localize rm (func ^. funcSig . funcParams)
+        = localize rm (fmap snd $ func ^. funcSig . funcParams . to M.fromList)
         $ funcBody (recmap rm) func
 
 instance Recmappable Program where

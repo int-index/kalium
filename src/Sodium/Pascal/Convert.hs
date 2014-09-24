@@ -26,7 +26,7 @@ instance Conv S.Program D.Program where
 	conv (S.Program funcs vars body) = do
 		clMain <- do
 			clBody <- conv (VB vars body)
-			let clFuncSig = D.FuncSig D.NameMain M.empty D.TypeUnit
+			let clFuncSig = D.FuncSig D.NameMain [] D.TypeUnit
 			return $ D.Func clFuncSig clBody []
 		clFuncs <- mapM conv funcs
 		return $ D.Program (clMain:clFuncs)
@@ -53,30 +53,43 @@ nameHook cs = do
 	wrap <$> conv cs
 
 instance Conv S.Func D.Func where
-	conv (S.Func name params pasType vars body)
-		= withReaderT (name:) $ do
-			clFuncSig
-				<-  D.FuncSig
-				<$> conv name
-				<*> (M.fromList <$> mapM conv (splitVarDecls params))
-				<*> conv pasType
-			clRetName <- nameHook name
-			let enclose = D.bodyVars %~
-				(M.insert clRetName $ clFuncSig ^. D.funcRetType)
-			clBody <- enclose <$> conv (VB vars body)
-			return $ D.Func clFuncSig clBody [D.Access clRetName]
+    conv (S.Func name params pasType vars body)
+        = local (name:) $ do
+            (retExprs, retType, enclose) <- case pasType of
+                Nothing -> return ([], D.TypeUnit, id)
+                Just ty -> do
+                    retName <- nameHook name
+                    retType <- conv ty
+                    let enclose = D.bodyVars %~ (M.insert retName retType)
+                    return ([D.Access retName], retType, enclose)
+            clFuncSig
+                <-  D.FuncSig
+                <$> conv name
+                <*> mapM conv (splitParamDecls params)
+                <*> return retType
+            clBody <- enclose <$> conv (VB vars body)
+            return $ D.Func clFuncSig clBody retExprs
 
 instance Conv S.Name D.Name where
 	conv = return . D.Name
 
 splitVarDecls vardecls
-	= [VarDecl name t | S.VarDecl names t <- vardecls, name <- names]
+    = [VarDecl name t | S.VarDecl names t <- vardecls, name <- names]
 
-data VarDecl = VarDecl S.Name S.PasType
+splitParamDecls paramdecls
+    = [ParamDecl name r t | S.ParamDecl names r t <- paramdecls, name <- names]
+
+data VarDecl   = VarDecl   S.Name      S.PasType
+data ParamDecl = ParamDecl S.Name Bool S.PasType
 
 instance Conv VarDecl (D.Name, D.Type) where
-	conv (VarDecl name pasType)
-		 = (,) <$> conv name <*> conv pasType
+    conv (VarDecl name pasType)
+         = (,) <$> conv name <*> conv pasType
+
+instance Conv ParamDecl (D.Name, D.ByType) where
+    conv (ParamDecl name r pasType)
+        = (,) <$> conv name <*> (annotate <$> conv pasType)
+        where annotate = (,) (if r then D.ByReference else D.ByValue)
 
 instance Conv S.PasType D.Type where
 	conv = \case

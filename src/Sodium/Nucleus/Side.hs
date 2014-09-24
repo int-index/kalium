@@ -26,7 +26,7 @@ sideAssign :: Name -> Expression -> Stack Name Body
 sideAssign name expr = do
     (e, xs) <- runWriterT (sideExpression expr)
     let (vardecls, sidecalls) = partitionEithers xs
-    let statements = sidecalls ++ [SideCall name OpId [e]]
+    let statements = sidecalls ++ [Execute (Just name) OpId [e]]
     return $ Body (M.fromList vardecls) statements
 
 sideExpression
@@ -40,7 +40,7 @@ sideExpression = \case
         name <- pop
         let vardecl = (name, TypeUnit) -- TODO: the real type
         tell [Left vardecl]
-        tell [Right $ SideCall name op eArgs]
+        tell [Right $ Execute (Just name) op eArgs]
         return (Access name)
 
 sideMultiIf :: MultiIfBranch -> Stack Name Body

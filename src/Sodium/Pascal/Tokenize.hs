@@ -16,6 +16,7 @@ data Token
     | KwTo
     | KwDo
     | KwFunction
+    | KwProcedure
     | KwTrue
     | KwFalse
     | KwAnd
@@ -142,6 +143,7 @@ keywords = M.fromList
     , ("to"      , KwTo)
     , ("do"      , KwDo)
     , ("function", KwFunction)
+    , ("procedure", KwProcedure)
     , ("true"    , KwTrue)
     , ("false"   , KwFalse)
     , ("and"     , KwAnd)

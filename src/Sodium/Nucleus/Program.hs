@@ -14,7 +14,7 @@ data Name
 data FuncSig
     = FuncSig
     { _funcName :: Name
-    , _funcParams :: Vars
+    , _funcParams  :: Params
     , _funcRetType :: Type
     } deriving (Eq, Show)
 
@@ -58,7 +58,17 @@ data Type
     | TypeUnit
     deriving (Eq, Show)
 
+data By
+    = ByValue
+    | ByReference
+    deriving (Eq, Show)
+
+type ByType = (By, Type)
+
 type Vars
     = M.Map Name Type
+
+type Params
+    = [(Name, ByType)]
 
 makeLenses ''FuncSig

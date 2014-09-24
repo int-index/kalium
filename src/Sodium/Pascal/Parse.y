@@ -25,6 +25,7 @@ import qualified Text.Parsec as P
     to       { T.KwTo    }
     do       { T.KwDo    }
     function { T.KwFunction }
+    procedure{ T.KwProcedure}
     true     { T.KwTrue  }
     false    { T.KwFalse }
     and      { T.KwAnd   }
@@ -65,10 +66,13 @@ import qualified Text.Parsec as P
 
 %%
 
-Program : Funcs Vars Body '.' { Program (reverse $1) $2 $3 }
+Program : Decls Vars Body '.' { Program (reverse $1) $2 $3 }
 
-Funcs :            {      [] }
-      | Funcs Func { $2 : $1 }
+Decls :            {      [] }
+      | Decls Decl { $2 : $1 }
+
+Decl : Func { $1 }
+     | Proc { $1 }
 
 Vars  :              { [] }
       | var VarDecls { $2 }
@@ -82,8 +86,11 @@ VarNames :              name { $1 : [] }
          | VarNames ',' name { $3 : $1 }
 
 
-Func : function name Params ':' Type ';' Vars Body ';'
-     { Func     $2   $3         $5       $7   $8 }
+Func : function  name Params ':' Type ';' Vars Body ';'
+     { Func      $2   $3     (Just $5)    $7   $8 }
+
+Proc : procedure name Params          ';' Vars Body ';'
+     { Func      $2   $3     Nothing      $5   $6 }
 
 Params :                    { [] }
        | '('            ')' { [] }
@@ -92,7 +99,10 @@ Params :                    { [] }
 ParamDecls : ParamDecl                { $1 : [] }
            | ParamDecl ';' ParamDecls { $1 : $3 }
 
-ParamDecl : ParamNames ':' Type { VarDecl (reverse $1) $3 }
+ParamDecl : ParamIsVar ParamNames ':' Type { ParamDecl (reverse $2) $1 $4 }
+
+ParamIsVar :     { False }
+ParamIsVar : var { True  }
 
 ParamNames :                name { $1 : [] }
            | ParamNames ',' name { $3 : $1 }

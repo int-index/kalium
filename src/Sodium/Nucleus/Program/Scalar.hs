@@ -30,7 +30,6 @@ data Body
 
 data Statement
 	= Assign Name Expression
-	| SideCall Name Operator [Expression]
 	| Execute (Maybe Name) Operator [Expression]
 	| ForStatement ForCycle
 	| MultiIfStatement MultiIfBranch

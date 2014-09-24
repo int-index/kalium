@@ -1,16 +1,4 @@
-module Sodium.Pascal.Program
-	( Program(..)
-	, Vars
-	, Body
-	, Func(..)
-	, VarDecl(..)
-	, Statement(..)
-	, Expression(..)
-	, Operator(..)
-	, UnaryOperator(..)
-	, Name
-	, PasType(..)
-	) where
+module Sodium.Pascal.Program where
 
 type Name = String
 
@@ -19,16 +7,21 @@ data Program
 	deriving (Show)
 
 type Vars = [VarDecl]
+type Params = [ParamDecl]
 
 type Body = [Statement]
 
 data Func
-	= Func Name Vars PasType Vars Body
-	deriving (Show)
+    = Func Name Params (Maybe PasType) Vars Body
+    deriving (Show)
 
 data VarDecl
-	= VarDecl [Name] PasType
-	deriving (Show)
+    = VarDecl [Name] PasType
+    deriving (Show)
+
+data ParamDecl
+    = ParamDecl [Name] Bool PasType
+    deriving (Show)
 
 data Statement
 	= Assign Name Expression
