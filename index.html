@@ -25,6 +25,20 @@
                 width: 10em;
                 float: left;
             }
+            table {
+                margin-left: auto;
+                margin-right: auto;
+                border-collapse: collapse;
+            }
+            .source {
+                padding: 1em;
+                border: thin solid #EEEEEE;
+                vertical-align: top;
+            }
+            tfoot {
+                font-size: 0.5em;
+                text-align: center;
+            }
         </style>
         <title>Sodium</title>
     </head>
@@ -99,7 +113,7 @@
             be a way to extract some information and use it to translate
             the program.
         </p>
-        
+
         <h2>The solution</h2>
         <p>
             There's no obvious solution for this problem.
@@ -125,6 +139,66 @@
                 </li>
             </ol>
         </p>
+        <h2>Example</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th> Pascal  </th>
+                    <th> Haskell </th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td class="source">
+<pre>
+function f(a: LongInt): LongInt;
+var
+    i: Integer;
+begin
+    f := 0;
+    for i := 1 to a do begin
+        f := f;
+        f := f + i;
+    end;
+end;
+
+var
+    k: LongInt;
+    trash: Boolean;
+    i, n: Integer;
+begin
+    ReadLn(n);
+    k := 1;
+    trash := True;
+    for i := 1 to n do begin
+        k := k * i;
+    end;
+    k := f(k);
+    WriteLn(k);
+end.
+</pre>
+                    </td>
+                    <td class="source">
+<pre>
+main
+  = do n &lt;- readLn :: IO Int
+       print (f (product [1 .. n]))
+       return ()
+
+f a = sum [1 .. a]
+</pre>
+                    </td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2">
+                        the code above was translated using Sodium
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
         <h2>Can I help?</h2>
         <p>
             Sure! Fork the repo and do whatever you think is good, then create
