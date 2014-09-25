@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+    <head>
+        <style>
+            main {
+                width: 70%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            footer {
+                text-align: center;
+            }
+        </style>
+        <title>Sodium</title>
+    </head>
+    <body>
+    <main>
+        <img src="sodium.png" style="float: left;"/>
+        <h1>Sodium</h1>
+        <p>
+            Sodium is a research project. The goal is to generate idiomatic
+            functional code from imperative code. The source language is
+            <strong>Pascal</strong> (because it's easy to implement), and the
+            target language is <strong>Haskell</strong> (because it's powerful).
+        </p>
+
+        <p>
+            The translator itself is written in Haskell and hosted on
+            <a href="https://github.com/int-index/sodium">GitHub</a>.
+            Contributions are welcome, so feel free to open an issue
+            or create a pull request.
+        </p>
+
+        <h2>Why bother?</h2>
+        <p>
+            There are reasons to believe that functional paradigm is superior.
+            The incomplete list being:
+            <ul>
+                <li>
+                    Code becomes more concise and flexible&mdash;thanks to
+                    higher order functions.
+                </li>
+                <li>
+                    Strong static typing helps to prevent bugs, but
+                    doesn't get in the way.
+                </li>
+                <li>
+                    The lack of implicit state means that code is way eaiser
+                    to reason about and maintain.
+                </li>
+                <li>
+                    Procedural/object-oriented concepts are embeddable
+                    using modern techniques (state monad, lenses).
+                </li>
+                <li>
+                    Parallel and concurrent algorithms are way easier to
+                    implement.
+                </li>
+            </ul>
+        </p>
+        <p>
+            Yet there's an unresolved question: what do we do with the
+            existing codebase? Billions of lines of code are written in
+            imperative languages.
+            Manually rewriting every library is extremely tedious
+            and can introduce new bugs.
+        </p>
+
+        <h2>The problem</h2>
+        <p>
+            Functional programming is based on λ-calculus, whereas
+            imperative programming takes Turing-machine model as its basis.
+            But these are <strong>equivalent</strong>&mdash;for every program
+            there's a direct translation from one model to another.
+        </p>
+        <p>
+            The actual problem is not the translation itself, but preserving
+            the higher-order abstractions. And this is really difficult
+            (probably impossible) to accomplish, as those abstractions
+            live inside the programmer's head, not in the code.
+
+            However, the code contains various reflections of those
+            abstractions (such as functions and data types), so there should
+            be a way to extract some information and use it to translate
+            the program.
+        </p>
+        
+        <h2>The solution</h2>
+        <p>
+            There's no obvious solution for this problem.
+            <strong>Sodium</strong> aims to discover how far we can get. The
+            core idea is pattern recognition. Numerous application
+            of semantics-preserving transformations to the code can yield
+            certain patterns, from which it is possible to extract high-level
+            concepts.
+        </p>
+        <p> The current roadmap is:
+            <ol>
+                <li>
+                    Translate a simple imperative language to a functional
+                    language. The output code may not be beautiful/idiomatic.
+                </li>
+                <li>
+                    Find the ways to recover the initial quality of the
+                    input code, so the output is at least as good as the input.
+                </li>
+                <li>
+                    Discover the possibilities to make the resulting code
+                    better than original (e.g. automatic parallelization).
+                </li>
+            </ol>
+        </p>
+        <h2>Can I help?</h2>
+        <p>
+            Sure! Fork the repo and do whatever you think is good, then create
+            a pull request. If you don't know what to do&mdash;my email
+            address can be found in commits&mdash;feel free to contact me.
+        </p>
+    </main>
+    <footer>
+        <a href="https://github.com/int-index">Index Int</a>, 2014
+    </footer>
+    </body>
+</html>
