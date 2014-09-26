@@ -2,6 +2,7 @@
 module Sodium.Pascal.Parse (parse, tokenize) where
 
 import Control.Monad
+import Control.Monad.Trans.Except
 
 import qualified Sodium.Pascal.Tokenize as T
 import Sodium.Pascal.Program
@@ -197,7 +198,8 @@ Arguments_ :                           {      [] }
 {
 parseErr _ = mzero
 
-parse = either (error.show) id . P.parse parser ""
+parse :: String -> Except P.ParseError Program
+parse = except . P.parse parser ""
 
 match_inumber (T.INumber i      ) = INumber i
 match_fnumber (T.FNumber i f    ) = FNumber i f

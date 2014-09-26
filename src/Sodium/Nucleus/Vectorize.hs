@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
-module Sodium.Nucleus.Vectorize (vectorize) where
+module Sodium.Nucleus.Vectorize (vectorize, Error(..)) where
 
 import Data.List
 import Control.Applicative
@@ -11,7 +11,7 @@ import qualified Data.Map as M
 import Sodium.Nucleus.Program.Scalar
 import qualified Sodium.Nucleus.Program.Vector as Vec
 
-data VectorizerException
+data Error
     = NoAccess Name Vec.Indices
     | NoFunction Operator
     | UpdateImmutable Name
@@ -19,16 +19,15 @@ data VectorizerException
     | InvalidOperation
     deriving (Show)
 
-type E = Except VectorizerException
+type E = Except Error
 type R m a = ReaderT Vec.Indices m a
 type S m a = StateT  Vec.Indices m a
 
-vectorize :: Program -> Vec.Program
-vectorize program = fromExcept $ do
+vectorize :: Program -> E Vec.Program
+vectorize program = do
     let funcSigs = program ^.. programFuncs . traversed . funcSig
     vecFuncs <- mapM (vectorizeFunc funcSigs) (program ^. programFuncs)
     return $ Vec.Program vecFuncs
-    where fromExcept = either (error.show) id . runExcept
 
 references :: FuncSig -> [Name]
 references funcSig = do

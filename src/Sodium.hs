@@ -13,18 +13,26 @@ import Sodium.Pascal.Parse   (parse)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified  Sodium.Pascal.Convert as P (convert)
 import qualified Sodium.Haskell.Convert as H (convert)
+import qualified Sodium.Error as E
+
+import Control.Monad.Except
 import Data.Profunctor
 
 import Debug.Trace
 
 translate :: String -> String
 translate = dimap fromPascal toHaskell onNucleus where
-    fromPascal = P.convert . parse
+    fromPascal = P.convert . parse'
     toHaskell  = prettyPrint . H.convert
-    onNucleus = dimap onScalar onVector vectorize
+    onNucleus = dimap onScalar onVector vectorize'
     onScalar = side . uncurse
     onVector = closure pass
     pass = flatten . inline . foldMatch . joinMultiIf . extractBody . clean
+
+parse'     = error' . withExcept E.parseError     . parse
+vectorize' = error' . withExcept E.vectorizeError . vectorize
+
+error' = either (error.show) id . runExcept
 
 closure :: Eq a => (a -> a) -> a -> a
 closure f = match 0 . iterate f
