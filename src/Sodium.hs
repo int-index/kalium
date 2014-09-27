@@ -1,4 +1,5 @@
-module Sodium (translate) where
+{-# LANGUAGE DeriveDataTypeable #-}
+module Sodium (SodiumException(..), translate) where
 
 import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.IOMagic     (uncurse)
@@ -18,7 +19,15 @@ import qualified Sodium.Error as E
 import Control.Monad.Except
 import Data.Profunctor
 
+import Data.Typeable
+import Control.Exception (Exception, throw)
+
 import Debug.Trace
+
+data SodiumException = SodiumException String
+    deriving (Typeable, Show)
+
+instance Exception SodiumException
 
 translate :: String -> String
 translate = dimap fromPascal toHaskell onNucleus where
@@ -32,7 +41,7 @@ translate = dimap fromPascal toHaskell onNucleus where
 parse'     = error' . withExcept E.parseError     . parse
 vectorize' = error' . withExcept E.vectorizeError . vectorize
 
-error' = either (error.show) id . runExcept
+error' = either (throw . SodiumException . show) id . runExcept
 
 closure :: Eq a => (a -> a) -> a -> a
 closure f = match 0 . iterate f
