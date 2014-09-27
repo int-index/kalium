@@ -5,6 +5,7 @@ import Data.Monoid
 import Control.Applicative
 import Control.Monad
 import Control.Lens
+import Control.Monad.Except
 
 import Shelly
 import qualified Filesystem.Path.CurrentOS as P
@@ -14,7 +15,7 @@ import qualified Data.Text as T
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Control.Exception (evaluate)
+import Control.Exception (SomeException, Exception, evaluate)
 
 import qualified Sodium
 
@@ -36,59 +37,56 @@ reifyTests tests = testGroup "tests"
 
 testRegroup = foldr (uncurry go) ([], [], [], [])
     where go name = \case
-            Stage0_Fail a -> over _1 (testCase name a:)
-            Stage1_Fail a -> over _2 (testCase name a:)
-            Stage2_Fail a -> over _3 (testCase name a:)
-            Stage3_Success-> over _4 (testCase name a:)
+            Stage0_Gen a -> over _1 (testCase name a:)
+            Stage1_Gen a -> over _2 (testCase name a:)
+            Stage2_Gen a -> over _3 (testCase name a:)
+            Stage3_Gen _ -> over _4 (testCase name a:)
                                               where a=return()
 
-data TestGen = Success
-             | Stage0_Fail Assertion
-             | Stage1_Fail Assertion
-             | Stage2_Fail Assertion
-             | Stage3_Success
+data TestGen = Stage0_Gen Assertion
+             | Stage1_Gen Assertion
+             | Stage2_Gen Assertion
+             | Stage3_Gen BS.ByteString
 
 testGen :: Sh [(String, TestGen)]
 testGen = do
-    testdirs <- ls "tests"
-    forM testdirs $ \testdir -> do
-        chdir testdir $ do
-            testName <- T.unpack . toTextIgnore . P.basename <$> pwd
-            tg <- testStage0 >>= \case
-                Left t -> return t
-                Right stage0 -> do
-                    testStage1 stage0 >>= \case
-                        Left t -> return t
-                        Right stage1 -> do
-                            testStage2 stage1 >>= \case
-                                Left t -> return t
-                                Right stage3 -> return Stage3_Success
-            return (testName, tg)
+    testdirs <- ls "tests" >>= filterM test_d
+    forM testdirs $ flip chdir $ do
+        testName <- T.unpack . toTextIgnore . P.basename <$> pwd
+        tg <- runExceptT $ testStage0 >>= testStage1 >>= testStage2
+        return (testName, either id Stage3_Gen tg)
 
-testStage0 :: Sh (Either TestGen T.Text)
-testStage0 = catchany_sh (Right <$> readfile "program.pas")
-           $ \_ -> return $ Left $ Stage0_Fail (assertFailure msg)
-    where msg = "bad test structure: program.pas not found"
 
-testStage1 :: T.Text -> Sh (Either TestGen T.Text)
-testStage1 source = catch_sh (Right <$> result)
-                  $ \(Sodium.SodiumException s) -> return $ Left $ Stage1_Fail (assertFailure s)
-    where result = liftIO . evaluate
+catch_sh' :: Exception e => (e -> Sh x) -> Sh a -> ExceptT x Sh a
+catch_sh' handler action = join $ lift $ catch_sh (fmap return action) (fmap throwError . handler)
+
+testStage0 :: ExceptT TestGen Sh T.Text
+testStage0 = catch_sh' handler (readfile "program.pas")
+    where handler  :: SomeException -> Sh TestGen
+          handler _ = return $ Stage0_Gen $ assertFailure msg
+          msg = "bad test structure: program.pas not found"
+
+testStage1 :: T.Text -> ExceptT TestGen Sh T.Text
+testStage1 source = catch_sh' handler action
+    where action = liftIO . evaluate
                  $ T.pack . Sodium.translate . T.unpack
                  $ source
+          handler :: Sodium.SodiumException -> Sh TestGen
+          handler (Sodium.SodiumException s) = return $ Stage1_Gen (assertFailure s)
 
-testStage2 :: T.Text -> Sh (Either TestGen BS.ByteString)
-testStage2 source = do
-    withTmpDir $ \sandbox -> do
-        let mainFile   = sandbox </> "Main.hs"
-        let ghcObjDir  = sandbox </> "ghc_obj"
-        let ghcBinFile = sandbox </> "ghc_bin"
-        writefile mainFile source
-        mkdir ghcObjDir
-        errExit False
-          $ run "ghc" [ toTextArg mainFile
-                      , T.pack "-outputdir", toTextArg ghcObjDir
-                      , T.pack "-o", toTextArg ghcBinFile
-                      ]
-        catchany_sh (Right <$> readBinary ghcBinFile)
-                   $ \_ -> return $ Left $ Stage2_Fail (assertFailure (T.unpack source))
+testStage2 :: T.Text -> ExceptT TestGen Sh BS.ByteString
+testStage2 source = catch_sh' handler action
+   where handler  :: SomeException -> Sh TestGen
+         handler _ = return $ Stage2_Gen (assertFailure (T.unpack source))
+         action = withTmpDir $ \sandbox -> do
+           let mainFile   = sandbox </> "Main.hs"
+           let ghcObjDir  = sandbox </> "ghc_obj"
+           let ghcBinFile = sandbox </> "ghc_bin"
+           writefile mainFile source
+           mkdir ghcObjDir
+           run "ghc"
+               [ toTextArg mainFile
+               , T.pack "-outputdir", toTextArg ghcObjDir
+               , T.pack "-o", toTextArg ghcBinFile
+               ] & errExit False
+           readBinary ghcBinFile
