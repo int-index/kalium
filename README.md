@@ -17,6 +17,21 @@ require the latest versions.
 Then build the project itself with `cabal build`.
 
 
+## Testing
+
+Run the regression tests with `cabal test`.
+
+If you want to add one, they are structured as follows. Tests are stored
+in `testing/tests`, one per directory. Each test consists of a Pascal
+source file `program.pas` and a scenario file `scenarios`. The latter
+is simply white-space separated list of scenarios, against which the
+translated program will be tested.
+
+Scenarios are stored in `testing/scenarios`, one per directory. Each
+scenario is basically two files: `input` that is fed to the translated
+program, and the expected `output`.
+
+
 ## Structure
 
 *Sodium* consists of a library that contains all the functionality and an

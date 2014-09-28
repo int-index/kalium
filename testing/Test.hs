@@ -57,7 +57,7 @@ data TestGen = Success
 goldenTestCase :: String -> BS.ByteString -> [T.Text] -> TestTree
 goldenTestCase name binary scenarios = testGroup name $ do
     scenario <- scenarios
-    let scenarioDir = "scenarios" </> P.fromText scenario :: P.FilePath
+    let scenarioDir = "testing" </> "scenarios" </> P.fromText scenario :: P.FilePath
     return $ goldenVsString (T.unpack scenario)
                             (P.encodeString $ scenarioDir </> "output")
            $ shelly . silently $ do
@@ -71,6 +71,7 @@ goldenTestCase name binary scenarios = testGroup name $ do
 
 testGen :: Sh [(String, TestGen)]
 testGen = do
+    cd "testing"
     testdirs <- ls "tests" >>= filterM test_d
     forM testdirs $ flip chdir $ do
         testName <- T.unpack . toTextIgnore . P.basename <$> pwd
@@ -115,7 +116,8 @@ testStage2 source = catch_sh' handler action
 testStage3 :: BS.ByteString -> ExceptT TestGen Sh TestGen
 testStage3 binary = catch_sh' handler action
     where handler  :: SomeException -> Sh TestGen
-          handler _ = return Success
+          handler _ = return $ TG_Structure $ assertFailure msg
+          msg = "scenarios not found"
           action = do
             let scenariosFile = "scenarios"
             scenarios <- T.words <$> readfile scenariosFile
