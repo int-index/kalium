@@ -8,15 +8,16 @@ import Control.Lens
 import Control.Monad.Except
 
 import Shelly
+import System.Process
+import System.Exit
+import System.IO
 import qualified Filesystem.Path.CurrentOS as P
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
 import Test.Tasty
 import Test.Tasty.HUnit
-import Test.Tasty.Golden
 
 import Control.Exception (SomeException, Exception, evaluate)
 
@@ -45,29 +46,14 @@ testRegroup = foldr (uncurry go) ([], [], [], [])
             TG_Structure a -> over _1 (testCase name a:)
             TG_Sodium a -> over _2 (testCase name a:)
             TG_GHC    a -> over _3 (testCase name a:)
-            TG_Scenarios binary scenarios
-                        -> over _4 (goldenTestCase name binary scenarios:)
+            TG_Scenarios as -> over _4 (tg:)
+                where tg = testGroup name (uncurry testCase `map` as)
 
 data TestGen = Success
              | TG_Structure Assertion
              | TG_Sodium    Assertion
              | TG_GHC       Assertion
-             | TG_Scenarios BS.ByteString [T.Text]
-
-goldenTestCase :: String -> BS.ByteString -> [T.Text] -> TestTree
-goldenTestCase name binary scenarios = testGroup name $ do
-    scenario <- scenarios
-    let scenarioDir = "testing" </> "scenarios" </> P.fromText scenario :: P.FilePath
-    return $ goldenVsString (T.unpack scenario)
-                            (P.encodeString $ scenarioDir </> "output")
-           $ shelly . silently $ do
-               inputString <- readfile (scenarioDir </> "input")
-               withTmpDir $ \sandbox -> do
-                 let ghcBinFile = sandbox </> "ghc_bin"
-                 liftIO $ BS.writeFile (P.encodeString ghcBinFile) binary
-                 run "chmod" ["u+x", toTextArg ghcBinFile]
-                 setStdin inputString
-                 LBS.fromStrict . T.encodeUtf8 <$> run ghcBinFile []
+             | TG_Scenarios [(TestName, Assertion)]
 
 testGen :: Sh [(String, TestGen)]
 testGen = do
@@ -121,4 +107,33 @@ testStage3 binary = catch_sh' handler action
           action = do
             let scenariosFile = "scenarios"
             scenarios <- T.words <$> readfile scenariosFile
-            return (TG_Scenarios binary scenarios)
+            return (tg_scenarios binary scenarios)
+
+tg_scenarios :: BS.ByteString -> [T.Text] -> TestGen
+tg_scenarios binary scenarios = TG_Scenarios (map tg scenarios)
+    where tg :: T.Text -> (TestName, Assertion)
+          tg scenario = (T.unpack scenario, tg_scenario binary scenario)
+
+tg_scenario :: BS.ByteString -> T.Text -> Assertion
+tg_scenario binary scenario = do
+    r <- shelly $ do
+        let scenarioPath = "testing" </> "scenarios" </> P.fromText scenario
+        withTmpDir $ \sandbox -> do
+            let ghcBinFile = P.encodeString (sandbox </> "ghc_bin")
+            liftIO $ BS.writeFile ghcBinFile binary
+            run "chmod" ["u+x", toTextArg ghcBinFile]
+            liftIO $ do
+              (Just stdin, Just stdout, _, proc) <- createProcess
+                $ (proc (P.encodeString scenarioPath) [])
+                    { std_in  = CreatePipe
+                    , std_out = CreatePipe
+                    }
+              hPutStrLn stdin ghcBinFile
+              hClose stdin
+              msg <- hGetContents stdout
+              waitForProcess proc >>= \case
+                ExitSuccess -> return (True, msg)
+                _ -> return (False, msg)
+    case r of
+        (True, "" ) -> return ()
+        (_   , msg) -> assertFailure msg

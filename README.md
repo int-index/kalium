@@ -19,17 +19,17 @@ Then build the project itself with `cabal build`.
 
 ## Testing
 
-Run the regression tests with `cabal test`.
+Run the regression tests with `cabal test`. Python 3.4 or higher is needed.
 
 If you want to add one, they are structured as follows. Tests are stored
 in `testing/tests`, one per directory. Each test consists of a Pascal
 source file `program.pas` and a scenario file `scenarios`. The latter
-is simply white-space separated list of scenarios, against which the
+is simply a whitespace separated list of scenarios, against which the
 translated program will be tested.
 
-Scenarios are stored in `testing/scenarios`, one per directory. Each
-scenario is basically two files: `input` that is fed to the translated
-program, and the expected `output`.
+Scenarios are stored in `testing/scenarios`, one per file. Each scenario
+is a script that takes the path to the translated program through STDIN
+and outputs a message to STDOUT if something is wrong.
 
 
 ## Structure
