@@ -67,14 +67,14 @@ test-suite test
                        lens >=4.4 && <4.5,
                        mtl >=2.2 && <2.3,
                        bytestring >=0.10 && <0.11,
-                       text >=1.1 && <1.2,
-                       shelly >=1.5 && <1.6,
                        process >=1.2 && <1.3,
-                       system-filepath >=0.4 && <0.5,
+                       temporary >=1.2 && <1.3,
+                       directory >=1.2 && <1.3,
                        tasty >=0.8 && <0.9,
                        tasty-hunit >=0.9 && <0.10,
                        sodium
   type:                exitcode-stdio-1.0
   hs-source-dirs:      testing
+  ghc-options:         -W
   default-language:    Haskell2010
   default-extensions:  LambdaCase

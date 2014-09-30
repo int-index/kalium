@@ -1,33 +1,30 @@
-{-# LANGUAGE OverloadedStrings, ExtendedDefaultRules #-}
-module Main where
+{-# LANGUAGE OverloadedStrings #-}
+module Main (main) where
 
-import Data.Monoid
+import Data.Char (isAlphaNum)
+import Data.List (isPrefixOf)
 import Control.Applicative
 import Control.Monad
 import Control.Lens
 import Control.Monad.Except
 
-import Shelly
 import System.Process
 import System.Exit
 import System.IO
-import qualified Filesystem.Path.CurrentOS as P
+import System.Directory
 import qualified Data.ByteString as BS
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Control.Exception (SomeException, Exception, evaluate)
+import Control.Concurrent (myThreadId)
+import Control.Exception
 
 import qualified Sodium
 
-default (T.Text)
-
 main :: IO ()
 main = do
-    tests <- shelly (silently testGen)
+    tests <- testGen
     defaultMain (reifyTests tests)
 
 reifyTests :: [(String, TestGen)] -> TestTree
@@ -55,85 +52,99 @@ data TestGen = Success
              | TG_GHC       Assertion
              | TG_Scenarios [(TestName, Assertion)]
 
-testGen :: Sh [(String, TestGen)]
-testGen = do
-    cd "testing"
-    testdirs <- ls "tests" >>= filterM test_d
-    forM testdirs $ flip chdir $ do
-        testName <- T.unpack . toTextIgnore . P.basename <$> pwd
-        tg <- runExceptT $ testStage0 >>= testStage1 >>= testStage2 >>= testStage3
-        return (testName, either id id tg)
+testGen :: IO [(String, TestGen)]
+testGen = chdir "testing" $ do
+    chdir "tests" $ do
+        dirs <- getCurrentDirectory >>= getDirectoryContents
+        let testdirs = filter (not . isPrefixOf ".") dirs
+        forM testdirs $ \testdir -> chdir testdir $ do
+            tg <- runExceptT $ testStage0 >>= testStage1 >>= testStage2 >>= testStage3
+            return (testdir, either id id tg)
 
 
-catch_sh' :: Exception e => (e -> Sh x) -> Sh a -> ExceptT x Sh a
-catch_sh' handler action = join $ lift $ catch_sh (fmap return action) (fmap throwError . handler)
+catch' :: Exception e => (e -> IO x) -> IO a -> ExceptT x IO a
+catch' handler action = join $ lift $ catch (fmap return action) (fmap throwError . handler)
 
-testStage0 :: ExceptT TestGen Sh T.Text
-testStage0 = catch_sh' handler (readfile "program.pas")
-    where handler  :: SomeException -> Sh TestGen
+testStage0 :: ExceptT TestGen IO String
+testStage0 = catch' handler (readFile "program.pas")
+    where handler  :: SomeException -> IO TestGen
           handler _ = return $ TG_Structure $ assertFailure msg
           msg = "program.pas not found"
 
-testStage1 :: T.Text -> ExceptT TestGen Sh T.Text
-testStage1 source = catch_sh' handler action
-    where action = liftIO . evaluate
-                 $ T.pack . Sodium.translate . T.unpack
-                 $ source
-          handler :: Sodium.SodiumException -> Sh TestGen
+testStage1 :: String -> ExceptT TestGen IO String
+testStage1 source = catch' handler action
+    where action = evaluate $ Sodium.translate $ source
+          handler :: Sodium.SodiumException -> IO TestGen
           handler (Sodium.SodiumException s) = return $ TG_Sodium (assertFailure s)
 
-testStage2 :: T.Text -> ExceptT TestGen Sh BS.ByteString
-testStage2 source = catch_sh' handler action
-   where handler  :: SomeException -> Sh TestGen
-         handler _ = return $ TG_GHC (assertFailure (T.unpack source))
-         action = withTmpDir $ \sandbox -> do
-           let mainFile   = sandbox </> "Main.hs"
-           let ghcObjDir  = sandbox </> "ghc_obj"
-           let ghcBinFile = sandbox </> "ghc_bin"
-           writefile mainFile source
-           mkdir ghcObjDir
-           run "ghc"
-               [ toTextArg mainFile
-               , T.pack "-outputdir", toTextArg ghcObjDir
-               , T.pack "-o", toTextArg ghcBinFile
-               ] & errExit False
-           readBinary ghcBinFile
+testStage2 :: String -> ExceptT TestGen IO BS.ByteString
+testStage2 source = catch' handler action
+   where handler  :: SomeException -> IO TestGen
+         handler _ = return $ TG_GHC (assertFailure source)
+         action = withTmpDir $ \sandbox -> chdir sandbox $ do
+           let mainFile   = "Main.hs"
+           let ghcObjDir  = "ghc_obj"
+           let ghcBinFile = "ghc_bin"
+           writeFile mainFile source
+           createDirectory ghcObjDir
+           callProcess "ghc"
+               [ mainFile
+               , "-outputdir", ghcObjDir
+               , "-o", ghcBinFile
+               ]
+           BS.readFile ghcBinFile
 
-testStage3 :: BS.ByteString -> ExceptT TestGen Sh TestGen
-testStage3 binary = catch_sh' handler action
-    where handler  :: SomeException -> Sh TestGen
+testStage3 :: BS.ByteString -> ExceptT TestGen IO TestGen
+testStage3 binary = catch' handler action
+    where handler  :: SomeException -> IO TestGen
           handler _ = return $ TG_Structure $ assertFailure msg
           msg = "scenarios not found"
           action = do
             let scenariosFile = "scenarios"
-            scenarios <- T.words <$> readfile scenariosFile
+            scenarios <- words <$> readFile scenariosFile
             return (tg_scenarios binary scenarios)
 
-tg_scenarios :: BS.ByteString -> [T.Text] -> TestGen
+tg_scenarios :: BS.ByteString -> [String] -> TestGen
 tg_scenarios binary scenarios = TG_Scenarios (map tg scenarios)
-    where tg :: T.Text -> (TestName, Assertion)
-          tg scenario = (T.unpack scenario, tg_scenario binary scenario)
+    where tg :: String -> (TestName, Assertion)
+          tg scenario = (scenario, tg_scenario binary scenario)
 
-tg_scenario :: BS.ByteString -> T.Text -> Assertion
+tg_scenario :: BS.ByteString -> String -> Assertion
 tg_scenario binary scenario = do
-    r <- shelly $ do
-        let scenarioPath = "testing" </> "scenarios" </> P.fromText scenario
+    r <- do
+        let scenarioPath = "testing/scenarios" ++ "/" ++ scenario
         withTmpDir $ \sandbox -> do
-            let ghcBinFile = P.encodeString (sandbox </> "ghc_bin")
-            liftIO $ BS.writeFile ghcBinFile binary
-            run "chmod" ["u+x", toTextArg ghcBinFile]
-            liftIO $ do
-              (Just stdin, Just stdout, _, proc) <- createProcess
-                $ (proc (P.encodeString scenarioPath) [])
-                    { std_in  = CreatePipe
-                    , std_out = CreatePipe
-                    }
-              hPutStrLn stdin ghcBinFile
-              hClose stdin
-              msg <- hGetContents stdout
-              waitForProcess proc >>= \case
-                ExitSuccess -> return (True, msg)
-                _ -> return (False, msg)
+            let ghcBinFile = sandbox ++ "/" ++ "ghc_bin"
+            do BS.writeFile ghcBinFile binary
+               p <- getPermissions ghcBinFile
+               setPermissions ghcBinFile (setOwnerExecutable True p)
+            (Just stdin, Just stdout, _, proc) <- createProcess
+              $ (proc scenarioPath [])
+                  { std_in  = CreatePipe
+                  , std_out = CreatePipe
+                  }
+            hPutStrLn stdin ghcBinFile
+            hClose stdin
+            msg <- hGetContents stdout
+            waitForProcess proc >>= \case
+              ExitSuccess -> return (True, msg)
+              _ -> return (False, msg)
     case r of
         (True, "" ) -> return ()
         (_   , msg) -> assertFailure msg
+
+chdir :: FilePath -> (IO a -> IO a)
+chdir path act = do
+    dir <- getCurrentDirectory
+    setCurrentDirectory path
+    act <* setCurrentDirectory dir
+
+withTmpDir :: (FilePath -> IO a) -> IO a
+withTmpDir act = do
+  dir <- getTemporaryDirectory
+  tid <- myThreadId
+  (p, handle) <- openTempFile dir ("tmp" ++ filter isAlphaNum (show tid))
+  hClose handle -- required on windows
+  callProcess "rm" ["-f", p]
+  createDirectory p
+  act p `finally` callProcess "rm" ["-rf", p]
