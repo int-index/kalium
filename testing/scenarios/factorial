@@ -1,0 +1,19 @@
+#!/usr/bin/python
+from subprocess import check_output
+
+def factorial(n):
+    if n == 0:
+        return 1
+    return n * factorial(n - 1)
+
+nums = range(0, 10)
+
+program = input()
+for num in nums:
+    inp = bytes(str(num), encoding='utf-8')
+    out = check_output(program, input=inp, timeout=3)
+    fac = factorial(num)
+    exp = bytes(str(fac) + '\n', encoding='utf-8')
+    if not out == exp:
+        print('output mismatch')
+        break

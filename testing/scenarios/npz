@@ -1,0 +1,18 @@
+#!/usr/bin/python
+from subprocess import check_output
+
+nums = range(1024, -1024, -23)
+
+program = input()
+for num in nums:
+    inp = bytes(str(num), encoding='utf-8')
+    out = check_output(program, input=inp, timeout=3)
+    if num > 0:
+        exp = b'Positive\n'
+    elif num < 0:
+        exp = b'Negative\n'
+    else:
+        exp = b'Zero\n'
+    if not out == exp:
+        print('output mismatch')
+        break
