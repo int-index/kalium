@@ -65,17 +65,21 @@ testGen = chdir "testing" $ do
 catch' :: Exception e => (e -> IO x) -> IO a -> ExceptT x IO a
 catch' handler action = join $ lift $ catch (fmap return action) (fmap throwError . handler)
 
-testStage0 :: ExceptT TestGen IO String
-testStage0 = catch' handler (readFile "program.pas")
+testStage0 :: ExceptT TestGen IO (Bool, String)
+testStage0 = catch' handler action
     where handler  :: SomeException -> IO TestGen
           handler _ = return $ TG_Structure $ assertFailure msg
           msg = "program.pas not found"
+          action = (,) <$> doesFileExist "shouldfail" <*> readFile "program.pas"
 
-testStage1 :: String -> ExceptT TestGen IO String
-testStage1 source = catch' handler action
+testStage1 :: (Bool, String) -> ExceptT TestGen IO String
+testStage1 (shouldfail, source) = catch' handler action
     where action = evaluate $ Sodium.translate $ source
           handler :: Sodium.SodiumException -> IO TestGen
-          handler (Sodium.SodiumException s) = return $ TG_Sodium (assertFailure s)
+          handler (Sodium.SodiumException s)
+            = if shouldfail
+                then return Success
+                else return $ TG_Sodium (assertFailure s)
 
 testStage2 :: String -> ExceptT TestGen IO BS.ByteString
 testStage2 source = catch' handler action
