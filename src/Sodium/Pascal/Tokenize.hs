@@ -21,6 +21,10 @@ data Token
     | KwFalse
     | KwAnd
     | KwOr
+    | KwXor
+    | KwNot
+    | KwDiv
+    | KwMod
     | KwIf
     | KwThen
     | KwElse
@@ -148,6 +152,10 @@ keywords = M.fromList
     , ("false"   , KwFalse)
     , ("and"     , KwAnd)
     , ("or"      , KwOr)
+    , ("xor"     , KwXor)
+    , ("not"     , KwNot)
+    , ("div"     , KwDiv)
+    , ("mod"     , KwMod)
     , ("if"      , KwIf)
     , ("then"    , KwThen)
     , ("else"    , KwElse)

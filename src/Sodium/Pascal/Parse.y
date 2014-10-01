@@ -31,6 +31,10 @@ import qualified Text.Parsec as P
     false    { T.KwFalse }
     and      { T.KwAnd   }
     or       { T.KwOr    }
+    xor      { T.KwXor   }
+    not      { T.KwNot   }
+    div      { T.KwDiv   }
+    mod      { T.KwMod   }
     if       { T.KwIf    }
     then     { T.KwThen  }
     else     { T.KwElse  }
@@ -61,9 +65,10 @@ import qualified Text.Parsec as P
     unknown  { T.Unknown _ }
 
 %nonassoc '<' '>' '='
-%left     '+' '-' or
-%left     '*' '/' and
+%left     '+' '-' or  xor
+%left     '*' '/' div mod and
 %left     NEG POS
+%left     not
 
 %%
 
@@ -165,13 +170,17 @@ Expression : Expression '<' Expression { Binary OpLess   $1 $3 }
 Expression_ : Expression '+' Expression { Binary OpAdd      $1 $3 }
             | Expression '-' Expression { Binary OpSubtract $1 $3 }
             | Expression  or Expression { Binary OpOr       $1 $3 }
+            | Expression xor Expression { Binary OpXor      $1 $3 }
 
             | Expression '*' Expression { Binary OpMultiply $1 $3 }
             | Expression '/' Expression { Binary OpDivide   $1 $3 }
+            | Expression div Expression { Binary OpDiv      $1 $3 }
+            | Expression mod Expression { Binary OpMod      $1 $3 }
             | Expression and Expression { Binary OpAnd      $1 $3 }
 
             | '-' Expression %prec NEG  { Unary UOpNegate $2 }
             | '+' Expression %prec POS  { Unary UOpPlus   $2 }
+            | not Expression            { Unary UOpNot    $2 }
 
             | '(' Expression ')' { $2 }
             |     Atom           { $1 }

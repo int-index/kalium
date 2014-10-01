@@ -45,22 +45,27 @@ data Expression
 	deriving (Show)
 
 data Operator
-	= OpAdd
-	| OpSubtract
-	| OpMultiply
-	| OpDivide
-	| OpLess
-	| OpMore
-	| OpEquals
-	| OpAnd
-	| OpOr
-	| OpRange
-	deriving (Show)
+    = OpAdd
+    | OpSubtract
+    | OpMultiply
+    | OpDivide
+    | OpDiv
+    | OpMod
+    | OpLess
+    | OpMore
+    | OpEquals
+    | OpAnd
+    | OpOr
+    | OpXor
+    | OpNot
+    | OpRange
+    deriving (Show)
 
 data UnaryOperator
-	= UOpNegate
-	| UOpPlus
-	deriving (Show)
+    = UOpNegate
+    | UOpPlus
+    | UOpNot
+    deriving (Show)
 
 data PasType
 	= PasInteger

@@ -1,0 +1,26 @@
+#!/usr/bin/python
+from subprocess import check_output
+
+def fib(n):
+    if n == 0:
+        return (0, 1)
+    else:
+        a, b = fib(n // 2)
+        c = a * (2 * b - a)
+        d = b * b + a * a
+        return (c, d) if n % 2 == 0 else (d, c + d)
+
+def fibonacci(n):
+    return fib(n)[0]
+
+nums = range(0, 10)
+
+program = input()
+for num in nums:
+    inp = bytes(str(num), encoding='utf-8')
+    out = check_output(program, input=inp, timeout=3)
+    fac = fibonacci(num)
+    exp = bytes(str(fac) + '\n', encoding='utf-8')
+    if not out == exp:
+        print('output mismatch')
+        break

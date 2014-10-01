@@ -23,11 +23,15 @@ data Operator
     | OpSubtract
     | OpMultiply
     | OpDivide
+    | OpDiv
+    | OpMod
     | OpLess
     | OpMore
     | OpEquals
     | OpAnd
     | OpOr
+    | OpNot
+    | OpXor
     | OpRange
     | OpElem
     | OpShow

@@ -191,21 +191,26 @@ instance Conv S.Expression D.Expression where
 		S.BTrue  -> return $ D.Primary (D.LitBoolean True)
 		S.BFalse -> return $ D.Primary (D.LitBoolean False)
 		S.Binary op x y -> binary <$> conv op <*> conv x <*> conv y
-		S.Unary op x -> case op of
-			S.UOpPlus -> conv x
-			S.UOpNegate
-				 -> D.Call D.OpNegate
-				<$> mapM conv [x]
+		S.Unary op x -> D.Call <$> conv op <*> mapM conv [x]
 
 instance Conv S.Operator D.Operator where
-	conv = return . \case
-		S.OpAdd -> D.OpAdd
-		S.OpSubtract -> D.OpSubtract
-		S.OpMultiply -> D.OpMultiply
-		S.OpDivide -> D.OpDivide
-		S.OpLess -> D.OpLess
-		S.OpMore -> D.OpMore
-		S.OpEquals -> D.OpEquals
-		S.OpAnd -> D.OpAnd
-		S.OpOr -> D.OpOr
-		S.OpRange -> D.OpRange
+    conv = return . \case
+        S.OpAdd -> D.OpAdd
+        S.OpSubtract -> D.OpSubtract
+        S.OpMultiply -> D.OpMultiply
+        S.OpDivide -> D.OpDivide
+        S.OpDiv  -> D.OpDiv
+        S.OpMod  -> D.OpMod
+        S.OpLess -> D.OpLess
+        S.OpMore -> D.OpMore
+        S.OpEquals -> D.OpEquals
+        S.OpAnd -> D.OpAnd
+        S.OpOr  -> D.OpOr
+        S.OpXor -> D.OpXor
+        S.OpRange -> D.OpRange
+
+instance Conv S.UnaryOperator D.Operator where
+    conv = return . \case
+        S.UOpPlus   -> D.OpId
+        S.UOpNegate -> D.OpNegate
+        S.UOpNot    -> D.OpNot
