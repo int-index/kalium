@@ -64,9 +64,6 @@ data Expression
     | Primary Literal
     deriving (Eq, Show)
 
-call OpId [arg] = arg
-call op args = Call op args
-
 data Index
     = Index Integer
     | Immutable

@@ -99,7 +99,7 @@ vectorizeStatement funcSigs = \case
               _ -> False
         let vecExecute
               | impure    = Vec.Execute name vecArgs
-              | otherwise = Vec.Assign (Vec.call name vecArgs)
+              | otherwise = Vec.Assign (Vec.Call name vecArgs)
         return $ (resnames ++ sidenames, vecExecute)
     ForStatement forCycle -> over _2 Vec.ForStatement <$> do
         vecRange <- vectorizeExpression (forCycle ^. forRange)

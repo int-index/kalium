@@ -10,6 +10,7 @@ import Sodium.Nucleus.Pass.Inline      (inline)
 import Sodium.Nucleus.Pass.FoldMatch   (foldMatch)
 import Sodium.Nucleus.Pass.ExtractBody (extractBody)
 import Sodium.Nucleus.Pass.Clean       (clean)
+import Sodium.Nucleus.Pass.Compute     (compute)
 import Sodium.Pascal.Parse   (parse)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified  Sodium.Pascal.Convert as P (convert)
@@ -36,7 +37,8 @@ translate = dimap fromPascal toHaskell onNucleus where
     onNucleus = dimap onScalar onVector vectorize'
     onScalar = side . uncurse
     onVector = closure pass
-    pass = flatten . inline . foldMatch . joinMultiIf . extractBody . clean
+    pass = compute . flatten     . inline      . foldMatch
+                   . joinMultiIf . extractBody . clean
 
 parse'     = error' . withExcept E.parseError     . parse
 vectorize' = error' . withExcept E.vectorizeError . vectorize

@@ -62,6 +62,18 @@ instance RecmapMk Body where
 instance RecmapMk Statement where
     recmapper rm = mempty { recmap_parent_second = rm }
 
+instance RecmapMk Expression where
+    recmapper rmExpr = mempty { recmap_parent_first  = rmBody
+                              , recmap_parent_second = rmStatement }
+        where rmStatement
+                     =  _Assign rmExpr
+                    >=> (_Execute . _2 . traversed) rmExpr
+                    >=> _ForStatement     rmForCycle
+                    >=> _MultiIfStatement rmMultiIf
+              rmBody = (bodyResults . traversed) rmExpr
+              rmForCycle  = (forArgExprs . traversed) rmExpr
+                         >=> forRange rmExpr
+              rmMultiIf = (multiIfLeafs . traversed . _1) rmExpr
 
 localizer :: Monad' m => (forall a . Vars -> m a -> m a) -> Recmapper Vector m
 localizer lc = mempty { localize = lc }
