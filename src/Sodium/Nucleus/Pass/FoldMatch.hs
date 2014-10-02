@@ -16,16 +16,5 @@ foldMatchStatement statement = statement
 forCycleMatch
     (ForCycle [(name1, j)] argExprs name2 range (Assign (Call op args)))
     | args == [Access name1 j, Access name2 Immutable]
-    = Just (foldMatchOn op argExprs range)
+    = Just (Fold op argExprs range)
 forCycleMatch _ = Nothing
-
-foldMatchOn OpMultiply [Primary (LitInteger 1)] range
-    = Call OpProduct [range]
-foldMatchOn OpAdd [Primary (LitInteger 0)] range
-    = Call OpSum [range]
-foldMatchOn OpAnd [Primary (LitBoolean True)] range
-    = Call OpAnd' [range]
-foldMatchOn OpOr [Primary (LitBoolean False)] range
-    = Call OpOr' [range]
-foldMatchOn op argExprs range
-    = Fold op argExprs range

@@ -19,5 +19,10 @@ recursively f = \case
     where rf = recursively f
 
 match :: Expression -> Expression
-match (Call OpId [expr]) = expr
-match e = e
+match = \case
+    Call OpId [expr] -> expr
+    Fold OpMultiply [Primary (LitInteger 1)]     range -> Call OpProduct [range]
+    Fold OpAdd      [Primary (LitInteger 0)]     range -> Call OpSum     [range]
+    Fold OpAnd      [Primary (LitBoolean True )] range -> Call OpAnd'    [range]
+    Fold OpOr       [Primary (LitBoolean False)] range -> Call OpOr'     [range]
+    expr -> expr
