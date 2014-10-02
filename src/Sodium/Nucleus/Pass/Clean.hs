@@ -5,15 +5,56 @@ import Control.Lens hiding (Index, Fold)
 import Control.Monad.Reader
 import qualified Data.Map as M
 import Data.Bool
+import Data.List
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
 
 clean :: Program -> Program
-clean = over recmapped cleanBody
+clean = over recmapped (cleanBody . cleanRetBody)
 
 cleanBody :: Body -> Body
 cleanBody body = (bodyVars %~ M.filterWithKey cc) body where
     cc name _ = runReader (checkRef $ bodyComponents body) name
+
+
+cleanRetBody :: Body -> Body
+cleanRetBody body = body & bodyBinds .~ binds where
+    wild [] = []
+    wild (bind:binds) = [cleanRetBind usage bind]
+        where check = runReader $ checkRef (binds, body ^. bodyResults)
+              usage = map (check . fst) (bind ^. bindIndices)
+    binds = (tails $ body ^. bodyBinds) >>= wild
+
+cleanRetBind :: [Bool] -> Bind -> Bind
+cleanRetBind usage bind = maybe bind id (runReaderT (eliminate bind) usage)
+
+keep :: [a] -> ReaderT [Bool] Maybe [a]
+keep xs = do
+    usage <- ask
+    guard $ length xs == length usage
+    return $ concat
+           $ zipWith (\used b -> if used then [b] else []) usage xs
+
+class Eliminate a where
+    eliminate :: a -> ReaderT [Bool] Maybe a
+
+instance Eliminate Bind where
+    eliminate = bindStatement eliminate >=> bindIndices keep
+
+instance Eliminate Statement where
+    eliminate
+        =  _BodyStatement    eliminate
+       >=> _MultiIfStatement eliminate
+       >=> _Execute          (const mzero)
+       >=> _ForStatement     (const mzero)
+       >=> _Assign           (const mzero)
+
+instance Eliminate Body where
+    eliminate = bodyResults keep
+
+instance Eliminate MultiIfBranch where
+    eliminate  = (multiIfLeafs . traversed . _2) eliminate
+              >=> multiIfElse eliminate
 
 
 class CheckRef a where
