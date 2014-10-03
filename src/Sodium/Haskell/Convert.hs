@@ -8,7 +8,8 @@ import Control.Applicative
 -- S for Src, D for Dest
 import qualified Sodium.Nucleus.Program.Vector as S
 import qualified Sodium.Haskell.Program as D
-import qualified Language.Haskell.Exts as H
+import qualified Language.Haskell.Exts        as H
+import qualified Language.Haskell.Exts.SrcLoc as H
 
 convert :: S.Program -> H.Module
 convert = maybe (error "Sodium.Haskell.Convert") id . conv
@@ -25,9 +26,16 @@ instance Conv S.Program where
     type Norm S.Program = H.Module
     conv (S.Program funcs) = do
         funcDefs <- mapM conv funcs
-        return $ D.program funcDefs
-            (D.extensions ["LambdaCase", "TupleSections", "MultiWayIf"])
-            (map D.importDecl ["Control.Monad", "Control.Applicative"])
+        return $ H.Module H.noLoc
+            (H.ModuleName "Main")
+            (extensions ["LambdaCase", "TupleSections", "MultiWayIf"])
+            Nothing
+            Nothing
+            (map importDecl ["Control.Monad", "Control.Applicative"])
+            funcDefs
+      where extensions names = [H.LanguagePragma H.noLoc (map H.Ident names)]
+            importDecl s = H.ImportDecl H.noLoc (H.ModuleName s)
+                           False False Nothing Nothing Nothing
 
     type Pure S.Program = ()
     pureconv _ = Nothing
@@ -64,12 +72,12 @@ instance Conv S.Type where
     conv = pureconv
 
     type Pure S.Type = H.Type
-    pureconv = return . \case
-        S.TypeInteger -> D.hsType "Int"
-        S.TypeDouble  -> D.hsType "Double"
-        S.TypeBoolean -> D.hsType "Bool"
-        S.TypeString  -> D.hsType "String"
-        S.TypeUnit    -> D.hsUnit
+    pureconv = return . H.TyCon . \case
+        S.TypeInteger -> D.hsName "Int"
+        S.TypeDouble  -> D.hsName "Double"
+        S.TypeBoolean -> D.hsName "Bool"
+        S.TypeString  -> D.hsName "String"
+        S.TypeUnit    -> H.Special H.UnitCon
 
 instance Conv S.Body where
 
@@ -79,9 +87,11 @@ instance Conv S.Body where
         hsRetValues <- mapM conv resultExprs
         let hsStatement
               = D.doExecute
-              $ D.beta (D.access "return")
+              $ H.App (D.access "return")
               $ D.expTuple hsRetValues
-        return $ D.doexpr (hsStatements ++ [hsStatement])
+        return $ case hsStatements ++ [hsStatement] of
+            [H.Qualifier expression] -> expression
+            statements -> H.Do statements
 
     type Pure S.Body = H.Exp
     pureconv (S.Body _ statements resultExprs) = msum
@@ -180,21 +190,23 @@ instance Conv S.Statement where
         | t == S.TypeString = return (D.access "getLine")
         | otherwise = do
                 hsType <- conv t
-                return $ D.access "readLn" `D.typed` D.hsIO hsType
+                return $ H.ExpTypeSig H.noLoc
+                    (D.access "readLn")
+                    (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
     conv (S.Execute S.OpPrintLn args)
         = case args of
-            [S.Call S.OpShow [arg]] -> D.beta (D.access "print") <$> conv arg
+            [S.Call S.OpShow [arg]] -> H.App (D.access "print") <$> conv arg
             args -> (<$> mapM conv args) $ \case
-                [] -> D.beta (D.access "putStrLn") (D.primary (D.quote ""))
+                [] -> H.App (D.access "putStrLn") (H.Lit (H.String ""))
                 hsExprs
-                    -> D.beta (D.access "putStrLn")
+                    -> H.App (D.access "putStrLn")
                      $ foldl1 (\x y -> betaL [D.access "++", x, y])
                      $ hsExprs
     conv (S.Execute op args) = error ("Execute " ++ show op ++ " " ++ show args)
     conv (S.ForStatement  forCycle) = conv forCycle
     conv (S.MultiIfStatement multiIfBranch) = conv multiIfBranch
     conv (S.BodyStatement body) = conv body
-    conv (S.Assign expr) = D.beta (D.access "return") <$> conv expr
+    conv (S.Assign expr) = H.App (D.access "return") <$> conv expr
 
     type Pure S.Statement = H.Exp
     pureconv = \case
@@ -228,10 +240,10 @@ instance Conv FoldLambda where
     pureconv (FoldLambda indices name) = do
         hsNames <- conv (IndicesList indices)
         hsName  <- conv (Name name S.Immutable)
-        return $ D.lambda [D.patTuple hsNames, D.patTuple [hsName]]
+        return $ H.Lambda H.noLoc [D.patTuple hsNames, D.patTuple [hsName]]
 
 
-betaL = foldl1 D.beta
+betaL = foldl1 H.App
 
 newtype IndicesList = IndicesList S.IndicesList
 
@@ -249,43 +261,48 @@ instance Conv S.Expression where
     conv = pureconv
 
     type Pure S.Expression = H.Exp
-    pureconv (S.Primary prim) = return $ case prim of
-        S.LitInteger n -> D.primary (H.Int  n)
-        S.LitDouble  x -> D.primary (H.Frac x)
-        S.LitBoolean a -> D.access (if a then "True" else "False")
-        S.LitString cs -> D.primary (D.quote cs)
-        S.LitUnit -> D.expTuple []
-    pureconv (S.Access name i) = D.access <$> pureconv (Name name i)
-    pureconv (S.Call op exprs) = do
-        hsExprs <- mapM pureconv exprs
-        return $ betaL (D.access (convOp op) : hsExprs)
-    pureconv (S.Fold op exprs range) = do
-        hsArgExpr <- D.expTuple <$> mapM pureconv exprs
-        hsRange <- pureconv range
-        return $ betaL [D.access "foldl", D.access (convOp op), hsArgExpr, hsRange]
+    pureconv expr = D.matchExpression <$> convexpr expr
 
-convOp = \case
-    S.OpNegate -> "negate"
-    S.OpShow -> "show"
-    S.OpProduct -> "product"
-    S.OpSum -> "sum"
-    S.OpAnd' -> "and"
-    S.OpOr' -> "or"
-    S.OpAdd -> "+"
+convexpr :: S.Expression -> Maybe H.Exp
+convexpr (S.Primary prim) = return $ case prim of
+    S.LitInteger n -> H.Lit (H.Int  n)
+    S.LitDouble  x -> H.Lit (H.Frac x)
+    S.LitString cs -> H.Lit (H.String cs)
+    S.LitBoolean a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
+    S.LitUnit -> H.Con (H.Special H.UnitCon)
+convexpr (S.Access name i) = D.access <$> pureconv (Name name i)
+convexpr (S.Call op exprs) = do
+    hsExprs <- mapM convexpr exprs
+    return $ betaL (convOp op : hsExprs)
+convexpr (S.Fold op exprs range) = do
+    hsArgExpr <- D.expTuple <$> mapM convexpr exprs
+    hsRange <- convexpr range
+    return $ betaL [D.access "foldl", convOp op, hsArgExpr, hsRange]
+
+convOp :: S.Operator -> H.Exp
+convOp = D.access . \case
+    S.OpName name-> transformName name
+    S.OpNegate   -> "negate"
+    S.OpShow     -> "show"
+    S.OpProduct  -> "product"
+    S.OpSum      -> "sum"
+    S.OpAnd'     -> "and"
+    S.OpOr'      -> "or"
+    S.OpAdd      -> "+"
     S.OpSubtract -> "-"
     S.OpMultiply -> "*"
-    S.OpDivide -> "/"
-    S.OpDiv -> "div"
-    S.OpMod -> "mod"
-    S.OpMore -> ">"
-    S.OpLess -> "<"
-    S.OpEquals -> "=="
-    S.OpXor -> "/="
-    S.OpAnd -> "&&"
-    S.OpOr -> "||"
-    S.OpElem -> "elem"
-    S.OpRange -> "enumFromTo"
-    S.OpId -> "id"
-    S.OpName name -> transformName name
+    S.OpDivide   -> "/"
+    S.OpDiv      -> "div"
+    S.OpMod      -> "mod"
+    S.OpMore     -> ">"
+    S.OpLess     -> "<"
+    S.OpEquals   -> "=="
+    S.OpXor      -> "/="
+    S.OpAnd      -> "&&"
+    S.OpOr       -> "||"
+    S.OpNot      -> "not"
+    S.OpElem     -> "elem"
+    S.OpRange    -> "enumFromTo"
+    S.OpId       -> "id"
     S.OpPrintLn  -> "print"
     S.OpReadLn _ -> "readLn"
