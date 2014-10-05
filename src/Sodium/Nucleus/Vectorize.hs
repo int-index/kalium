@@ -59,7 +59,8 @@ vectorizeBody funcSigs body = do
                 $ M.intersectionWith (/=)
                 indices indices'
         let vecBodyGen results
-                = Vec.Body (body ^. bodyVars) (map (uncurry Vec.Bind) vecStatements)
+                = Vec.Body (body ^. bodyVars)
+                (map (\(indices, expr) -> Vec.Bind (Vec.Pattern indices) expr) vecStatements)
                 <$> runReaderT (mapM vectorizeExpression results) indices'
         return (changed, vecBodyGen)
 
@@ -69,7 +70,7 @@ vectorizeBody' funcSigs body = do
     vecBody <- lift $ vecBodyGen (map Access changed)
     return (changed, vecBody)
 
-vectorizeStatement' :: [FuncSig] -> Statement -> S E (Vec.IndicesList, Vec.Statement)
+vectorizeStatement' :: [FuncSig] -> Statement -> S E ([(Name, Vec.Index)], Vec.Statement)
 vectorizeStatement' funcSigs statement
     = _1 (mapM registerIndexUpdate)
     =<< readerToState (vectorizeStatement funcSigs statement)
@@ -108,7 +109,7 @@ vectorizeStatement funcSigs = \case
              $ vectorizeBody' funcSigs (forCycle ^. forBody)
         argIndices <- closedIndices changed
         let vecForCycle = Vec.ForCycle
-                argIndices
+                (Vec.Pattern argIndices)
                 (uncurry Vec.Access `map` argIndices)
                 (forCycle ^. forName)
                 vecRange
@@ -167,7 +168,7 @@ registerIndexUpdate name = do
             Vec.Uninitialized -> return (Vec.Index 0)
             Vec.Immutable -> throwError (UpdateImmutable name)
 
-closedIndices :: [Name] -> R E Vec.IndicesList
+closedIndices :: [Name] -> R E [(Name, Vec.Index)]
 closedIndices = mapM $ \name -> do
     index <- lookupIndex name
     return (name, index)

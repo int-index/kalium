@@ -24,5 +24,6 @@ bodyMatch body
 
     | otherwise = do
         [bind] <- return (body ^. bodyBinds)
-        guard $ map (uncurry Access) (bind ^. bindIndices) == body ^. bodyResults
+        -- TODO: proper matching
+        guard $ (\(Pattern xs) -> map (uncurry Access) xs) (bind ^. bindPattern) == body ^. bodyResults
         return (bind ^. bindStatement)

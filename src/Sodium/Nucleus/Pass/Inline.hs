@@ -26,7 +26,7 @@ eliminateAssign
 	-> ([Expression], [Bind])
 eliminateAssign (bodyResults, (bind:binds))
 	= maybe follow id $ do
-		Bind [name] (Assign expr) <- Just bind
+		Bind (Pattern [name]) (Assign expr) <- Just bind
 		let subSingle = (,)
 			<$> traversed subOnce bodyResults
 			<*> traversed subOnce binds
@@ -78,7 +78,7 @@ instance SubOnce ForCycle where
 		 =  forRange subOnce
 		>=> (forArgExprs . traversed) subOnce
 		>=> apUnless
-			(shadowedBy . toListOf (forArgIndices . traversed . _1))
+			(shadowedBy . view (forArgPattern . to patBound))
 			(forAction subOnce)
 
 instance SubOnce MultiIfBranch where

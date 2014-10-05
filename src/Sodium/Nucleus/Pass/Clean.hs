@@ -22,7 +22,9 @@ cleanRetBody body = body & bodyBinds .~ binds where
     wild [] = []
     wild (bind:binds) = [cleanRetBind usage bind]
         where check = runReader $ checkRef (binds, body ^. bodyResults)
-              usage = map (check . fst) (bind ^. bindIndices)
+              -- TODO: simply put wildcards here, and eliminate
+              -- them in a separate pass
+              usage = map check (bind ^. bindPattern . to patBound)
     binds = (tails $ body ^. bodyBinds) >>= wild
 
 cleanRetBind :: [Bool] -> Bind -> Bind
@@ -39,7 +41,7 @@ class Eliminate a where
     eliminate :: a -> ReaderT [Bool] Maybe a
 
 instance Eliminate Bind where
-    eliminate = bindStatement eliminate >=> bindIndices keep
+    eliminate = bindStatement eliminate >=> bindPattern (\(Pattern xs) -> Pattern <$> keep xs)
 
 instance Eliminate Statement where
     eliminate
@@ -95,7 +97,7 @@ instance CheckRef Bind where
 
 instance CheckRef ForCycle where
     checkRef forCycle = do
-        shadowed <- shadowedBy (forCycle ^.. forArgIndices . traversed . _1)
+        shadowed <- shadowedBy (forCycle ^. forArgPattern . to patBound)
         let base = (forCycle ^. forRange, forCycle ^. forArgExprs)
         let unsh = bool [forCycle ^. forAction] [] shadowed
         checkRef (base, unsh)

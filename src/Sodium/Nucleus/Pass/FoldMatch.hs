@@ -14,7 +14,7 @@ foldMatchStatement statement@(ForStatement forCycle)
 foldMatchStatement statement = statement
 
 forCycleMatch
-    (ForCycle [(name1, j)] argExprs name2 range (Assign (Call op args)))
+    (ForCycle (Pattern [(name1, j)]) argExprs name2 range (Assign (Call op args)))
     | args == [Access name1 j, Access name2 Immutable]
     = Just (Fold op argExprs range)
 forCycleMatch _ = Nothing

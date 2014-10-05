@@ -102,7 +102,7 @@ instance Conv S.Body where
                    (x:xs') -> (, reverse xs') <$> f x
                    _ -> mzero
              let extractIndex = \case
-                   [(name, i)] -> return (Name name i)
+                   S.Pattern [(name, i)] -> return (Name name i)
                    _ -> mzero
              let convStatement (S.Bind indices statement)
                     =  (,)
@@ -125,10 +125,10 @@ instance Conv S.Body where
 
 instance Conv S.ForCycle where
     type Norm S.ForCycle = H.Exp
-    conv (S.ForCycle argIndices argExprs name exprRange clBody) = do
+    conv (S.ForCycle argPattern argExprs name exprRange clBody) = do
         hsRange <- conv exprRange
         hsArgExpr <- D.expTuple <$> mapM conv argExprs
-        hsFoldLambda <- conv (FoldLambda argIndices name) <*> conv clBody
+        hsFoldLambda <- conv (FoldLambda argPattern name) <*> conv clBody
         return $ betaL
             [ D.access "foldM"
             , hsFoldLambda
@@ -137,11 +137,11 @@ instance Conv S.ForCycle where
             ]
 
     type Pure S.ForCycle = H.Exp
-    pureconv (S.ForCycle argIndices argExprs name exprRange clBody) = do
+    pureconv (S.ForCycle argPattern argExprs name exprRange clBody) = do
         hsRange <- pureconv exprRange
         hsArgExpr <- D.expTuple <$> mapM pureconv argExprs
         hsFoldLambda
-            <-  pureconv (FoldLambda argIndices name)
+            <-  pureconv (FoldLambda argPattern name)
             <*> pureconv clBody
         return $ betaL [D.access "foldl", hsFoldLambda, hsArgExpr, hsRange]
 
@@ -171,16 +171,16 @@ instance Conv S.MultiIfBranch where
 instance Conv S.Bind where
 
     type Norm S.Bind = H.Stmt
-    conv (S.Bind [] statement) = D.doExecute <$> conv statement
-    conv (S.Bind retIndices statement)
+    conv (S.Bind (S.Pattern []) statement) = D.doExecute <$> conv statement
+    conv (S.Bind pattern statement)
          =  D.doBind
-        <$> (D.patTuple <$> conv (IndicesList retIndices))
+        <$> conv pattern
         <*> conv statement
 
     type Pure S.Bind = H.Decl
-    pureconv (S.Bind retIndices statement)
+    pureconv (S.Bind pattern statement)
          =  D.valueDef
-        <$> (D.patTuple <$> pureconv (IndicesList retIndices))
+        <$> pureconv pattern
         <*> pureconv statement
 
 instance Conv S.Statement where
@@ -230,29 +230,27 @@ instance Conv S.Func where
         <$> pureconv clBody
         where paramNames = map transformName (map fst params)
 
-data FoldLambda = FoldLambda S.IndicesList S.Name
+data FoldLambda = FoldLambda S.Pattern S.Name
 
 instance Conv FoldLambda where
     type Norm FoldLambda = H.Exp -> H.Exp
     conv = pureconv
 
     type Pure FoldLambda = H.Exp -> H.Exp
-    pureconv (FoldLambda indices name) = do
-        hsNames <- conv (IndicesList indices)
-        hsName  <- conv (Name name S.Immutable)
-        return $ H.Lambda H.noLoc [D.patTuple hsNames, D.patTuple [hsName]]
+    pureconv (FoldLambda pattern name) = do
+        hsPat  <- conv pattern
+        hsName <- conv (Name name S.Immutable)
+        return $ H.Lambda H.noLoc [hsPat, D.patTuple [hsName]]
 
 
 betaL = foldl1 H.App
 
-newtype IndicesList = IndicesList S.IndicesList
-
-instance Conv IndicesList where
-    type Norm IndicesList = [D.Name]
+instance Conv S.Pattern where
+    type Norm S.Pattern = H.Pat
     conv = pureconv
 
-    type Pure IndicesList = [D.Name]
-    pureconv (IndicesList xs) = mapM (pureconv . uncurry Name) xs
+    type Pure S.Pattern = H.Pat
+    pureconv (S.Pattern xs) = D.patTuple <$> mapM (pureconv . uncurry Name) xs
 
 
 instance Conv S.Expression where

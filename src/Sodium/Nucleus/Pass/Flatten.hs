@@ -15,7 +15,7 @@ flattenBody = bodyBinds %~ concatMap flattenBind
 flattenBodyBind :: Body -> ([Bind], Body)
 flattenBodyBind body = (freeBinds, set bodyBinds closedBinds body)
     where (freeBinds, closedBinds) = span isFree (body ^. bodyBinds)
-          isFree = view (bindIndices . to null)
+          isFree = view (bindPattern . to (\(Pattern xs) -> null xs))
 
 flattenBind :: Bind -> [Bind]
 flattenBind bind = maybe [bind] id $ do

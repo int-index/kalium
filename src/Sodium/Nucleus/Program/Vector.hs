@@ -1,10 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Sodium.Nucleus.Program.Vector
-	( module Sodium.Nucleus.Program.Vector
-	, module Sodium.Nucleus.Program
-	) where
+    ( module Sodium.Nucleus.Program.Vector
+    , module Sodium.Nucleus.Program
+    ) where
 
-import Control.Lens (prism', Simple, Prism)
 import Control.Lens.TH
 import qualified Data.Map as M
 
@@ -30,7 +29,7 @@ data Body
 
 data Bind
     = Bind
-    { _bindIndices :: IndicesList
+    { _bindPattern :: Pattern
     , _bindStatement :: Statement
     } deriving (Eq, Show)
 
@@ -44,7 +43,7 @@ data Statement
 
 data ForCycle
     = ForCycle
-    { _forArgIndices :: IndicesList
+    { _forArgPattern :: Pattern
     , _forArgExprs   :: [Expression]
     , _forName   :: Name
     , _forRange  :: Expression
@@ -73,8 +72,12 @@ data Index
 type Indices
     = M.Map Name Index
 
-type IndicesList
-    = [(Name, Index)]
+data Pattern
+    = Pattern [(Name, Index)]
+    deriving (Eq, Show)
+
+patBound :: Pattern -> [Name]
+patBound (Pattern xs) = map fst xs
 
 makeLenses ''Func
 makeLenses ''Bind
