@@ -61,6 +61,7 @@ data Expression
     | Fold Operator [Expression] Expression
     | Call Operator [Expression]
     | Primary Literal
+    | Tuple [Expression]
     deriving (Eq, Show)
 
 data Index
@@ -73,11 +74,10 @@ type Indices
     = M.Map Name Index
 
 data Pattern
-    = Pattern [(Name, Index)]
+    = PTuple [Pattern]
+    | PAccess Name Index
+    | PWildCard
     deriving (Eq, Show)
-
-patBound :: Pattern -> [Name]
-patBound (Pattern xs) = map fst xs
 
 makeLenses ''Func
 makeLenses ''Bind
@@ -87,3 +87,4 @@ makeLenses ''MultiIfBranch
 makeLenses ''Program
 
 makePrisms ''Statement
+makePrisms ''Pattern

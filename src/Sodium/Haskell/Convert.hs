@@ -102,7 +102,7 @@ instance Conv S.Body where
                    (x:xs') -> (, reverse xs') <$> f x
                    _ -> mzero
              let extractIndex = \case
-                   S.Pattern [(name, i)] -> return (Name name i)
+                   S.PAccess name i -> return (Name name i)
                    _ -> mzero
              let convStatement (S.Bind indices statement)
                     =  (,)
@@ -171,7 +171,7 @@ instance Conv S.MultiIfBranch where
 instance Conv S.Bind where
 
     type Norm S.Bind = H.Stmt
-    conv (S.Bind (S.Pattern []) statement) = D.doExecute <$> conv statement
+    conv (S.Bind S.PWildCard statement) = D.doExecute <$> conv statement
     conv (S.Bind pattern statement)
          =  D.doBind
         <$> conv pattern
@@ -239,8 +239,8 @@ instance Conv FoldLambda where
     type Pure FoldLambda = H.Exp -> H.Exp
     pureconv (FoldLambda pattern name) = do
         hsPat  <- conv pattern
-        hsName <- conv (Name name S.Immutable)
-        return $ H.Lambda H.noLoc [hsPat, D.patTuple [hsName]]
+        hsName <- conv (S.PAccess name S.Immutable)
+        return $ H.Lambda H.noLoc [hsPat, hsName]
 
 
 betaL = foldl1 H.App
@@ -250,7 +250,9 @@ instance Conv S.Pattern where
     conv = pureconv
 
     type Pure S.Pattern = H.Pat
-    pureconv (S.Pattern xs) = D.patTuple <$> mapM (pureconv . uncurry Name) xs
+    pureconv S.PWildCard = return H.PWildCard
+    pureconv (S.PAccess name i) = H.PVar . H.Ident <$> pureconv (Name name i)
+    pureconv (S.PTuple pats) = H.PTuple H.Boxed <$> mapM pureconv pats
 
 
 instance Conv S.Expression where

@@ -5,6 +5,7 @@ import Control.Monad
 import qualified Data.Map as M
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Pattern
 
 extractBody :: Program -> Program
 extractBody = over recmapped extractBodyStatement
@@ -24,6 +25,7 @@ bodyMatch body
 
     | otherwise = do
         [bind] <- return (body ^. bodyBinds)
-        -- TODO: proper matching
-        guard $ (\(Pattern xs) -> map (uncurry Access) xs) (bind ^. bindPattern) == body ^. bodyResults
+        let smartTuple [x] = x
+            smartTuple xs  = Tuple xs
+        guard $ patMatch (bind ^. bindPattern) (body ^. bodyResults . to smartTuple)
         return (bind ^. bindStatement)

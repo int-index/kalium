@@ -3,7 +3,6 @@ module Sodium.Nucleus.Pass.FoldMatch (foldMatch) where
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
 import Control.Lens (over)
-import qualified Data.Map as M
 
 foldMatch :: Program -> Program
 foldMatch = over recmapped foldMatchStatement
@@ -14,7 +13,7 @@ foldMatchStatement statement@(ForStatement forCycle)
 foldMatchStatement statement = statement
 
 forCycleMatch
-    (ForCycle (Pattern [(name1, j)]) argExprs name2 range (Assign (Call op args)))
+    (ForCycle (PAccess name1 j) argExprs name2 range (Assign (Call op args)))
     | args == [Access name1 j, Access name2 Immutable]
     = Just (Fold op argExprs range)
 forCycleMatch _ = Nothing

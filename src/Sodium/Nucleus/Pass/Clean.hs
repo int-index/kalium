@@ -4,60 +4,47 @@ import Control.Applicative
 import Control.Lens hiding (Index, Fold)
 import Control.Monad.Reader
 import qualified Data.Map as M
+import Data.Monoid
 import Data.Bool
 import Data.List
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Pattern
 
 clean :: Program -> Program
-clean = over recmapped (cleanBody . cleanRetBody)
+clean = runIdentity . recmap cleaner
 
-cleanBody :: Body -> Body
-cleanBody body = (bodyVars %~ M.filterWithKey cc) body where
+cleaner =  recmapper (return . cleanVars)
+        <> recmapper (return . cleanBody)
+        <> recmapper (return . cleanStatement)
+
+cleanVars :: Body -> Body
+cleanVars body = (bodyVars %~ M.filterWithKey cc) body where
     cc name _ = runReader (checkRef $ bodyComponents body) name
 
+cleanBody :: Body -> Body
+cleanBody body = body & bodyBinds .~ binds where
+    cleanBind [] = []
+    cleanBind (bind:binds) = [bind & bindPattern %~ cleanUsage scope]
+        where scope = (binds, body ^. bodyResults)
+    binds = tails (body ^. bodyBinds) >>= cleanBind
 
-cleanRetBody :: Body -> Body
-cleanRetBody body = body & bodyBinds .~ binds where
-    wild [] = []
-    wild (bind:binds) = [cleanRetBind usage bind]
-        where check = runReader $ checkRef (binds, body ^. bodyResults)
-              -- TODO: simply put wildcards here, and eliminate
-              -- them in a separate pass
-              usage = map check (bind ^. bindPattern . to patBound)
-    binds = (tails $ body ^. bodyBinds) >>= wild
+cleanUsage :: CheckRef scope => scope -> Pattern -> Pattern
+cleanUsage scope (PTuple ps)
+  = case cleanUsage scope `map` ps of
+      []  -> PWildCard
+      [p] -> p
+      ps' -> PTuple ps'
+cleanUsage scope (PAccess name _)
+  | not (checkRef scope `runReader` name) = PWildCard
+cleanUsage _ pat = pat
 
-cleanRetBind :: [Bool] -> Bind -> Bind
-cleanRetBind usage bind = maybe bind id (runReaderT (eliminate bind) usage)
-
-keep :: [a] -> ReaderT [Bool] Maybe [a]
-keep xs = do
-    usage <- ask
-    guard $ length xs == length usage
-    return $ concat
-           $ zipWith (\used b -> if used then [b] else []) usage xs
-
-class Eliminate a where
-    eliminate :: a -> ReaderT [Bool] Maybe a
-
-instance Eliminate Bind where
-    eliminate = bindStatement eliminate >=> bindPattern (\(Pattern xs) -> Pattern <$> keep xs)
-
-instance Eliminate Statement where
-    eliminate
-        =  _BodyStatement    eliminate
-       >=> _MultiIfStatement eliminate
-       >=> _Execute          (const mzero)
-       >=> _ForStatement     (const mzero)
-       >=> _Assign           (const mzero)
-
-instance Eliminate Body where
-    eliminate = bodyResults keep
-
-instance Eliminate MultiIfBranch where
-    eliminate  = (multiIfLeafs . traversed . _2) eliminate
-              >=> multiIfElse eliminate
-
+cleanStatement :: Statement -> Statement
+cleanStatement = over _ForStatement cleanForCycle
+  where
+    cleanForCycle :: ForCycle -> ForCycle
+    cleanForCycle forCycle
+      = forCycle & forArgPattern %~ cleanUsage (forCycle ^. forAction)
 
 class CheckRef a where
     checkRef :: a -> Reader Name Bool
@@ -77,9 +64,8 @@ instance (CheckRef a, CheckRef b) => CheckRef (a, b) where
 instance CheckRef Expression where
     checkRef = \case
         Primary _ -> return False
-        Access name' _ -> do
-            name <- ask
-            return (name == name')
+        Tuple exprs -> checkRef exprs
+        Access name _ -> (==name) <$> ask
         Call _ exprs -> -- Check the operator?
             checkRef exprs
         Fold _ exprs range -> checkRef (exprs, range)

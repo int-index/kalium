@@ -44,6 +44,8 @@ vectorizeFunc funcSigs func = do
     vecBody <- vecBodyGen (func ^. funcResults ++ refs)
     return $ Vec.Func (func ^. funcSig) vecBody
 
+patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
+
 vectorizeBody :: [FuncSig] -> Body -> R E ([Name], [Expression] -> E Vec.Body)
 vectorizeBody funcSigs body = do
     closure <- ask
@@ -60,7 +62,7 @@ vectorizeBody funcSigs body = do
                 indices indices'
         let vecBodyGen results
                 = Vec.Body (body ^. bodyVars)
-                (map (\(indices, expr) -> Vec.Bind (Vec.Pattern indices) expr) vecStatements)
+                (map (\(indices, expr) -> Vec.Bind (patTuple indices) expr) vecStatements)
                 <$> runReaderT (mapM vectorizeExpression results) indices'
         return (changed, vecBodyGen)
 
@@ -109,7 +111,7 @@ vectorizeStatement funcSigs = \case
              $ vectorizeBody' funcSigs (forCycle ^. forBody)
         argIndices <- closedIndices changed
         let vecForCycle = Vec.ForCycle
-                (Vec.Pattern argIndices)
+                (patTuple argIndices)
                 (uncurry Vec.Access `map` argIndices)
                 (forCycle ^. forName)
                 vecRange

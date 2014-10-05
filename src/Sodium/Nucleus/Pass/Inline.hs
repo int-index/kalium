@@ -7,6 +7,7 @@ import Control.Lens hiding (Index, Fold)
 import qualified Data.Map as M
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Pattern
 import Control.Monad.Counter
 import Data.Bool
 
@@ -26,11 +27,11 @@ eliminateAssign
 	-> ([Expression], [Bind])
 eliminateAssign (bodyResults, (bind:binds))
 	= maybe follow id $ do
-		Bind (Pattern [name]) (Assign expr) <- Just bind
+		Bind (PAccess name i) (Assign expr) <- Just bind
 		let subSingle = (,)
 			<$> traversed subOnce bodyResults
 			<*> traversed subOnce binds
-		case runReaderT subSingle (name, expr) of
+		case runReaderT subSingle ((name, i), expr) of
 			Counter _ bodyPair -> Just (eliminateAssign bodyPair)
 			Done -> Nothing
 	where follow

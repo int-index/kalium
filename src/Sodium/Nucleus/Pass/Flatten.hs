@@ -5,6 +5,7 @@ import qualified Data.Map as M
 
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Pattern
 
 flatten :: Program -> Program
 flatten = over recmapped flattenBody
@@ -15,7 +16,7 @@ flattenBody = bodyBinds %~ concatMap flattenBind
 flattenBodyBind :: Body -> ([Bind], Body)
 flattenBodyBind body = (freeBinds, set bodyBinds closedBinds body)
     where (freeBinds, closedBinds) = span isFree (body ^. bodyBinds)
-          isFree = view (bindPattern . to (\(Pattern xs) -> null xs))
+          isFree = view (bindPattern . to patBound . to null)
 
 flattenBind :: Bind -> [Bind]
 flattenBind bind = maybe [bind] id $ do

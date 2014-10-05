@@ -13,10 +13,6 @@ valueDef pat exp = H.PatBind H.noLoc pat Nothing (H.UnGuardedRhs exp) (H.BDecls 
 pureLet []   = id
 pureLet defs = H.Let (H.BDecls defs)
 
-patTuple []     = H.PWildCard
-patTuple [name] = H.PVar (H.Ident name)
-patTuple names  = H.PTuple H.Boxed . map H.PVar $ map H.Ident names
-
 expTuple []    = H.Con $ H.Special $ H.UnitCon
 expTuple [exp] = exp
 expTuple exps  = H.Tuple H.Boxed exps
