@@ -4,6 +4,7 @@ module Sodium.Nucleus.Pass.Inline (inline) where
 import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.Writer
+import Control.Monad.State
 import Control.Lens hiding (Index, Fold)
 import qualified Data.Map as M
 import Sodium.Nucleus.Program.Vector
@@ -15,30 +16,22 @@ inline :: Program -> Program
 inline = over recmapped inlineBody
 
 inlineBody :: Body -> Body
-inlineBody body
-  = update body $ eliminateAssign
-        (body ^. bodyResults, body ^. bodyBinds)
-  where
-    update body (subResults, subBinds)
-       = body
-       & bodyResults .~ subResults
-       & bodyBinds .~ subBinds
-
-eliminateAssign
-	:: ([Expression], [Bind])
-	-> ([Expression], [Bind])
-eliminateAssign (bodyResults, (bind:binds))
-	= maybe follow id $ do
-		Bind (PAccess name i) (Assign expr) <- Just bind
-		let subSingle = (,)
-			<$> traversed subOnce bodyResults
-			<*> traversed subOnce binds
-		let (bodyPair, count) = runWriter (runReaderT subSingle ((name, i), expr))
-		if getSum count == 1 then Just (eliminateAssign bodyPair) else Nothing
-	where follow
-		= over _2 (bind:)
-		$ eliminateAssign (bodyResults, binds)
-eliminateAssign bodyPair = bodyPair
+inlineBody = evalState unconsBind where
+    unconsBind :: State Body Body
+    unconsBind = uses bodyBinds uncons >>= maybe get go
+    go (bind, binds) = do
+        bodyBinds .= binds
+        elim bind <$> get >>= \case
+            Just body -> put body >> unconsBind
+            Nothing   -> over bodyBinds (bind:) <$> unconsBind
+    elim bind body' = do
+        Bind (PAccess name i) (Assign expr) <- return bind
+        let (body, count)
+              = runWriter
+              $ flip runReaderT ((name, i), expr)
+              $ unsafeBodySubOnce body'
+        guard (count <= 1)
+        return body
 
 type SubOnceEnv = ((Name, Index), Expression)
 
