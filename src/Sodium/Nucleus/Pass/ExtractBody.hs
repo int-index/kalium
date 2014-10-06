@@ -17,15 +17,11 @@ extractBodyStatement statement = statement
 
 bodyMatch body
     | M.null (body ^. bodyVars) && null (body ^. bodyBinds)
-    = case body ^. bodyResults of
-        [expr] -> return (Assign expr)
-        _ -> mzero
-        -- TODO: just wrap bodyResults in a tuple
-        --       to allow multiple expressions
-
+        = return $ Assign (body ^. bodyResult)
     | otherwise = do
+        -- TODO: propagate the bound variables
+        -- onto the enclosing body
+        guard $ M.null (body ^. bodyVars)
         [bind] <- return (body ^. bodyBinds)
-        let smartTuple [x] = x
-            smartTuple xs  = Tuple xs
-        guard $ patMatch (bind ^. bindPattern) (body ^. bodyResults . to smartTuple)
+        guard $ patMatch (bind ^. bindPattern) (body ^. bodyResult)
         return (bind ^. bindStatement)

@@ -82,21 +82,21 @@ instance Conv S.Type where
 instance Conv S.Body where
 
     type Norm S.Body = H.Exp
-    conv (S.Body _ statements resultExprs) = do
+    conv (S.Body _ statements resultExpr) = do
         hsStatements <- mapM conv statements
-        hsRetValues <- mapM conv resultExprs
+        hsRetValue <- conv resultExpr
         let hsStatement
               = D.doExecute
               $ H.App (D.access "return")
-              $ D.expTuple hsRetValues
+              $ hsRetValue
         return $ case hsStatements ++ [hsStatement] of
             [H.Qualifier expression] -> expression
             statements -> H.Do statements
 
     type Pure S.Body = H.Exp
-    pureconv (S.Body _ statements resultExprs) = msum
-        [ do name1 <- case resultExprs of
-                   [S.Access name i] -> return $ Name name i
+    pureconv (S.Body _ statements resultExpr) = msum
+        [ do name1 <- case resultExpr of
+                   S.Access name i -> return $ Name name i
                    _ -> mzero
              let appToLast f xs = case reverse xs of
                    (x:xs') -> (, reverse xs') <$> f x
@@ -118,16 +118,16 @@ instance Conv S.Body where
              hsValueDefs <- mapM pureconv statements
              return $ D.pureLet hsValueDefs hsExpr
         , do hsValueDefs <- mapM pureconv statements
-             hsRetValues <- mapM pureconv resultExprs
-             return $ D.pureLet hsValueDefs (D.expTuple hsRetValues)
+             hsRetValue <- pureconv resultExpr
+             return $ D.pureLet hsValueDefs hsRetValue
         ]
 
 
 instance Conv S.ForCycle where
     type Norm S.ForCycle = H.Exp
-    conv (S.ForCycle argPattern argExprs name exprRange clBody) = do
+    conv (S.ForCycle argPattern argExpr name exprRange clBody) = do
         hsRange <- conv exprRange
-        hsArgExpr <- D.expTuple <$> mapM conv argExprs
+        hsArgExpr <- conv argExpr
         hsFoldLambda <- conv (FoldLambda argPattern name) <*> conv clBody
         return $ betaL
             [ D.access "foldM"
@@ -137,9 +137,9 @@ instance Conv S.ForCycle where
             ]
 
     type Pure S.ForCycle = H.Exp
-    pureconv (S.ForCycle argPattern argExprs name exprRange clBody) = do
+    pureconv (S.ForCycle argPattern argExpr name exprRange clBody) = do
         hsRange <- pureconv exprRange
-        hsArgExpr <- D.expTuple <$> mapM pureconv argExprs
+        hsArgExpr <- pureconv argExpr
         hsFoldLambda
             <-  pureconv (FoldLambda argPattern name)
             <*> pureconv clBody
@@ -274,8 +274,9 @@ convexpr (S.Access name i) = D.access <$> pureconv (Name name i)
 convexpr (S.Call op exprs) = do
     hsExprs <- mapM convexpr exprs
     return $ betaL (convOp op : hsExprs)
-convexpr (S.Fold op exprs range) = do
-    hsArgExpr <- D.expTuple <$> mapM convexpr exprs
+convexpr (S.Tuple exprs) = D.expTuple <$> mapM convexpr exprs
+convexpr (S.Fold op expr range) = do
+    hsArgExpr <- convexpr expr
     hsRange <- convexpr range
     return $ betaL [D.access "foldl", convOp op, hsArgExpr, hsRange]
 

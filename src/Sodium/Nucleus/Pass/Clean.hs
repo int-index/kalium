@@ -26,7 +26,7 @@ cleanBody :: Body -> Body
 cleanBody body = body & bodyBinds .~ binds where
     cleanBind [] = []
     cleanBind (bind:binds) = [bind & bindPattern %~ cleanUsage scope]
-        where scope = (binds, body ^. bodyResults)
+        where scope = (binds, body ^. bodyResult)
     binds = tails (body ^. bodyBinds) >>= cleanBind
 
 cleanUsage :: CheckRef scope => scope -> Pattern -> Pattern
@@ -84,7 +84,7 @@ instance CheckRef Bind where
 instance CheckRef ForCycle where
     checkRef forCycle = do
         shadowed <- shadowedBy (forCycle ^. forArgPattern . to patBound)
-        let base = (forCycle ^. forRange, forCycle ^. forArgExprs)
+        let base = (forCycle ^. forRange, forCycle ^. forArgExpr)
         let unsh = bool [forCycle ^. forAction] [] shadowed
         checkRef (base, unsh)
 
@@ -92,7 +92,7 @@ instance CheckRef MultiIfBranch where
     checkRef multiIfBranch = checkRef 
         (multiIfBranch ^. multiIfLeafs, multiIfBranch ^. multiIfElse)
 
-bodyComponents body = (body ^. bodyResults, body ^. bodyBinds)
+bodyComponents body = (body ^. bodyResult, body ^. bodyBinds)
 
 instance CheckRef Body where
     checkRef body = do

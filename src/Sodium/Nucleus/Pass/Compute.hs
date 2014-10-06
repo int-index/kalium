@@ -15,14 +15,17 @@ recursively f = \case
     e@(Access _ _) -> f e
     e@(Primary  _) -> f e
     Call op exprs  -> f $ Call op (map rf exprs)
-    Fold op exprs expr -> f $ Fold op (map rf exprs) (rf expr)
+    Tuple   exprs  -> f $ Tuple (map rf exprs)
+    Fold op expr range -> f $ Fold op (rf expr) (rf range)
     where rf = recursively f
 
 match :: Expression -> Expression
 match = \case
     Call OpId [expr] -> expr
-    Fold OpMultiply [Primary (LitInteger 1)]     range -> Call OpProduct [range]
-    Fold OpAdd      [Primary (LitInteger 0)]     range -> Call OpSum     [range]
-    Fold OpAnd      [Primary (LitBoolean True )] range -> Call OpAnd'    [range]
-    Fold OpOr       [Primary (LitBoolean False)] range -> Call OpOr'     [range]
+    Tuple     [expr] -> expr
+    Tuple [] -> Primary LitUnit
+    Fold OpMultiply (Primary (LitInteger 1))     range -> Call OpProduct [range]
+    Fold OpAdd      (Primary (LitInteger 0))     range -> Call OpSum     [range]
+    Fold OpAnd      (Primary (LitBoolean True )) range -> Call OpAnd'    [range]
+    Fold OpOr       (Primary (LitBoolean False)) range -> Call OpOr'     [range]
     expr -> expr

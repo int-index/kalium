@@ -24,7 +24,7 @@ data Body
     = Body
     { _bodyVars  :: Vars
     , _bodyBinds :: [Bind]
-    , _bodyResults :: [Expression]
+    , _bodyResult :: Expression
     } deriving (Eq, Show)
 
 data Bind
@@ -44,7 +44,7 @@ data Statement
 data ForCycle
     = ForCycle
     { _forArgPattern :: Pattern
-    , _forArgExprs   :: [Expression]
+    , _forArgExpr    :: Expression
     , _forName   :: Name
     , _forRange  :: Expression
     , _forAction :: Statement
@@ -58,7 +58,7 @@ data MultiIfBranch
 
 data Expression
     = Access Name Index
-    | Fold Operator [Expression] Expression
+    | Fold Operator Expression Expression
     | Call Operator [Expression]
     | Primary Literal
     | Tuple [Expression]

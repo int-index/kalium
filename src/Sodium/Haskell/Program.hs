@@ -87,6 +87,13 @@ matchExpression (H.InfixApp expr1' op expr2') = H.InfixApp lhs op rhs
         lhs = wrap handler1 expr1
         rhs = wrap handler2 expr2
 
+matchExpression (H.Tuple box exprs')
+  = H.Tuple box (map wrap exprs) where 
+      exprs = map matchExpression exprs'
+      wrap expr = case detectLevel expr of
+          SLevel -> H.Paren expr
+          _ -> expr
+
 matchExpression (expr1' `H.EnumFromTo` expr2')
   = H.EnumFromTo (wrap expr1) (wrap expr2) where
       expr1 = matchExpression expr1'

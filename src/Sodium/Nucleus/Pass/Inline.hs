@@ -42,20 +42,23 @@ apUnless :: Monad m => (a -> m Bool) -> (a -> m a) -> (a -> m a)
 apUnless p f = \a -> p a >>= bool (f a) (return a)
 
 instance SubOnce Expression where
-	subOnce = \case
-		Primary prim -> return (Primary prim)
-		Access name' j -> do
-			(name, expr) <- ask
-			if name == (name', j)
-				then tell (Sum 1) >> return expr
-				else return (Access name' j)
-		Call op exprs
-			 -> Call op
-			<$> traversed subOnce exprs
-		Fold op exprs range
-			 -> Fold op
-			<$> traversed subOnce exprs
-			<*> subOnce range
+    subOnce = \case
+        Primary prim -> return (Primary prim)
+        Access name' j -> do
+            (name, expr) <- ask
+            if name == (name', j)
+                then tell (Sum 1) >> return expr
+                else return (Access name' j)
+        Tuple exprs
+             -> Tuple
+            <$> traversed subOnce exprs
+        Call op exprs
+             -> Call op
+            <$> traversed subOnce exprs
+        Fold op expr range
+             -> Fold op
+            <$> subOnce expr
+            <*> subOnce range
 
 instance SubOnce Statement where
 	subOnce
@@ -71,7 +74,7 @@ instance SubOnce Bind where
 instance SubOnce ForCycle where
 	subOnce
 		 =  forRange subOnce
-		>=> (forArgExprs . traversed) subOnce
+		>=> forArgExpr subOnce
 		>=> apUnless
 			(shadowedBy . view (forArgPattern . to patBound))
 			(forAction subOnce)
@@ -88,7 +91,7 @@ instance SubOnce Body where
 
 unsafeBodySubOnce
 	 =  (bodyBinds   . traversed) subOnce
-	>=> (bodyResults . traversed) subOnce
+	>=> bodyResult subOnce
 
 shadowedBy :: Monad m => [Name] -> ReaderT SubOnceEnv m Bool
 shadowedBy names = do

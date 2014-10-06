@@ -70,9 +70,8 @@ instance RecmapMk Expression where
                     >=> (_Execute . _2 . traversed) rmExpr
                     >=> _ForStatement     rmForCycle
                     >=> _MultiIfStatement rmMultiIf
-              rmBody = (bodyResults . traversed) rmExpr
-              rmForCycle  = (forArgExprs . traversed) rmExpr
-                         >=> forRange rmExpr
+              rmBody = bodyResult rmExpr
+              rmForCycle = forArgExpr rmExpr >=> forRange rmExpr
               rmMultiIf = (multiIfLeafs . traversed . _1) rmExpr
 
 localizer :: Monad' m => (forall a . Vars -> m a -> m a) -> Recmapper Vector m

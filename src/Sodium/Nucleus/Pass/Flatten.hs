@@ -26,7 +26,10 @@ flattenBind bind = maybe [bind] id $ do
            | otherwise = [bindStatement .~ BodyStatement body' $ bind]
     return (binds ++ cx)
 
+-- probably not needed, because `extractBody` should
+-- extract it as `Assign (Primary LitUnit)` which
+-- should be eliminated later
 nullBody :: Body -> Bool
 nullBody body =  (body ^. bodyBinds   . to null)
-              && (body ^. bodyResults . to null)
+              && (body ^. bodyResult . to (==Primary LitUnit))
               && (body ^. bodyVars  . to M.null)
