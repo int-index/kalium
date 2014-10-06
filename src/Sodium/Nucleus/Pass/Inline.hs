@@ -3,24 +3,26 @@ module Sodium.Nucleus.Pass.Inline (inline) where
 
 import Control.Applicative
 import Control.Monad.Reader
+import Control.Monad.Writer
 import Control.Lens hiding (Index, Fold)
 import qualified Data.Map as M
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
 import Sodium.Nucleus.Pattern
-import Control.Monad.Counter
 import Data.Bool
 
 inline :: Program -> Program
 inline = over recmapped inlineBody
 
+inlineBody :: Body -> Body
 inlineBody body
-	= update body $ eliminateAssign
-		(body ^. bodyResults, body ^. bodyBinds)
-	where update body (subResults, subBinds)
-		= body
-		& bodyResults .~ subResults
-		& bodyBinds .~ subBinds
+  = update body $ eliminateAssign
+        (body ^. bodyResults, body ^. bodyBinds)
+  where
+    update body (subResults, subBinds)
+       = body
+       & bodyResults .~ subResults
+       & bodyBinds .~ subBinds
 
 eliminateAssign
 	:: ([Expression], [Bind])
@@ -31,9 +33,8 @@ eliminateAssign (bodyResults, (bind:binds))
 		let subSingle = (,)
 			<$> traversed subOnce bodyResults
 			<*> traversed subOnce binds
-		case runReaderT subSingle ((name, i), expr) of
-			Counter _ bodyPair -> Just (eliminateAssign bodyPair)
-			Done -> Nothing
+		let (bodyPair, count) = runWriter (runReaderT subSingle ((name, i), expr))
+		if getSum count == 1 then Just (eliminateAssign bodyPair) else Nothing
 	where follow
 		= over _2 (bind:)
 		$ eliminateAssign (bodyResults, binds)
@@ -42,7 +43,7 @@ eliminateAssign bodyPair = bodyPair
 type SubOnceEnv = ((Name, Index), Expression)
 
 class SubOnce a where
-	subOnce :: a -> ReaderT SubOnceEnv (Counter 1) a
+	subOnce :: a -> ReaderT SubOnceEnv (Writer (Sum Integer)) a
 
 apUnless :: Monad m => (a -> m Bool) -> (a -> m a) -> (a -> m a)
 apUnless p f = \a -> p a >>= bool (f a) (return a)
@@ -53,7 +54,7 @@ instance SubOnce Expression where
 		Access name' j -> do
 			(name, expr) <- ask
 			if name == (name', j)
-				then lift (Counter 1 expr)
+				then tell (Sum 1) >> return expr
 				else return (Access name' j)
 		Call op exprs
 			 -> Call op

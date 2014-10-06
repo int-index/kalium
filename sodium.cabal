@@ -33,8 +33,6 @@ library
                        Sodium.Nucleus.Recmap.Vector
                        Sodium.Nucleus.Recmap
                        Sodium.Nucleus.Pattern
-                       Control.Monad.Counter
-                       Data.Stack
 
   build-depends:       base,
                        transformers,
