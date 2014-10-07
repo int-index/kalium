@@ -23,5 +23,5 @@ bodyMatch body
         -- onto the enclosing body
         guard $ M.null (body ^. bodyVars)
         [bind] <- return (body ^. bodyBinds)
-        guard $ patMatch (bind ^. bindPattern) (body ^. bodyResult)
+        guard $ expMatch (bind ^. bindPattern) (body ^. bodyResult)
         return (bind ^. bindStatement)
