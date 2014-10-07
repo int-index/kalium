@@ -17,6 +17,8 @@ import qualified  Sodium.Pascal.Convert as P (convert)
 import qualified Sodium.Haskell.Convert as H (convert)
 import qualified Sodium.Error as E
 
+import qualified Sodium.Nucleus.Render as R
+
 import Control.Monad.Except
 import Data.Profunctor
 
@@ -39,6 +41,7 @@ translate = dimap fromPascal toHaskell onNucleus where
     onVector = closure pass
     pass = compute . flatten     . inline      . foldMatch
                    . joinMultiIf . extractBody . clean
+                   . (\program -> trace ("-----\n" ++ R.render program) program)
 
 parse'     = error' . withExcept E.parseError     . parse
 vectorize' = error' . withExcept E.vectorizeError . vectorize

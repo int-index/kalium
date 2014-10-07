@@ -33,6 +33,7 @@ library
                        Sodium.Nucleus.Recmap.Vector
                        Sodium.Nucleus.Recmap
                        Sodium.Nucleus.Pattern
+                       Sodium.Nucleus.Render
 
   build-depends:       base,
                        transformers,
