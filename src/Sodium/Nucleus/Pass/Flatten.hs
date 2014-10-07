@@ -1,7 +1,6 @@
 module Sodium.Nucleus.Pass.Flatten (flatten) where
 
 import Control.Lens
-import qualified Data.Map as M
 
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
@@ -22,14 +21,5 @@ flattenBind :: Bind -> [Bind]
 flattenBind bind = maybe [bind] id $ do
     BodyStatement body <- return (bind ^. bindStatement)
     let (binds, body') = flattenBodyBind body
-    let cx | nullBody body' = []
-           | otherwise = [bindStatement .~ BodyStatement body' $ bind]
+    let cx = [bindStatement .~ BodyStatement body' $ bind]
     return (binds ++ cx)
-
--- probably not needed, because `extractBody` should
--- extract it as `Assign (Primary LitUnit)` which
--- should be eliminated later
-nullBody :: Body -> Bool
-nullBody body =  (body ^. bodyBinds   . to null)
-              && (body ^. bodyResult . to (==Primary LitUnit))
-              && (body ^. bodyVars  . to M.null)

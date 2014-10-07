@@ -24,7 +24,10 @@ inlineBody = evalState unconsBind where
         elim bind <$> get >>= \case
             Just body -> put body >> unconsBind
             Nothing   -> over bodyBinds (bind:) <$> unconsBind
-    elim bind body' = do
+    elim bind |  bind ^. bindPattern   . to (==PWildCard)
+              && bind ^. bindStatement . to noExec
+              = return
+    elim bind = \body' -> do
         Bind (PAccess name i) (Assign expr) <- return bind
         let (body, count)
               = runWriter
@@ -32,6 +35,16 @@ inlineBody = evalState unconsBind where
               $ unsafeBodySubOnce body'
         guard (count <= 1)
         return body
+
+-- check if a statement contains any side-effects
+noExec :: Statement -> Bool
+noExec = r where
+    r = maybe False (const True) . recmapped failExec
+    failExec :: Statement -> Maybe Statement
+    failExec = \case
+        Execute _ _ -> Nothing
+        statement -> Just statement
+
 
 type SubOnceEnv = ((Name, Index), Expression)
 
