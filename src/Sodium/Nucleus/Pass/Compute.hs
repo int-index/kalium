@@ -21,11 +21,15 @@ recursively f = \case
 
 match :: Expression -> Expression
 match = \case
-    Call OpId [expr] -> expr
-    Tuple     [expr] -> expr
-    Tuple [] -> Primary LitUnit
-    Fold OpMultiply (Primary (LitInteger 1))     range -> Call OpProduct [range]
-    Fold OpAdd      (Primary (LitInteger 0))     range -> Call OpSum     [range]
-    Fold OpAnd      (Primary (LitBoolean True )) range -> Call OpAnd'    [range]
-    Fold OpOr       (Primary (LitBoolean False)) range -> Call OpOr'     [range]
+    Call (NameOp OpId) [expr] -> expr
+    Tuple [expr] -> expr
+    Tuple [    ] -> Primary LitUnit
+    Fold (NameOp OpMultiply) (Primary (LitInteger 1)) range
+        -> Call (NameOp OpProduct) [range]
+    Fold (NameOp OpAdd)      (Primary (LitInteger 0)) range
+        -> Call (NameOp OpSum)     [range]
+    Fold (NameOp OpAnd) (Primary (LitBoolean True ))  range
+        -> Call (NameOp OpAnd')    [range]
+    Fold (NameOp OpOr)  (Primary (LitBoolean False))  range
+        -> Call (NameOp OpOr')     [range]
     expr -> expr

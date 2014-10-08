@@ -30,7 +30,7 @@ data Body
 
 data Statement
 	= Assign Name Expression
-	| Execute (Maybe Name) Operator [Expression]
+	| Execute (Maybe Name) Name [Expression]
 	| ForStatement ForCycle
 	| MultiIfStatement MultiIfBranch
 	| BodyStatement Body
@@ -51,7 +51,7 @@ data MultiIfBranch
 
 data Expression
 	= Access Name
-	| Call Operator [Expression]
+	| Call Name [Expression]
 	| Primary Literal
 	deriving (Show)
 

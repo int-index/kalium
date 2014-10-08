@@ -8,6 +8,7 @@ data Name
     = Name String
     | NameMain
     | NameGen Integer
+    | NameOp Operator
     | NameUnique Name
     deriving (Eq, Ord, Show)
 
@@ -43,8 +44,7 @@ data Operator
     | OpPrintLn
     | OpReadLn Type
     | OpId
-    | OpName Name
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 data Literal
     = LitInteger Integer
@@ -60,7 +60,7 @@ data Type
     | TypeBoolean
     | TypeString
     | TypeUnit
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 data By
     = ByValue

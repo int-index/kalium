@@ -29,7 +29,7 @@ sideAssign :: Name -> Expression -> NameStack Body
 sideAssign name expr = do
     (e, xs) <- runWriterT (sideExpression expr)
     let (vardecls, sidecalls) = partitionEithers xs
-    let statements = sidecalls ++ [Execute (Just name) OpId [e]]
+    let statements = sidecalls ++ [Execute (Just name) (NameOp OpId) [e]]
     return $ Body (M.fromList vardecls) statements
 
 
@@ -54,7 +54,7 @@ sideMultiIf multiIfBranch = do
     let statements = assigns ++ [MultiIfStatement $ set multiIfLeafs leafs multiIfBranch]
     return $ Body (M.fromList vardecls) statements
 
-sideExecute :: Maybe Name -> Operator -> [Expression] -> NameStack Body
+sideExecute :: Maybe Name -> Name -> [Expression] -> NameStack Body
 sideExecute mname op exprs = do
     (exprs', xs) <- runWriterT $ mapM sideExpression exprs
     let (vardecls, sidecalls) = partitionEithers xs

@@ -27,6 +27,7 @@ instance Render Name where
         Name cs   -> cs
         NameMain  -> tick : "main"
         NameGen n -> tick : show n
+        NameOp op -> render op
         NameUnique name -> tick : "uniq" ++ tick : render name
 
 instance Render Operator where
@@ -55,7 +56,6 @@ instance Render Operator where
         OpPrintLn -> "println"
         OpReadLn ty -> "readln-" ++ render ty
         OpId -> "id"
-        OpName name -> render name
 
 instance Render FuncSig where
     render funcSig = unwords

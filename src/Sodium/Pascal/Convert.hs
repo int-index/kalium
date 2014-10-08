@@ -98,7 +98,7 @@ instance Conv S.PasType D.Type where
 		S.PasReal    -> return D.TypeDouble
 		S.PasBoolean -> return D.TypeBoolean
 		S.PasString  -> return D.TypeString
-		S.PasType cs -> error "Custom types are not implemented"
+		S.PasType _  -> error "Custom types are not implemented"
 
 binary op a b = D.Call op [a,b]
 
@@ -113,15 +113,15 @@ instance Conv S.Statement D.Statement where
 		S.Execute name exprs
 			 -> D.Execute Nothing
 			<$> case name of
-				"readln"  -> return (D.OpReadLn undefined)
-				"writeln" -> return D.OpPrintLn
-				name -> D.OpName <$> conv name
+				"readln"  -> return (D.NameOp $ D.OpReadLn undefined)
+				"writeln" -> return (D.NameOp D.OpPrintLn)
+				name -> conv name
 			<*> mapM conv exprs
 		S.ForCycle name fromExpr toExpr statement
 			-> (D.ForStatement <$>)
 			 $  D.ForCycle
 			<$> nameHook name
-			<*> (binary D.OpRange <$> conv fromExpr <*> conv toExpr)
+			<*> (binary (D.NameOp D.OpRange) <$> conv fromExpr <*> conv toExpr)
 			<*> convBodyStatement statement
 		S.IfBranch expr bodyThen mBodyElse
 			-> (D.MultiIfStatement <$>)
@@ -144,12 +144,12 @@ instance Conv S.Statement D.Statement where
 					return (D.Access clName, wrap)
 			let instRange = \case
 				S.Binary S.OpRange exprFrom exprTo
-					 -> (binary D.OpElem clCaseExpr)
-					<$> (binary D.OpRange <$> conv exprFrom <*> conv exprTo)
-				expr -> binary D.OpEquals clCaseExpr <$> conv expr
+					 -> (binary (D.NameOp D.OpElem) clCaseExpr)
+					<$> (binary (D.NameOp D.OpRange) <$> conv exprFrom <*> conv exprTo)
+				expr -> binary (D.NameOp D.OpEquals) clCaseExpr <$> conv expr
 			let instLeaf (exprs, body)
 				 =  (,)
-				<$> (foldl1 (binary D.OpOr) <$> mapM instRange exprs)
+				<$> (foldl1 (binary (D.NameOp D.OpOr)) <$> mapM instRange exprs)
 				<*> convBodyStatement body
 			let multiIfBranch
 				 =  D.MultiIfBranch
@@ -180,7 +180,7 @@ instance Conv S.Expression D.Expression where
 		S.Access name -> D.Access <$> nameHook name
 		S.Call name exprs
 			 -> D.Call
-			<$> (D.OpName <$> conv name)
+			<$> conv name
 			<*> mapM conv exprs
 		S.INumber intSection -> return (D.Primary $ inumber intSection)
 		S.FNumber intSection fracSection
@@ -193,8 +193,8 @@ instance Conv S.Expression D.Expression where
 		S.Binary op x y -> binary <$> conv op <*> conv x <*> conv y
 		S.Unary op x -> D.Call <$> conv op <*> mapM conv [x]
 
-instance Conv S.Operator D.Operator where
-    conv = return . \case
+instance Conv S.Operator D.Name where
+    conv = return . D.NameOp . \case
         S.OpAdd -> D.OpAdd
         S.OpSubtract -> D.OpSubtract
         S.OpMultiply -> D.OpMultiply
@@ -209,8 +209,8 @@ instance Conv S.Operator D.Operator where
         S.OpXor -> D.OpXor
         S.OpRange -> D.OpRange
 
-instance Conv S.UnaryOperator D.Operator where
-    conv = return . \case
+instance Conv S.UnaryOperator D.Name where
+    conv = return . D.NameOp . \case
         S.UOpPlus   -> D.OpId
         S.UOpNegate -> D.OpNegate
         S.UOpNot    -> D.OpNot

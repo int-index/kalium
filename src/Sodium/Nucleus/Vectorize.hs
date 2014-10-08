@@ -13,7 +13,7 @@ import qualified Sodium.Nucleus.Program.Vector as Vec
 
 data Error
     = NoAccess Name Vec.Indices
-    | NoFunction Operator
+    | NoFunction Name
     | UpdateImmutable Name
     | NoReference
     | InvalidOperation
@@ -98,8 +98,8 @@ vectorizeStatement funcSigs = \case
 
         -- TODO: purity flag in function signature
         let impure = case name of
-              OpReadLn _ -> True
-              OpPrintLn  -> True
+              NameOp (OpReadLn _) -> True
+              NameOp OpPrintLn    -> True
               _ -> False
         let vecExecute
               | impure    = Vec.Execute name vecArgs
@@ -154,12 +154,12 @@ lookupIndex name = do
     M.lookup name indices
        & maybe (throwError $ NoAccess name indices) return
 
-lookupFuncSig :: [FuncSig] -> Operator -> E FuncSig
-lookupFuncSig funcSigs op@(OpName name)
-    = find (\funcSig -> view funcName funcSig == name) funcSigs
-    & maybe (throwError $ NoFunction op) return
+lookupFuncSig :: [FuncSig] -> Name -> E FuncSig
 -- TODO: real signatures for builtin operators
-lookupFuncSig _ _ = return $ FuncSig (Name "") [] (TypeUnit)
+lookupFuncSig _ (NameOp _) = return $ FuncSig (Name "") [] (TypeUnit)
+lookupFuncSig funcSigs name
+    = find (\funcSig -> view funcName funcSig == name) funcSigs
+    & maybe (throwError $ NoFunction name) return
 
 registerIndexUpdate :: Name -> S E (Name, Vec.Index)
 registerIndexUpdate name = do

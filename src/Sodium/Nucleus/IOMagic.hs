@@ -20,16 +20,16 @@ uncurse program
 
 uncurseStatement :: Statement -> ReaderT Vars (Either Error) Statement
 uncurseStatement = _Execute
-    $ \(mres, op, args) -> case op of
-        OpReadLn _ -> case (mres, args) of
+    $ \(mres, name, args) -> case name of
+        NameOp (OpReadLn _) -> case (mres, args) of
             (Nothing, [Access name])
                  -> lookupType name
-                <&> \t -> (Just name, OpReadLn t, [])
+                <&> \t -> (Just name, NameOp (OpReadLn t), [])
             _ -> error "IOMagic supports only single-value read operations"
-        OpPrintLn
+        NameOp OpPrintLn
              -> mapM uncurseArgument args
-            <&> \args -> (mres, OpPrintLn, args)
-        _ -> return (mres, op, args)
+            <&> \args -> (mres, name, args)
+        _ -> return (mres, name, args)
 
 uncurseArgument = \case
     -- TODO: apply `show` only to non-String
@@ -38,7 +38,7 @@ uncurseArgument = \case
          -> lookupType name
         <&> \case
             TypeString -> Access name
-            _ -> Call OpShow [Access name]
+            _ -> Call (NameOp OpShow) [Access name]
     expr -> return expr
 
 lookupType name = do

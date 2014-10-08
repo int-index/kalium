@@ -49,6 +49,7 @@ transformName = \case
             else id) cs
     S.NameGen u -> "_'" ++ show u
     S.NameUnique name -> transformName name ++ "'_"
+    S.NameOp op -> convOp op
     where reserved = flip elem
                [ "let", "show", "read", "readLn", "getLine", "return", "foldl"
                , "map", "filter", "undefined", "main", "import", "_"]
@@ -186,16 +187,16 @@ instance Conv S.Bind where
 instance Conv S.Statement where
 
     type Norm S.Statement = H.Exp
-    conv (S.Execute (S.OpReadLn t) [])
+    conv (S.Execute (S.NameOp (S.OpReadLn t)) [])
         | t == S.TypeString = return (D.access "getLine")
         | otherwise = do
                 hsType <- conv t
                 return $ H.ExpTypeSig H.noLoc
                     (D.access "readLn")
                     (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
-    conv (S.Execute S.OpPrintLn args)
+    conv (S.Execute (S.NameOp S.OpPrintLn) args)
         = case args of
-            [S.Call S.OpShow [arg]] -> H.App (D.access "print") <$> conv arg
+            [S.Call (S.NameOp S.OpShow) [arg]] -> H.App (D.access "print") <$> conv arg
             args -> (<$> mapM conv args) $ \case
                 [] -> H.App (D.access "putStrLn") (H.Lit (H.String ""))
                 hsExprs
@@ -273,16 +274,15 @@ convexpr (S.Primary prim) = return $ case prim of
 convexpr (S.Access name i) = D.access <$> pureconv (Name name i)
 convexpr (S.Call op exprs) = do
     hsExprs <- mapM convexpr exprs
-    return $ betaL (convOp op : hsExprs)
+    return $ betaL (D.access (transformName op) : hsExprs)
 convexpr (S.Tuple exprs) = D.expTuple <$> mapM convexpr exprs
 convexpr (S.Fold op expr range) = do
     hsArgExpr <- convexpr expr
     hsRange <- convexpr range
-    return $ betaL [D.access "foldl", convOp op, hsArgExpr, hsRange]
+    return $ betaL [D.access "foldl", D.access (transformName op), hsArgExpr, hsRange]
 
-convOp :: S.Operator -> H.Exp
-convOp = D.access . \case
-    S.OpName name-> transformName name
+convOp :: S.Operator -> D.Name
+convOp = \case
     S.OpNegate   -> "negate"
     S.OpShow     -> "show"
     S.OpProduct  -> "product"

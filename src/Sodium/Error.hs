@@ -9,7 +9,7 @@ import qualified Sodium.Nucleus.Vectorize as V
 
 data Error = ParseError String Int Int
            | NoAccess   N.Name [N.Name]
-           | NoFunction N.Operator
+           | NoFunction N.Name
            | NoReference
            | UpdateImmutable N.Name
            | InvalidOperation
@@ -25,7 +25,7 @@ parseError e = ParseError name line column
 vectorizeError :: V.Error -> Error
 vectorizeError = \case
     V.NoAccess name indices -> NoAccess name (M.keys indices)
-    V.NoFunction op         -> NoFunction op
+    V.NoFunction name       -> NoFunction name
     V.UpdateImmutable name  -> UpdateImmutable name
     V.NoReference           -> NoReference
     V.InvalidOperation      -> InvalidOperation

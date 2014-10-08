@@ -35,7 +35,7 @@ data Bind
 
 data Statement
     = Assign Expression
-    | Execute Operator [Expression]
+    | Execute Name [Expression]
     | ForStatement ForCycle
     | MultiIfStatement MultiIfBranch
     | BodyStatement Body
@@ -58,8 +58,8 @@ data MultiIfBranch
 
 data Expression
     = Access Name Index
-    | Fold Operator Expression Expression
-    | Call Operator [Expression]
+    | Fold Name Expression Expression
+    | Call Name [Expression]
     | Primary Literal
     | Tuple [Expression]
     deriving (Eq, Show)
