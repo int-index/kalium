@@ -17,7 +17,7 @@ data Program
 data Func
     = Func
     { _funcSig :: FuncSig
-    , _funcBody :: Body
+    , _funcStatement :: Statement
     } deriving (Eq, Show)
 
 data Body

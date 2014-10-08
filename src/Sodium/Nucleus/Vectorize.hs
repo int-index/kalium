@@ -42,7 +42,7 @@ vectorizeFunc funcSigs func = do
             $ initIndices (Vec.Index 0) (func ^. funcSig . funcParams . to M.fromList)
     let refs = map Access (func ^. funcSig . to references)
     vecBody <- vecBodyGen (func ^. funcResults ++ refs)
-    return $ Vec.Func (func ^. funcSig) vecBody
+    return $ Vec.Func (func ^. funcSig) (Vec.BodyStatement vecBody)
 
 patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
 expTuple = Vec.Tuple  . map (uncurry Vec.Access)
