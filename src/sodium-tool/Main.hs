@@ -1,8 +1,11 @@
 module Main (main) where
 
+import Control.Monad.Except
+
 import System.Environment
 import System.Exit
 import qualified Sodium
+import Sodium.Error ()
 
 main = getArgs >>= \case
     [filename1, filename2] -> processFiles filename1 filename2
@@ -10,5 +13,8 @@ main = getArgs >>= \case
             exitWith $ ExitFailure 1
 
 processFiles :: String -> String -> IO ()
-processFiles filename1 filename2
-    = readFile filename1 >>= writeFile filename2 . Sodium.translate
+processFiles filename1 filename2 = do
+    content <- readFile filename1
+    case runExcept (Sodium.translate content) of
+        Left e  -> putStrLn (show e)
+        Right r -> writeFile filename2 r

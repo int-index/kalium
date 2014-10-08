@@ -73,13 +73,10 @@ testStage0 = catch' handler action
           action = (,) <$> doesFileExist "shouldfail" <*> readFile "program.pas"
 
 testStage1 :: (Bool, String) -> ExceptT TestGen IO String
-testStage1 (shouldfail, source) = catch' handler action
-    where action = evaluate $ Sodium.translate $ source
-          handler :: Sodium.SodiumException -> IO TestGen
-          handler (Sodium.SodiumException s)
-            = if shouldfail
-                then return Success
-                else return $ TG_Sodium (assertFailure s)
+testStage1 (shouldfail, source)
+        = withExceptT handle (Sodium.translate source)
+    where handle _ | shouldfail = Success
+          handle e = TG_Sodium (assertFailure (show e))
 
 testStage2 :: String -> ExceptT TestGen IO BS.ByteString
 testStage2 source = catch' handler action

@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-module Sodium (SodiumException(..), translate) where
+{-# LANGUAGE FlexibleContexts #-}
+module Sodium (translate) where
 
 import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.IOMagic     (uncurse)
@@ -16,39 +16,34 @@ import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified  Sodium.Pascal.Convert as P (convert)
 import qualified Sodium.Haskell.Convert as H (convert)
 import qualified Sodium.Error as E
-
+import qualified Sodium.Nucleus.Program.Vector as V
 import qualified Sodium.Nucleus.Render as R
 
+import Data.Bool
+import Control.Monad.Writer hiding (pass)
 import Control.Monad.Except
-import Data.Profunctor
-
-import Data.Typeable
-import Control.Exception (Exception, throw)
 
 import Debug.Trace
 
-data SodiumException = SodiumException String
-    deriving (Typeable, Show)
+translate :: MonadError E.Error m => String -> m String
+translate src = do
+    pas <- liftErr E.parseError (parse src)
+    let scalar = (side . uncurse . P.convert) pas
+    vector <- liftErr E.vectorizeError (vectorize scalar)
+    let optimal = let (a, log) = runWriter (closureM pass vector)
+                  in trace (concat $ map R.render log) a
+    return $ prettyPrint (H.convert optimal)
 
-instance Exception SodiumException
+liftErr :: MonadError e' m => (e -> e') -> Except e a -> m a
+liftErr h m = either (throwError . h) return (runExcept m)
 
-translate :: String -> String
-translate = dimap fromPascal toHaskell onNucleus where
-    fromPascal = P.convert . parse'
-    toHaskell  = prettyPrint . H.convert
-    onNucleus = dimap onScalar onVector vectorize'
-    onScalar = side . uncurse
-    onVector = closure pass
-    pass = compute . flatten     . inline      . foldMatch
-                   . joinMultiIf . extractBody . clean
-                   . (\program -> trace ("-----\n" ++ R.render program) program)
+pass :: MonadWriter [V.Program] m => V.Program -> m V.Program
+pass program = tell [program] >> f program
+    where f = return
+            . compute   . flatten     . inline
+            . foldMatch . joinMultiIf . extractBody
+            . clean
 
-parse'     = error' . withExcept E.parseError     . parse
-vectorize' = error' . withExcept E.vectorizeError . vectorize
-
-error' = either (throw . SodiumException . show) id . runExcept
-
-closure :: Eq a => (a -> a) -> a -> a
-closure f = match 0 . iterate f
-  where match n (a:b:_) | a == b = trace ("Pass amount: " ++ show n) a
-        match n (_:c) = match (succ n) c
+closureM :: (Eq a, Monad m) => (a -> m a) -> (a -> m a)
+closureM f = go where
+    go x = f x >>= \y -> bool (go y) (return x) (x == y)
