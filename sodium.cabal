@@ -27,6 +27,7 @@ library
                        Sodium.Nucleus.Pass.Inline
                        Sodium.Nucleus.Pass.FoldMatch
                        Sodium.Nucleus.Pass.ExtractBody
+                       Sodium.Nucleus.Pass.BindClean
                        Sodium.Nucleus.Pass.Clean
                        Sodium.Nucleus.Pass.Compute
                        Sodium.Nucleus.Recmap.Scalar

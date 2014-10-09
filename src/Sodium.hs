@@ -9,6 +9,7 @@ import Sodium.Nucleus.Pass.JoinMultiIf (joinMultiIf)
 import Sodium.Nucleus.Pass.Inline      (inline)
 import Sodium.Nucleus.Pass.FoldMatch   (foldMatch)
 import Sodium.Nucleus.Pass.ExtractBody (extractBody)
+import Sodium.Nucleus.Pass.BindClean   (bindClean)
 import Sodium.Nucleus.Pass.Clean       (clean)
 import Sodium.Nucleus.Pass.Compute     (compute)
 import Sodium.Pascal.Parse   (parse)
@@ -42,7 +43,7 @@ pass program = tell [program] >> f program
     where f = return
             . compute   . flatten     . inline
             . foldMatch . joinMultiIf . extractBody
-            . clean
+            . bindClean . clean
 
 closureM :: (Eq a, Monad m) => (a -> m a) -> (a -> m a)
 closureM f = go where
