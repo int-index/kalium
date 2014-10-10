@@ -4,7 +4,7 @@ module Sodium.Pascal.Convert (convert) where
 
 import Prelude hiding (mapM)
 import Control.Applicative
-import Control.Monad.Reader hiding (mapM)
+import Control.Monad.Identity hiding (mapM)
 import qualified Data.Map  as M
 import qualified Data.Char as C
 import Data.Ratio
@@ -15,12 +15,13 @@ import qualified Sodium.Pascal.Program as S
 import qualified Sodium.Nucleus.Program.Scalar as D
 
 convert :: S.Program -> D.Program
-convert = flip runReader [] . conv
+convert = runIdentity . conv
 
-type ConvEnv = [S.Name]
+nameV = D.Name ["v"]
+nameF = D.Name ["f"]
 
 class Conv s d | s -> d where
-	conv :: s -> Reader ConvEnv d
+	conv :: s -> Identity d
 
 instance Conv S.Program D.Program where
 	conv (S.Program funcs vars body) = do
@@ -47,31 +48,23 @@ instance Conv VB D.Body where
 		<$> (M.fromList <$> mapM conv (splitVarDecls vardecls))
 		<*> mapM conv statements
 
-nameHook cs = do
-	names <- ask
-	let wrap = if cs `elem` names then D.NameUnique else id
-	wrap <$> conv cs
-
 instance Conv S.Func D.Func where
     conv (S.Func name params pasType vars body)
-        = local (name:) $ do
+        = do
             (retExprs, retType, enclose) <- case pasType of
                 Nothing -> return ([], D.TypeUnit, id)
                 Just ty -> do
-                    retName <- nameHook name
+                    let retName = nameV name
                     retType <- conv ty
                     let enclose = D.bodyVars %~ (M.insert retName retType)
                     return ([D.Access retName], retType, enclose)
             clFuncSig
                 <-  D.FuncSig
-                <$> conv name
+                <$> return (nameF name)
                 <*> mapM conv (splitParamDecls params)
                 <*> return retType
             clBody <- enclose <$> conv (VB vars body)
             return $ D.Func clFuncSig clBody retExprs
-
-instance Conv S.Name D.Name where
-	conv = return . D.Name
 
 splitVarDecls vardecls
     = [VarDecl name t | S.VarDecl names t <- vardecls, name <- names]
@@ -84,11 +77,11 @@ data ParamDecl = ParamDecl S.Name Bool S.PasType
 
 instance Conv VarDecl (D.Name, D.Type) where
     conv (VarDecl name pasType)
-         = (,) <$> conv name <*> conv pasType
+         = (,) <$> pure (nameV name) <*> conv pasType
 
 instance Conv ParamDecl (D.Name, D.ByType) where
     conv (ParamDecl name r pasType)
-        = (,) <$> conv name <*> (annotate <$> conv pasType)
+        = (,) <$> pure (nameV name) <*> (annotate <$> conv pasType)
         where annotate = (,) (if r then D.ByReference else D.ByValue)
 
 instance Conv S.PasType D.Type where
@@ -109,18 +102,18 @@ instance Conv S.Statement D.Statement where
 		S.BodyStatement body
 			 -> D.BodyStatement
 			<$> conv (VB [] body)
-		S.Assign name expr -> D.Assign <$> nameHook name <*> conv expr
+		S.Assign name expr -> D.Assign (nameV name) <$> conv expr
 		S.Execute name exprs
 			 -> D.Execute Nothing
 			<$> case name of
 				"readln"  -> return (D.NameOp $ D.OpReadLn undefined)
 				"writeln" -> return (D.NameOp D.OpPrintLn)
-				name -> conv name
+				name -> return (nameF name)
 			<*> mapM conv exprs
 		S.ForCycle name fromExpr toExpr statement
 			-> (D.ForStatement <$>)
 			 $  D.ForCycle
-			<$> nameHook name
+			<$> return (nameV name)
 			<*> (binary (D.NameOp D.OpRange) <$> conv fromExpr <*> conv toExpr)
 			<*> convBodyStatement statement
 		S.IfBranch expr bodyThen mBodyElse
@@ -131,10 +124,10 @@ instance Conv S.Statement D.Statement where
 			<*> (maybeBodySingleton <$> mapM conv mBodyElse)
 		S.CaseBranch expr leafs mBodyElse -> do
 			(clCaseExpr, wrap) <- case expr of
-				S.Access name -> (, id) <$> (D.Access <$> nameHook name)
+				S.Access name -> return (D.Access (nameV name), id)
 				expr -> do
 					clExpr <- conv expr
-					let clName = D.Name "__CASE'__" -- generate a name?
+					let clName = D.Name ["g"] "case1" -- generate a name?
 					let clType = D.TypeUnit -- typeof(expr)
 					let wrap statement
 						= D.BodyStatement
@@ -177,10 +170,10 @@ parseExp intSection fracSection eSign eSection
 
 instance Conv S.Expression D.Expression where
 	conv = \case
-		S.Access name -> D.Access <$> nameHook name
+		S.Access name -> return $ D.Access (nameV name)
 		S.Call name exprs
 			 -> D.Call
-			<$> conv name
+			<$> pure (nameF name)
 			<*> mapM conv exprs
 		S.INumber intSection -> return (D.Primary $ inumber intSection)
 		S.FNumber intSection fracSection
@@ -206,6 +199,7 @@ instance Conv S.Operator D.Name where
         S.OpEquals -> D.OpEquals
         S.OpAnd -> D.OpAnd
         S.OpOr  -> D.OpOr
+        S.OpNot -> D.OpNot
         S.OpXor -> D.OpXor
         S.OpRange -> D.OpRange
 

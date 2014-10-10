@@ -4,12 +4,13 @@ module Sodium.Nucleus.Program where
 import Control.Lens.TH
 import qualified Data.Map as M
 
+type NameSpace = [String]
+
 data Name
-    = Name String
+    = Name NameSpace String
     | NameMain
     | NameGen Integer
     | NameOp Operator
-    | NameUnique Name
     deriving (Eq, Ord, Show)
 
 data FuncSig

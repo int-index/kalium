@@ -25,11 +25,10 @@ commas = parens . intercalate ", "
 
 instance Render Name where
     render = \case
-        Name cs   -> cs
+        Name namespaces cs -> concatMap (++"::") namespaces ++ cs
         NameMain  -> tick : "main"
         NameGen n -> tick : show n
         NameOp op -> render op
-        NameUnique name -> tick : "uniq" ++ tick : render name
 
 instance Render Operator where
     render = \case

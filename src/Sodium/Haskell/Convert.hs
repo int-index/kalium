@@ -43,12 +43,8 @@ instance Conv S.Program where
 transformName :: S.Name -> D.Name
 transformName = \case
     S.NameMain -> "main"
-    S.Name cs
-        -> (if reserved cs
-            then ("_'"++)
-            else id) cs
+    S.Name namespaces cs -> concatMap (++"'") namespaces ++ cs
     S.NameGen u -> "_'" ++ show u
-    S.NameUnique name -> transformName name ++ "'_"
     S.NameOp op -> convOp op
     where reserved = flip elem
                [ "let", "show", "read", "readLn", "getLine", "return", "foldl"
