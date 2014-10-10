@@ -305,5 +305,7 @@ convOp = \case
     S.OpElem     -> "elem"
     S.OpRange    -> "enumFromTo"
     S.OpId       -> "id"
+    S.OpFst      -> "fst"
+    S.OpSnd      -> "snd"
     S.OpPrintLn  -> "print"
     S.OpReadLn _ -> "readLn"

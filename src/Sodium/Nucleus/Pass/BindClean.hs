@@ -31,7 +31,7 @@ patClean p@PWildCard = [(p, wildCleaner)]
 patClean (PTuple pats) = concat (unfoldr go 0) where
     go n = do
         (pre, cur:post) <- Just (splitAt n pats)
-        let wrap (PWildCard, _)  = [(PTuple (pre++post), tupWildCleaner n)]
+        let wrap (PWildCard, _)  = [(PTuple (pre++post), tupWildCleaner pats n)]
             wrap (cur', _) = [(PTuple (pre++cur':post) -- TODO: implement it
                              , error "Nested pattern cleaning not implemented")]
         return (patClean cur >>= wrap, succ n)
@@ -42,11 +42,19 @@ type Cleaner = Expression -> Maybe Expression
 wildCleaner :: Cleaner
 wildCleaner _ = Just (Primary LitUnit)
 
-tupWildCleaner :: Int -> Cleaner
-tupWildCleaner n expr = do
-    Tuple  exprs  <- Just expr
-    (pre, _:post) <- Just (splitAt n exprs)
-    return $ Tuple (pre ++ post)
+tupWildCleaner :: [Pattern] -> Int -> Cleaner
+tupWildCleaner pats n expr = getFirst (First direct <> First indirect)
+ where direct = do
+         Tuple  exprs  <- Just expr
+         (pre, _:post) <- Just (splitAt n exprs)
+         return $ Tuple (pre ++ post)
+       indirect = do
+         guard $ length pats == 2
+         op <- case n of
+            0 -> Just OpSnd
+            1 -> Just OpFst
+            _ -> Nothing
+         return $ Call (NameOp op) [expr]
 
 class CleanRet a where
     cleanRet :: Cleaner -> a -> Maybe a

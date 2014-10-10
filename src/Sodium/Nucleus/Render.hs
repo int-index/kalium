@@ -56,6 +56,8 @@ instance Render Operator where
         OpPrintLn -> "println"
         OpReadLn ty -> "readln-" ++ render ty
         OpId -> "id"
+        OpFst -> "fst"
+        OpSnd -> "snd"
 
 instance Render FuncSig where
     render funcSig = unwords

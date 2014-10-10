@@ -44,6 +44,8 @@ data Operator
     | OpPrintLn
     | OpReadLn Type
     | OpId
+    | OpFst
+    | OpSnd
     deriving (Eq, Ord, Show)
 
 data Literal
