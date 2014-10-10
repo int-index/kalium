@@ -9,7 +9,6 @@ type NameSpace = [String]
 data Name
     = Name NameSpace String
     | NameMain
-    | NameGen Integer
     | NameOp Operator
     deriving (Eq, Ord, Show)
 

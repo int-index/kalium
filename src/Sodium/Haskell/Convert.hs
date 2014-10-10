@@ -44,7 +44,6 @@ transformName :: S.Name -> D.Name
 transformName = \case
     S.NameMain -> "main"
     S.Name namespaces cs -> concatMap (++"'") namespaces ++ cs
-    S.NameGen u -> "_'" ++ show u
     S.NameOp op -> convOp op
     where reserved = flip elem
                [ "let", "show", "read", "readLn", "getLine", "return", "foldl"

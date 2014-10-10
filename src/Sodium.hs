@@ -22,6 +22,7 @@ import qualified Sodium.Nucleus.Render as R
 
 import Data.Bool
 import Control.Monad.Writer hiding (pass)
+import Control.Monad.State
 import Control.Monad.Except
 
 import Debug.Trace
@@ -29,7 +30,8 @@ import Debug.Trace
 translate :: MonadError E.Error m => String -> m String
 translate src = do
     pas <- liftErr E.parseError (parse src)
-    let scalar = (side . uncurse . P.convert) pas
+    let scalar = (side <=< (return . uncurse) <=< P.convert) pas
+          `evalState` map (V.Name ["g"] . show) [0..]
     vector <- liftErr E.vectorizeError (vectorize scalar)
     let optimal = let (a, log) = runWriter (closureM pass vector)
                   in trace (concat $ map R.render log) a

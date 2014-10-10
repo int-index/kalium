@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts, ConstraintKinds #-}
 module Sodium.Nucleus.Side (side) where
 
 import Control.Lens
@@ -10,14 +11,15 @@ import Sodium.Nucleus.Program.Scalar
 import Sodium.Nucleus.Recmap.Scalar
 
 type VarDecl = (Name, Type)
+type Stack s m = (Applicative m, MonadState [s] m)
 
-type NameStack = State [Name]
+pop :: Stack Name m => m Name
 pop = gets head <* modify tail
 
-side :: Program -> Program
-side = flip evalState (map NameGen [0..]) . recmapped sideStatement
+side :: Stack Name m => Program -> m Program
+side = recmapped sideStatement
 
-sideStatement :: Statement -> NameStack Statement
+sideStatement :: Stack Name m => Statement -> m Statement
 sideStatement = \case
     Assign name expr -> BodyStatement <$> sideAssign name expr
     MultiIfStatement multiIf -> BodyStatement <$> sideMultiIf multiIf
@@ -25,7 +27,7 @@ sideStatement = \case
     ForStatement forCycle -> BodyStatement <$> sideForCycle forCycle
     statement -> return statement
 
-sideAssign :: Name -> Expression -> NameStack Body
+sideAssign :: Stack Name m => Name -> Expression -> m Body
 sideAssign name expr = do
     (e, xs) <- runWriterT (sideExpression expr)
     let (vardecls, sidecalls) = partitionEithers xs
@@ -34,8 +36,8 @@ sideAssign name expr = do
 
 
 sideExpression
-    :: Expression
-    -> WriterT [Either VarDecl Statement] NameStack Expression
+    :: Stack Name m => Expression
+    -> WriterT [Either VarDecl Statement] m Expression
 sideExpression = \case
     Access name -> return (Access name)
     Primary lit -> return (Primary lit)
@@ -47,21 +49,21 @@ sideExpression = \case
         tell [Right $ Execute (Just name) op eArgs]
         return (Access name)
 
-sideMultiIf :: MultiIf -> NameStack Body
+sideMultiIf :: Stack Name m => MultiIf -> m Body
 sideMultiIf multiIf = do
     (leafs, xs) <- runWriterT (mapM (_1 sideExpression) $ view multiIfLeafs multiIf)
     let (vardecls, assigns) = partitionEithers xs
     let statements = assigns ++ [MultiIfStatement $ set multiIfLeafs leafs multiIf]
     return $ Body (M.fromList vardecls) statements
 
-sideExecute :: Maybe Name -> Name -> [Expression] -> NameStack Body
+sideExecute :: Stack Name m => Maybe Name -> Name -> [Expression] -> m Body
 sideExecute mname op exprs = do
     (exprs', xs) <- runWriterT $ mapM sideExpression exprs
     let (vardecls, sidecalls) = partitionEithers xs
     let statements = sidecalls ++ [Execute mname op exprs']
     return $ Body (M.fromList vardecls) statements
 
-sideForCycle :: ForCycle -> NameStack Body
+sideForCycle :: Stack Name m => ForCycle -> m Body
 sideForCycle forCycle = do
     (expr, xs) <- runWriterT (sideExpression $ view forRange forCycle)
     let (vardecls, sidecalls) = partitionEithers xs

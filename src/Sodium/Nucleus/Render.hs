@@ -27,7 +27,6 @@ instance Render Name where
     render = \case
         Name namespaces cs -> concatMap (++"::") namespaces ++ cs
         NameMain  -> tick : "main"
-        NameGen n -> tick : show n
         NameOp op -> render op
 
 instance Render Operator where
