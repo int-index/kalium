@@ -20,7 +20,7 @@ side = flip evalState (map NameGen [0..]) . recmapped sideStatement
 sideStatement :: Statement -> NameStack Statement
 sideStatement = \case
     Assign name expr -> BodyStatement <$> sideAssign name expr
-    MultiIfStatement multiIfBranch -> BodyStatement <$> sideMultiIf multiIfBranch
+    MultiIfStatement multiIf -> BodyStatement <$> sideMultiIf multiIf
     Execute mname op exprs -> BodyStatement <$> sideExecute mname op exprs
     ForStatement forCycle -> BodyStatement <$> sideForCycle forCycle
     statement -> return statement
@@ -47,11 +47,11 @@ sideExpression = \case
         tell [Right $ Execute (Just name) op eArgs]
         return (Access name)
 
-sideMultiIf :: MultiIfBranch -> NameStack Body
-sideMultiIf multiIfBranch = do
-    (leafs, xs) <- runWriterT (mapM (_1 sideExpression) $ view multiIfLeafs multiIfBranch)
+sideMultiIf :: MultiIf -> NameStack Body
+sideMultiIf multiIf = do
+    (leafs, xs) <- runWriterT (mapM (_1 sideExpression) $ view multiIfLeafs multiIf)
     let (vardecls, assigns) = partitionEithers xs
-    let statements = assigns ++ [MultiIfStatement $ set multiIfLeafs leafs multiIfBranch]
+    let statements = assigns ++ [MultiIfStatement $ set multiIfLeafs leafs multiIf]
     return $ Body (M.fromList vardecls) statements
 
 sideExecute :: Maybe Name -> Name -> [Expression] -> NameStack Body

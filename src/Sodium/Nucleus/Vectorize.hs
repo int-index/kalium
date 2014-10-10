@@ -118,9 +118,9 @@ vectorizeStatement funcSigs = \case
                 vecRange
                 (Vec.BodyStatement vecBody)
         return (changed, vecForCycle)
-    MultiIfStatement multiIfBranch -> over _2 Vec.MultiIfStatement <$> do
+    MultiIfStatement multiIf -> over _2 Vec.MultiIfStatement <$> do
         (unzip -> (changedList, vecLeafGens))
-            <- forM (multiIfBranch ^. multiIfLeafs)
+            <- forM (multiIf ^. multiIfLeafs)
              $ \(expr, body) -> do
                  vecExpr <- vectorizeExpression expr
                  (changed, vecBodyGen) <- vectorizeBody funcSigs body
@@ -129,14 +129,14 @@ vectorizeStatement funcSigs = \case
                          return (vecExpr, Vec.BodyStatement vecBody)
                  return (changed, vecLeafGen)
         (changedElse, vecBodyElseGen)
-            <- vectorizeBody funcSigs (multiIfBranch ^. multiIfElse)
+            <- vectorizeBody funcSigs (multiIf ^. multiIfElse)
         let changed = nub $ changedElse ++ concat changedList
         let accessChanged = map Access changed
-        vecMultiIfBranch <- lift
-             $  Vec.MultiIfBranch
+        vecMultiIf <- lift
+             $  Vec.MultiIf
             <$> mapM ($ accessChanged) vecLeafGens
             <*> fmap Vec.BodyStatement (vecBodyElseGen accessChanged)
-        return $ (changed, vecMultiIfBranch)
+        return $ (changed, vecMultiIf)
     _ -> throwError InvalidOperation
 
 vectorizeExpression :: Expression -> R E Vec.Expression

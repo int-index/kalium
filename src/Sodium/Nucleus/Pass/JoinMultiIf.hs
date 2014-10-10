@@ -5,14 +5,28 @@ import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
 
 joinMultiIf :: Program -> Program
-joinMultiIf = over recmapped joinMultiIfStatement
+joinMultiIf = over recmapped joinMultiIfExpression
+            . over recmapped joinMultiIfStatement
+
+joinMultiIfExpression :: Expression -> Expression
+joinMultiIfExpression
+    = _MultiIfExpression %~ tryApply joinMultiIf
+    where joinMultiIf multiIf
+            =  multiIf ^? multiIfElse . _MultiIfExpression
+           <&> over multiIfLeafs (view multiIfLeafs multiIf ++)
 
 joinMultiIfStatement :: Statement -> Statement
-joinMultiIfStatement
-    = _MultiIfStatement %~ tryApply joinMultiIfBranch
-    where joinMultiIfBranch multiIfBranch
-            =  multiIfBranch ^? multiIfElse . _MultiIfStatement
-           <&> over multiIfLeafs (view multiIfLeafs multiIfBranch ++)
+joinMultiIfStatement = tryApply
+    $ \statement ->  statement
+                 ^? _MultiIfStatement
+                 >>= matchExpression
+                 <&> Assign
+
+matchExpression :: MultiIf Statement -> Maybe Expression
+matchExpression multiIf = do
+    exprLeafs <- (traversed . _2) (preview _Assign) (multiIf ^. multiIfLeafs)
+    exprElse  <- multiIf ^? multiIfElse . _Assign
+    return $ MultiIfExpression $ MultiIf exprLeafs exprElse
 
 tryApply :: (a -> Maybe a) -> (a -> a)
 tryApply f a = maybe a id (f a)

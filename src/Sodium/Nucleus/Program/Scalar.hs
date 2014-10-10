@@ -32,7 +32,7 @@ data Statement
 	= Assign Name Expression
 	| Execute (Maybe Name) Name [Expression]
 	| ForStatement ForCycle
-	| MultiIfStatement MultiIfBranch
+	| MultiIfStatement MultiIf
 	| BodyStatement Body
 	deriving (Show)
 
@@ -43,8 +43,8 @@ data ForCycle
 	, _forBody :: Body
 	} deriving (Show)
 
-data MultiIfBranch
-	= MultiIfBranch
+data MultiIf
+	= MultiIf
 	{ _multiIfLeafs :: [(Expression, Body)]
 	, _multiIfElse  :: Body
 	} deriving (Show)
@@ -68,7 +68,7 @@ bodySingleton
 makeLenses ''Func
 makeLenses ''Body
 makeLenses ''ForCycle
-makeLenses ''MultiIfBranch
+makeLenses ''MultiIf
 makeLenses ''Program
 
 makePrisms ''Statement

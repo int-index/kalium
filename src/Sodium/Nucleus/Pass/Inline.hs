@@ -72,6 +72,9 @@ instance SubOnce Expression where
              -> Fold op
             <$> subOnce expr
             <*> subOnce range
+        MultiIfExpression multiIf
+             -> MultiIfExpression
+            <$> subOnce multiIf
 
 instance SubOnce Statement where
 	subOnce
@@ -92,10 +95,10 @@ instance SubOnce ForCycle where
 			(shadowedBy . view (forArgPattern . to patBound))
 			(forAction subOnce)
 
-instance SubOnce MultiIfBranch where
-	subOnce
-		 = (multiIfLeafs . traversed) (_1 subOnce >=> _2 subOnce)
-		>=> multiIfElse subOnce
+instance SubOnce a => SubOnce (MultiIf a) where
+    subOnce
+         = (multiIfLeafs . traversed) (_1 subOnce >=> _2 subOnce)
+        >=> multiIfElse subOnce
 
 instance SubOnce Body where
 	subOnce = apUnless

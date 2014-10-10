@@ -17,6 +17,10 @@ recursively f = \case
     Call op exprs  -> f $ Call op (map rf exprs)
     Tuple   exprs  -> f $ Tuple (map rf exprs)
     Fold op expr range -> f $ Fold op (rf expr) (rf range)
+    MultiIfExpression multiIf -> f
+        $ MultiIfExpression
+        $ multiIf & multiIfLeafs . traversed . both %~ rf
+                  & multiIfElse %~ rf
     where rf = recursively f
 
 match :: Expression -> Expression

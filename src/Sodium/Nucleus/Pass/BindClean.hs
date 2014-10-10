@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Sodium.Nucleus.Pass.BindClean (bindClean) where
 
 import Control.Monad
@@ -65,7 +66,7 @@ instance CleanRet Expression where
 instance CleanRet Body where
     cleanRet cc = bodyResult (cleanRet cc)
 
-instance CleanRet MultiIfBranch where
+instance CleanRet (MultiIf Statement) where
     cleanRet cc  = (multiIfLeafs . traversed . _2) (cleanRet cc)
                 >=> multiIfElse (cleanRet cc)
 

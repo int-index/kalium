@@ -95,33 +95,10 @@ instance Conv S.Body where
             statements -> H.Do statements
 
     type Pure S.Body = H.Exp
-    pureconv (S.Body _ statements resultExpr) = msum
-        [ do name1 <- case resultExpr of
-                   S.Access name i -> return $ Name name i
-                   _ -> mzero
-             let appToLast f xs = case reverse xs of
-                   (x:xs') -> (, reverse xs') <$> f x
-                   _ -> mzero
-             let extractIndex = \case
-                   S.PAccess name i -> return (Name name i)
-                   _ -> mzero
-             let convStatement (S.Bind indices statement)
-                    =  (,)
-                   <$> extractIndex indices
-                   <*> case statement of
-                       S.Assign expr -> pureconv expr
-                       S.ForStatement forCycle -> pureconv forCycle
-                       S.MultiIfStatement multiIfBranch -> pureconv multiIfBranch
-                       S.BodyStatement body -> pureconv body
-                       _ -> mzero
-             ((name2, hsExpr), statements) <- appToLast convStatement statements
-             guard $ name1 == name2
-             hsValueDefs <- mapM pureconv statements
-             return $ D.pureLet hsValueDefs hsExpr
-        , do hsValueDefs <- mapM pureconv statements
-             hsRetValue <- pureconv resultExpr
-             return $ D.pureLet hsValueDefs hsRetValue
-        ]
+    pureconv (S.Body _ statements resultExpr) = do
+        hsValueDefs <- mapM pureconv statements
+        hsRetValue <- pureconv resultExpr
+        return $ D.pureLet hsValueDefs hsRetValue
 
 
 instance Conv S.ForCycle where
@@ -147,10 +124,10 @@ instance Conv S.ForCycle where
         return $ betaL [D.access "foldl", hsFoldLambda, hsArgExpr, hsRange]
 
 
-instance Conv S.MultiIfBranch where
+instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.MultiIf a) where
 
-    type Norm S.MultiIfBranch = H.Exp
-    conv (S.MultiIfBranch leafs statementElse) = do
+    type Norm (S.MultiIf a) = H.Exp
+    conv (S.MultiIf leafs statementElse) = do
         let convLeaf (expr, statement)
               =  (,)
              <$> conv expr
@@ -159,8 +136,8 @@ instance Conv S.MultiIfBranch where
         hsStatementElse <- (D.access "otherwise",) <$> conv statementElse
         return $ D.multiIf (leafGens ++ [hsStatementElse])
 
-    type Pure S.MultiIfBranch = H.Exp
-    pureconv (S.MultiIfBranch leafs statementElse) = do
+    type Pure (S.MultiIf a) = H.Exp
+    pureconv (S.MultiIf leafs statementElse) = do
         let convLeaf (expr, statement)
               =  (,)
              <$> pureconv expr
@@ -205,7 +182,7 @@ instance Conv S.Statement where
                      $ hsExprs
     conv (S.Execute op args) = error ("Execute " ++ show op ++ " " ++ show args)
     conv (S.ForStatement  forCycle) = conv forCycle
-    conv (S.MultiIfStatement multiIfBranch) = conv multiIfBranch
+    conv (S.MultiIfStatement multiIf) = conv multiIf
     conv (S.BodyStatement body) = conv body
     conv (S.Assign expr) = H.App (D.access "return") <$> conv expr
 
@@ -213,7 +190,7 @@ instance Conv S.Statement where
     pureconv = \case
             S.Assign expr -> pureconv expr
             S.ForStatement forCycle -> pureconv forCycle
-            S.MultiIfStatement multiIfBranch -> pureconv multiIfBranch
+            S.MultiIfStatement multiIf -> pureconv multiIf
             S.BodyStatement body -> pureconv body
             _ -> mzero
 
@@ -280,6 +257,7 @@ convexpr (S.Fold op expr range) = do
     hsArgExpr <- convexpr expr
     hsRange <- convexpr range
     return $ betaL [D.access "foldl", D.access (transformName op), hsArgExpr, hsRange]
+convexpr (S.MultiIfExpression multiIf) = pureconv multiIf
 
 convOp :: S.Operator -> D.Name
 convOp = \case

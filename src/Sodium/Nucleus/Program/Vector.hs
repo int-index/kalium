@@ -37,7 +37,7 @@ data Statement
     = Assign Expression
     | Execute Name [Expression]
     | ForStatement ForCycle
-    | MultiIfStatement MultiIfBranch
+    | MultiIfStatement (MultiIf Statement)
     | BodyStatement Body
     deriving (Eq, Show)
 
@@ -50,10 +50,10 @@ data ForCycle
     , _forAction :: Statement
     } deriving (Eq, Show)
 
-data MultiIfBranch
-    = MultiIfBranch
-    { _multiIfLeafs :: [(Expression, Statement)]
-    , _multiIfElse  :: Statement
+data MultiIf a
+    = MultiIf
+    { _multiIfLeafs :: [(Expression, a)]
+    , _multiIfElse  :: a
     } deriving (Eq, Show)
 
 data Expression
@@ -62,6 +62,7 @@ data Expression
     | Call Name [Expression]
     | Primary Literal
     | Tuple [Expression]
+    | MultiIfExpression (MultiIf Expression)
     deriving (Eq, Show)
 
 data Index
@@ -83,8 +84,9 @@ makeLenses ''Func
 makeLenses ''Bind
 makeLenses ''Body
 makeLenses ''ForCycle
-makeLenses ''MultiIfBranch
+makeLenses ''MultiIf
 makeLenses ''Program
 
+makePrisms ''Expression
 makePrisms ''Statement
 makePrisms ''Pattern

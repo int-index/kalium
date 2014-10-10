@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Sodium.Nucleus.Render where
 
 import Data.List
@@ -121,7 +122,7 @@ instance Render Statement where
         Assign expr -> render expr
         Execute op args -> render op ++ commas (map render args)
         BodyStatement body -> render body
-        MultiIfStatement multiIfBranch -> render multiIfBranch
+        MultiIfStatement multiIf -> render multiIf
         ForStatement forCycle -> render forCycle
 
 instance Render Pattern where
@@ -144,14 +145,14 @@ instance Render Expression where
         Call op args -> render op ++ commas (map render args)
         expr -> show expr
 
-instance Render MultiIfBranch where
-    render multiIfBranch =
+instance Render (MultiIf Statement) where
+    render multiIf =
         let rLeaf (cond, statement)
                 = "| " ++ render cond ++ "\n"
                        ++ indent (render statement)
             r = map rLeaf
-                $ (multiIfBranch ^. multiIfLeafs)
-                ++ [(Primary (LitBoolean True), multiIfBranch ^. multiIfElse)]
+                $ (multiIf ^. multiIfLeafs)
+                ++ [(Primary (LitBoolean True), multiIf ^. multiIfElse)]
         in unlines r
 
 instance Render ForCycle where

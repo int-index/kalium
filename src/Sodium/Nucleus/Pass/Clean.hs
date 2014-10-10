@@ -69,6 +69,7 @@ instance CheckRef Expression where
         Call _ exprs -> -- Check the operator?
             checkRef exprs
         Fold _ exprs range -> checkRef (exprs, range)
+        MultiIfExpression multiIf -> checkRef multiIf
 
 instance CheckRef Statement where
     checkRef = \case
@@ -76,7 +77,7 @@ instance CheckRef Statement where
         Assign expr -> checkRef expr
         BodyStatement body -> checkRef body
         ForStatement forCycle -> checkRef forCycle
-        MultiIfStatement multiIfBranch -> checkRef multiIfBranch
+        MultiIfStatement multiIf -> checkRef multiIf
 
 instance CheckRef Bind where
     checkRef = checkRef . view bindStatement
@@ -88,9 +89,9 @@ instance CheckRef ForCycle where
         let unsh = bool [forCycle ^. forAction] [] shadowed
         checkRef (base, unsh)
 
-instance CheckRef MultiIfBranch where
-    checkRef multiIfBranch = checkRef 
-        (multiIfBranch ^. multiIfLeafs, multiIfBranch ^. multiIfElse)
+instance CheckRef a => CheckRef (MultiIf a) where
+    checkRef multiIf = checkRef
+        (multiIf ^. multiIfLeafs, multiIf ^. multiIfElse)
 
 bodyComponents body = (body ^. bodyResult, body ^. bodyBinds)
 

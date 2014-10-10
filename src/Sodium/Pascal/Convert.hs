@@ -102,7 +102,7 @@ instance Conv S.PasType D.Type where
 
 binary op a b = D.Call op [a,b]
 
-multifyIf expr bodyThen bodyElse = D.MultiIfBranch [(expr, bodyThen)] bodyElse
+multifyIf expr bodyThen bodyElse = D.MultiIf [(expr, bodyThen)] bodyElse
 
 instance Conv S.Statement D.Statement where
 	conv = \case
@@ -151,11 +151,11 @@ instance Conv S.Statement D.Statement where
 				 =  (,)
 				<$> (foldl1 (binary (D.NameOp D.OpOr)) <$> mapM instRange exprs)
 				<*> convBodyStatement body
-			let multiIfBranch
-				 =  D.MultiIfBranch
+			let multiIf
+				 =  D.MultiIf
 				<$> mapM instLeaf leafs
 				<*> (maybeBodySingleton <$> mapM conv mBodyElse)
-			wrap <$> (D.MultiIfStatement <$> multiIfBranch)
+			wrap <$> (D.MultiIfStatement <$> multiIf)
 
 inumber intSection = D.LitInteger $ parseInt intSection
 fnumber intSection fracSection = D.LitDouble $ parseFrac intSection fracSection
