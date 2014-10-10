@@ -44,7 +44,7 @@ library
                        array,
                        lens,
                        profunctors,
-                       haskell-src-exts,
+                       haskell-src-exts == 1.16.*,
                        parsec
   ghc-options:         -W -O2
   hs-source-dirs:      src

@@ -35,7 +35,7 @@ instance Conv S.Program where
             funcDefs
       where extensions names = [H.LanguagePragma H.noLoc (map H.Ident names)]
             importDecl s = H.ImportDecl H.noLoc (H.ModuleName s)
-                           False False Nothing Nothing Nothing
+                           False False False Nothing Nothing Nothing
 
     type Pure S.Program = ()
     pureconv _ = Nothing

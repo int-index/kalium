@@ -8,7 +8,7 @@ type Name = String
 
 funcDef name args exp = H.FunBind [H.Match H.noLoc (H.Ident name) (map (H.PVar . H.Ident) args) Nothing (H.UnGuardedRhs exp) (H.BDecls [])]
 
-valueDef pat exp = H.PatBind H.noLoc pat Nothing (H.UnGuardedRhs exp) (H.BDecls [])
+valueDef pat exp = H.PatBind H.noLoc pat (H.UnGuardedRhs exp) (H.BDecls [])
 
 pureLet []   = id
 pureLet defs = H.Let (H.BDecls defs)
@@ -28,7 +28,9 @@ access [] = error "Null name"
 
 hsName = H.UnQual . H.Ident
 
-multiIf alts = H.MultiIf (uncurry H.IfAlt `map` alts)
+multiIf alts = H.MultiIf (map handleAlt alts)
+  where
+    handleAlt (cond, expr) = H.GuardedRhs H.noLoc [H.Qualifier cond] expr
 
 doBind H.PWildCard = doExecute
 doBind pat = \case
