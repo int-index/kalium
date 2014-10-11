@@ -10,6 +10,7 @@ data Name
     = Name NameSpace String
     | NameMain
     | NameOp Operator
+    | Shadow Name
     deriving (Eq, Ord, Show)
 
 data FuncSig

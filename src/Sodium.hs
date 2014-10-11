@@ -3,6 +3,7 @@ module Sodium (translate) where
 
 import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.IOMagic     (uncurse)
+import Sodium.Nucleus.Shadow      (unshadow)
 import Sodium.Nucleus.Side        (side)
 import Sodium.Nucleus.Pass.Flatten     (flatten)
 import Sodium.Nucleus.Pass.JoinMultiIf (joinMultiIf)
@@ -33,7 +34,8 @@ translate src = do
     let scalar = (side <=< (return . uncurse) <=< P.convert) pas
           `evalState` map (V.Name ["g"] . show) [0..]
     vector <- liftErr E.vectorizeError (vectorize scalar)
-    let optimal = let (a, log) = runWriter (closureM pass vector)
+    let noshadow = unshadow vector
+    let optimal = let (a, log) = runWriter (closureM pass noshadow)
                   in trace (concat $ map R.render log) a
     return $ prettyPrint (H.convert optimal)
 

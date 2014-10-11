@@ -5,11 +5,9 @@ import Control.Lens hiding (Index, Fold)
 import Control.Monad.Reader
 import qualified Data.Map as M
 import Data.Monoid
-import Data.Bool
 import Data.List
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
-import Sodium.Nucleus.Pattern
 
 clean :: Program -> Program
 clean = runIdentity . recmap cleaner
@@ -83,11 +81,8 @@ instance CheckRef Bind where
     checkRef = checkRef . view bindStatement
 
 instance CheckRef ForCycle where
-    checkRef forCycle = do
-        shadowed <- shadowedBy (forCycle ^. forArgPattern . to patBound)
-        let base = (forCycle ^. forRange, forCycle ^. forArgExpr)
-        let unsh = bool [forCycle ^. forAction] [] shadowed
-        checkRef (base, unsh)
+    checkRef forCycle = checkRef
+        ((forCycle ^. forRange, forCycle ^. forArgExpr), forCycle ^. forAction)
 
 instance CheckRef a => CheckRef (MultiIf a) where
     checkRef multiIf = checkRef
@@ -96,9 +91,4 @@ instance CheckRef a => CheckRef (MultiIf a) where
 bodyComponents body = (body ^. bodyResult, body ^. bodyBinds)
 
 instance CheckRef Body where
-    checkRef body = do
-        shadowed <- shadowedBy (body ^. bodyVars . to M.keys)
-        checkRef $ bool [bodyComponents body] [] shadowed
-
-shadowedBy :: [Name] -> Reader Name Bool
-shadowedBy names = (`elem` names) <$> ask
+    checkRef body = checkRef (bodyComponents body)

@@ -6,11 +6,8 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.State
 import Control.Lens hiding (Index, Fold)
-import qualified Data.Map as M
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
-import Sodium.Nucleus.Pattern
-import Data.Bool
 
 inline :: Program -> Program
 inline = over recmapped inlineBody
@@ -32,7 +29,7 @@ inlineBody = evalState unconsBind where
         let (body, count)
               = runWriter
               $ flip runReaderT ((name, i), expr)
-              $ unsafeBodySubOnce body'
+              $ subOnce body'
         guard (count <= 1)
         return body
 
@@ -50,9 +47,6 @@ type SubOnceEnv = ((Name, Index), Expression)
 
 class SubOnce a where
 	subOnce :: a -> ReaderT SubOnceEnv (Writer (Sum Integer)) a
-
-apUnless :: Monad m => (a -> m Bool) -> (a -> m a) -> (a -> m a)
-apUnless p f = \a -> p a >>= bool (f a) (return a)
 
 instance SubOnce Expression where
     subOnce = \case
@@ -91,9 +85,7 @@ instance SubOnce ForCycle where
 	subOnce
 		 =  forRange subOnce
 		>=> forArgExpr subOnce
-		>=> apUnless
-			(shadowedBy . view (forArgPattern . to patBound))
-			(forAction subOnce)
+		>=> (forAction subOnce)
 
 instance SubOnce a => SubOnce (MultiIf a) where
     subOnce
@@ -101,15 +93,6 @@ instance SubOnce a => SubOnce (MultiIf a) where
         >=> multiIfElse subOnce
 
 instance SubOnce Body where
-	subOnce = apUnless
-		(shadowedBy . M.keys . view bodyVars)
-		unsafeBodySubOnce
-
-unsafeBodySubOnce
-	 =  (bodyBinds   . traversed) subOnce
-	>=> bodyResult subOnce
-
-shadowedBy :: Monad m => [Name] -> ReaderT SubOnceEnv m Bool
-shadowedBy names = do
-	(name, _) <- ask
-	return $ fst name `elem` names
+    subOnce
+         = (bodyBinds . traversed) subOnce
+        >=> bodyResult subOnce
