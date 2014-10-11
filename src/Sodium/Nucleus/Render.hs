@@ -25,7 +25,7 @@ commas = parens . intercalate ", "
 
 instance Render Name where
     render = \case
-        Name namespaces cs -> concatMap (++"::") namespaces ++ cs
+        Name namespaces cs -> concatMap (++"'") namespaces ++ cs
         NameMain  -> tick : "main"
         NameOp op -> render op
 
@@ -141,6 +141,7 @@ instance Render Expression where
         Access name index -> render name ++ render index
         Primary lit -> render lit
         Call op args -> render op ++ commas (map render args)
+        MultiIfExpression multiIf -> render multiIf
         expr -> show expr
 
 instance Render (MultiIf Statement) where
@@ -148,7 +149,13 @@ instance Render (MultiIf Statement) where
         let rLeaf (cond, statement)
                 = "| " ++ render cond ++ "\n"
                        ++ indent (render statement)
-        in unlines $ map rLeaf $ (multiIf ^. multiIfLeafs)
+        in unlines $ map rLeaf $ multiIf ^. multiIfLeafs
+
+instance Render (MultiIf Expression) where
+    render multiIf =
+        let rLeaf (cond, expression)
+                = "| " ++ render cond ++ ": " ++ render expression ++ ";"
+        in "(" ++ unwords (map rLeaf $ multiIf ^. multiIfLeafs) ++ ")"
 
 instance Render ForCycle where
     render _ = "LOOP"

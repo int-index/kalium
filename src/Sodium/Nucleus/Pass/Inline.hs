@@ -29,7 +29,7 @@ inlineBody = evalState unconsBind where
         let (body, count)
               = runWriter
               $ flip runReaderT ((name, i), expr)
-              $ subOnce body'
+              $ inl body'
         when (expr ^? _Access == Nothing) $ guard (count <= 1)
         return body
 
@@ -43,54 +43,54 @@ noExec = r where
         statement -> Just statement
 
 
-type SubOnceEnv = ((Name, Index), Expression)
+type InlineEnv = ((Name, Index), Expression)
 
-class SubOnce a where
-	subOnce :: a -> ReaderT SubOnceEnv (Writer (Sum Integer)) a
+class Inline a where
+    inl :: a -> ReaderT InlineEnv (Writer (Sum Integer)) a
 
-instance SubOnce Expression where
-    subOnce = \case
-        Primary prim -> return (Primary prim)
-        Access name' j -> do
+instance Inline a => Inline [a] where
+    inl = traverse inl
+
+instance (Inline a, Inline b) => Inline (a, b) where
+    inl = _1 inl >=> _2 inl
+
+instance (Inline a, Inline b, Inline c) => Inline (a, b, c) where
+    inl = _1 inl >=> _2 inl >=> _3 inl
+
+instance Inline Name where
+    inl = return
+
+instance Inline Expression where
+    inl expr = recInline expr >>= \case
+        expr'@(Access name' j) -> do
             (name, expr) <- ask
             if name == (name', j)
                 then tell (Sum 1) >> return expr
-                else return (Access name' j)
-        Tuple exprs
-             -> Tuple
-            <$> traversed subOnce exprs
-        Call op exprs
-             -> Call op
-            <$> traversed subOnce exprs
-        Fold op expr range
-             -> Fold op
-            <$> subOnce expr
-            <*> subOnce range
-        MultiIfExpression multiIf
-             -> MultiIfExpression
-            <$> subOnce multiIf
+                else return expr'
+        expr' -> return expr'
+        where recInline
+                =  _Tuple inl
+               >=> _Call  inl
+               >=> _Fold  inl
+               >=> _MultiIfExpression inl
 
-instance SubOnce Statement where
-	subOnce
-		 = (_Execute . _2 . traversed) subOnce
-		>=> _Assign subOnce
-		>=> _BodyStatement    subOnce
-		>=> _ForStatement     subOnce
-		>=> _MultiIfStatement subOnce
+instance Inline Statement where
+    inl  =  _Execute inl
+        >=> _Assign  inl
+        >=> _BodyStatement    inl
+        >=> _ForStatement     inl
+        >=> _MultiIfStatement inl
 
-instance SubOnce Bind where
-	subOnce = bindStatement subOnce
+instance Inline Bind where
+    inl = bindStatement inl
 
-instance SubOnce ForCycle where
-	subOnce
-		 =  forRange subOnce
-		>=> forArgExpr subOnce
-		>=> (forAction subOnce)
+instance Inline ForCycle where
+    inl  =  forRange   inl
+        >=> forArgExpr inl
+        >=> forAction  inl
 
-instance SubOnce a => SubOnce (MultiIf a) where
-    subOnce = (multiIfLeafs . traversed) (_1 subOnce >=> _2 subOnce)
+instance Inline a => Inline (MultiIf a) where
+    inl = multiIfLeafs inl
 
-instance SubOnce Body where
-    subOnce
-         = (bodyBinds . traversed) subOnce
-        >=> bodyResult subOnce
+instance Inline Body where
+    inl = bodyBinds inl >=> bodyResult inl
