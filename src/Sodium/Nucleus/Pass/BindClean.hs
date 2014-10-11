@@ -71,7 +71,10 @@ instance CleanRet (MultiIf Statement) where
                 >=> multiIfElse (cleanRet cc)
 
 instance CleanRet ForCycle where
-    cleanRet cc = forAction (cleanRet cc)
+    -- even if the value is not
+    -- used outside the loop, it
+    -- still needs to be passed
+    cleanRet cc = const mzero
 
 instance CleanRet Statement where
     cleanRet cc
