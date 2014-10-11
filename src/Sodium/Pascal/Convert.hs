@@ -1,11 +1,10 @@
 {-# LANGUAGE FlexibleInstances, FunctionalDependencies #-}
-{-# LANGUAGE FlexibleContexts, ConstraintKinds #-}
+{-# LANGUAGE ConstraintKinds #-}
  
 module Sodium.Pascal.Convert (convert) where
 
 import Prelude hiding (mapM)
 import Control.Applicative
-import Control.Monad.State hiding (mapM)
 import qualified Data.Map  as M
 import qualified Data.Char as C
 import Data.Ratio
@@ -14,20 +13,16 @@ import Control.Lens
 -- S for Src, D for Dest
 import qualified Sodium.Pascal.Program as S
 import qualified Sodium.Nucleus.Program.Scalar as D
+import Sodium.Nucleus.Name
 
-type Stack s m = (Applicative m, MonadState [s] m)
-
-pop :: Stack D.Name m => m D.Name
-pop = gets head <* modify tail
-
-convert :: Stack D.Name m => S.Program -> m D.Program
+convert :: NameStack t m => S.Program -> m D.Program
 convert = conv
 
 nameV = D.Name ["v"]
 nameF = D.Name ["f"]
 
 class Conv s d | s -> d where
-	conv :: Stack D.Name m => s -> m d
+	conv :: NameStack t m => s -> m d
 
 instance Conv S.Program D.Program where
 	conv (S.Program funcs vars body) = do
@@ -133,7 +128,7 @@ instance Conv S.Statement D.Statement where
 				S.Access name -> return (D.Access (nameV name), id)
 				expr -> do
 					clExpr <- conv expr
-					clName <- pop
+					clName <- namepop
 					let clType = D.TypeUnit -- typeof(expr)
 					let wrap statement
 						= D.BodyStatement
