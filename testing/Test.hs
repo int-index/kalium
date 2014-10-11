@@ -112,27 +112,16 @@ tg_scenarios binary scenarios = TG_Scenarios (map tg scenarios)
 
 tg_scenario :: BS.ByteString -> String -> Assertion
 tg_scenario binary scenario = do
-    r <- do
-        let scenarioPath = "testing/scenarios" ++ "/" ++ scenario
-        withTmpDir $ \sandbox -> do
-            let ghcBinFile = sandbox ++ "/" ++ "ghc_bin"
-            do BS.writeFile ghcBinFile binary
-               p <- getPermissions ghcBinFile
-               setPermissions ghcBinFile (setOwnerExecutable True p)
-            (Just stdin, Just stdout, _, proc) <- createProcess
-              $ (proc scenarioPath [])
-                  { std_in  = CreatePipe
-                  , std_out = CreatePipe
-                  }
-            hPutStrLn stdin ghcBinFile
-            hClose stdin
-            msg <- hGetContents stdout
-            waitForProcess proc >>= \case
-              ExitSuccess -> return (True, msg)
-              _ -> return (False, msg)
-    case r of
-        (True, "" ) -> return ()
-        (_   , msg) -> assertFailure msg
+    let scenarioPath = "testing/scenarios" ++ "/" ++ scenario
+    withTmpDir $ \sandbox -> do
+        let ghcBinFile = sandbox ++ "/" ++ "ghc_bin"
+        do BS.writeFile ghcBinFile binary
+           p <- getPermissions ghcBinFile
+           setPermissions ghcBinFile (setOwnerExecutable True p)
+        (excode, msg, _) <- readProcessWithExitCode scenarioPath [] ghcBinFile
+        case (excode, msg) of
+            (ExitSuccess, "") -> return ()
+            (_, msg) -> assertFailure msg
 
 chdir :: FilePath -> (IO a -> IO a)
 chdir path act = do
