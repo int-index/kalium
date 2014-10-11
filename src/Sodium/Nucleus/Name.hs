@@ -58,7 +58,6 @@ instance Mask ForCycle where
 
 instance Mask a => Mask (MultiIf a) where
     mask  =  multiIfLeafs mask
-         >=> multiIfElse  mask
 
 instance Mask Statement where
     mask  =  _Assign  mask

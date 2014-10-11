@@ -28,8 +28,7 @@ instance Recmap Scalar where
         $ (bodyStatements . traversed) (recmap_second rm) body
     recmap_children_second rm = onMultiIf <=< onBody <=< onFor where
         rr = recmap_first rm
-        onMultiIf = _MultiIfStatement
-            $ (multiIfLeafs . traversed . _2) rr <=< multiIfElse rr
+        onMultiIf = _MultiIfStatement $ (multiIfLeafs . traversed . _2) rr
         onFor = _ForStatement (forBody rr)
         onBody = _BodyStatement rr
 

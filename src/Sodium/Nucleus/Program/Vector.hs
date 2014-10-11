@@ -53,7 +53,6 @@ data ForCycle
 data MultiIf a
     = MultiIf
     { _multiIfLeafs :: [(Expression, a)]
-    , _multiIfElse  :: a
     } deriving (Eq, Show)
 
 data Expression
@@ -90,3 +89,5 @@ makeLenses ''Program
 makePrisms ''Expression
 makePrisms ''Statement
 makePrisms ''Pattern
+
+

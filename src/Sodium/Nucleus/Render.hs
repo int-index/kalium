@@ -148,10 +148,7 @@ instance Render (MultiIf Statement) where
         let rLeaf (cond, statement)
                 = "| " ++ render cond ++ "\n"
                        ++ indent (render statement)
-            r = map rLeaf
-                $ (multiIf ^. multiIfLeafs)
-                ++ [(Primary (LitBoolean True), multiIf ^. multiIfElse)]
-        in unlines r
+        in unlines $ map rLeaf $ (multiIf ^. multiIfLeafs)
 
 instance Render ForCycle where
     render _ = "LOOP"

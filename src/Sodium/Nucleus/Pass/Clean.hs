@@ -85,8 +85,7 @@ instance CheckRef ForCycle where
         ((forCycle ^. forRange, forCycle ^. forArgExpr), forCycle ^. forAction)
 
 instance CheckRef a => CheckRef (MultiIf a) where
-    checkRef multiIf = checkRef
-        (multiIf ^. multiIfLeafs, multiIf ^. multiIfElse)
+    checkRef multiIf = checkRef (multiIf ^. multiIfLeafs)
 
 bodyComponents body = (body ^. bodyResult, body ^. bodyBinds)
 

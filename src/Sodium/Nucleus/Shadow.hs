@@ -37,7 +37,6 @@ instance Unshadow Statement where
 
 instance Unshadow a => Unshadow (MultiIf a) where
     unsh  = (multiIfLeafs . traversed . _2) unsh
-         >=> multiIfElse unsh
 
 instance Unshadow ForCycle where
     unsh = execStateT $ do

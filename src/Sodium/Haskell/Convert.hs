@@ -123,24 +123,24 @@ instance Conv S.ForCycle where
 instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.MultiIf a) where
 
     type Norm (S.MultiIf a) = H.Exp
-    conv (S.MultiIf leafs statementElse) = do
+    conv (S.MultiIf leafs) = do
         let convLeaf (expr, statement)
               =  (,)
              <$> conv expr
              <*> conv statement
         leafGens <- mapM convLeaf leafs
-        hsStatementElse <- (D.access "otherwise",) <$> conv statementElse
-        return $ D.multiIf (leafGens ++ [hsStatementElse])
+        -- TODO: if the last leaf condition is `True`
+        --       then replace it with `otherwise`
+        return $ D.multiIf leafGens
 
     type Pure (S.MultiIf a) = H.Exp
-    pureconv (S.MultiIf leafs statementElse) = do
+    pureconv (S.MultiIf leafs) = do
         let convLeaf (expr, statement)
               =  (,)
              <$> pureconv expr
              <*> pureconv statement
         leafGens <- mapM convLeaf leafs
-        hsStatementElse <- (D.access "otherwise",) <$> pureconv statementElse
-        return $ D.multiIf (leafGens ++ [hsStatementElse])
+        return $ D.multiIf leafGens
 
 instance Conv S.Bind where
 

@@ -29,8 +29,7 @@ instance Recmap Vector where
     recmap_children_second rm = onMultiIf <=< onBody <=< onFor where
         r1 = recmap_first  rm
         r2 = recmap_second rm
-        onMultiIf = _MultiIfStatement
-            $ (multiIfLeafs . traversed . _2) r2 <=< multiIfElse r2
+        onMultiIf = _MultiIfStatement $ (multiIfLeafs . traversed . _2) r2
         onFor = _ForStatement (forAction r2)
         onBody = _BodyStatement r1
 

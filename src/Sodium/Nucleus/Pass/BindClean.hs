@@ -68,7 +68,6 @@ instance CleanRet Body where
 
 instance CleanRet (MultiIf Statement) where
     cleanRet cc  = (multiIfLeafs . traversed . _2) (cleanRet cc)
-                >=> multiIfElse (cleanRet cc)
 
 instance CleanRet ForCycle where
     -- even if the value is not

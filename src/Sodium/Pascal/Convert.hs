@@ -96,60 +96,55 @@ instance Conv S.PasType D.Type where
 
 binary op a b = D.Call op [a,b]
 
-multifyIf expr bodyThen bodyElse = D.MultiIf [(expr, bodyThen)] bodyElse
+multifyIf expr bodyThen bodyElse = D.MultiIf
+    [(expr, bodyThen), (D.Primary (D.LitBoolean True), bodyElse)] 
 
 instance Conv S.Statement D.Statement where
-	conv = \case
-		S.BodyStatement body
-			 -> D.BodyStatement
-			<$> conv (VB [] body)
-		S.Assign name expr -> D.Assign (nameV name) <$> conv expr
-		S.Execute name exprs
-			 -> D.Execute Nothing
-			<$> case name of
-				"readln"  -> return (D.NameOp $ D.OpReadLn undefined)
-				"writeln" -> return (D.NameOp D.OpPrintLn)
-				name -> return (nameF name)
-			<*> mapM conv exprs
-		S.ForCycle name fromExpr toExpr statement
-			-> (D.ForStatement <$>)
-			 $  D.ForCycle
-			<$> return (nameV name)
-			<*> (binary (D.NameOp D.OpRange) <$> conv fromExpr <*> conv toExpr)
-			<*> convBodyStatement statement
-		S.IfBranch expr bodyThen mBodyElse
-			-> (D.MultiIfStatement <$>)
-			 $  multifyIf
-			<$> conv expr
-			<*> convBodyStatement bodyThen
-			<*> (maybeBodySingleton <$> mapM conv mBodyElse)
-		S.CaseBranch expr leafs mBodyElse -> do
-			(clCaseExpr, wrap) <- case expr of
-				S.Access name -> return (D.Access (nameV name), id)
-				expr -> do
-					clExpr <- conv expr
-					clName <- namepop
-					let clType = D.TypeUnit -- typeof(expr)
-					let wrap statement
-						= D.BodyStatement
-						$ D.Body
-							(M.singleton clName clType)
-							[D.Assign clName clExpr, statement]
-					return (D.Access clName, wrap)
-			let instRange = \case
-				S.Binary S.OpRange exprFrom exprTo
-					 -> (binary (D.NameOp D.OpElem) clCaseExpr)
-					<$> (binary (D.NameOp D.OpRange) <$> conv exprFrom <*> conv exprTo)
-				expr -> binary (D.NameOp D.OpEquals) clCaseExpr <$> conv expr
-			let instLeaf (exprs, body)
-				 =  (,)
-				<$> (foldl1 (binary (D.NameOp D.OpOr)) <$> mapM instRange exprs)
-				<*> convBodyStatement body
-			let multiIf
-				 =  D.MultiIf
-				<$> mapM instLeaf leafs
-				<*> (maybeBodySingleton <$> mapM conv mBodyElse)
-			wrap <$> (D.MultiIfStatement <$> multiIf)
+    conv = \case
+        S.BodyStatement body
+             -> D.BodyStatement
+            <$> conv (VB [] body)
+        S.Assign name expr -> D.Assign (nameV name) <$> conv expr
+        S.Execute name exprs
+             -> D.Execute Nothing
+            <$> case name of
+                "readln"  -> return (D.NameOp $ D.OpReadLn undefined)
+                "writeln" -> return (D.NameOp D.OpPrintLn)
+                name -> return (nameF name)
+            <*> mapM conv exprs
+        S.ForCycle name fromExpr toExpr statement
+            -> (D.ForStatement <$>)
+             $  D.ForCycle
+            <$> return (nameV name)
+            <*> (binary (D.NameOp D.OpRange) <$> conv fromExpr <*> conv toExpr)
+            <*> convBodyStatement statement
+        S.IfBranch expr bodyThen mBodyElse
+            -> (D.MultiIfStatement <$>)
+             $  multifyIf
+            <$> conv expr
+            <*> convBodyStatement bodyThen
+            <*> (maybeBodySingleton <$> mapM conv mBodyElse)
+        S.CaseBranch expr leafs mBodyElse -> do
+            clExpr <- conv expr
+            clName <- namepop
+            let clType = D.TypeUnit -- typeof(expr)
+            let clCaseExpr = D.Access clName
+            let instRange = \case
+                    S.Binary S.OpRange exprFrom exprTo
+                         -> (binary (D.NameOp D.OpElem) clCaseExpr)
+                        <$> (binary (D.NameOp D.OpRange) <$> conv exprFrom <*> conv exprTo)
+                    expr -> binary (D.NameOp D.OpEquals) clCaseExpr <$> conv expr
+            let instLeaf (exprs, body)
+                     =  (,)
+                    <$> (foldl1 (binary (D.NameOp D.OpOr)) <$> mapM instRange exprs)
+                    <*> convBodyStatement body
+            leafs <- mapM instLeaf leafs
+            leafElse <- maybeBodySingleton <$> mapM conv mBodyElse
+            let statement = D.MultiIfStatement $ D.MultiIf
+                 $ snoc leafs (D.Primary (D.LitBoolean True), leafElse)
+            return $ D.BodyStatement $ D.Body
+                        (M.singleton clName clType)
+                        [D.Assign clName clExpr, statement]
 
 inumber intSection = D.LitInteger $ parseInt intSection
 fnumber intSection fracSection = D.LitDouble $ parseFrac intSection fracSection

@@ -1,4 +1,4 @@
-module Sodium.Nucleus.Pass.Compute (compute) where
+module Sodium.Nucleus.Pass.Compute (compute, recursively) where
 
 import Control.Lens hiding (Index, Fold)
 import Sodium.Nucleus.Program.Vector
@@ -20,12 +20,16 @@ recursively f = \case
     MultiIfExpression multiIf -> f
         $ MultiIfExpression
         $ multiIf & multiIfLeafs . traversed . both %~ rf
-                  & multiIfElse %~ rf
     where rf = recursively f
 
 match :: Expression -> Expression
 match = \case
     Call (NameOp OpId) [expr] -> expr
+    Call (NameOp op) [x, y]
+        | Primary (LitInteger a) <- x
+        , Primary (LitInteger b) <- y
+        , Just f <- binaryIntegerOp op
+        -> Primary (LitInteger (f a b))
     Tuple [expr] -> expr
     Tuple [    ] -> Primary LitUnit
     Fold (NameOp OpMultiply) (Primary (LitInteger 1)) range
@@ -37,3 +41,12 @@ match = \case
     Fold (NameOp OpOr)  (Primary (LitBoolean False))  range
         -> Call (NameOp OpOr')     [range]
     expr -> expr
+
+binaryIntegerOp :: Operator -> Maybe (Integer -> Integer -> Integer)
+binaryIntegerOp = \case
+    OpSubtract -> Just (-)
+    OpAdd -> Just (+)
+    OpMultiply -> Just (*)
+    OpDiv -> Just div
+    OpMod -> Just mod
+    _ -> Nothing

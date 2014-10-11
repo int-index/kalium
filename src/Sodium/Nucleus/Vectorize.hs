@@ -128,14 +128,11 @@ vectorizeStatement funcSigs = \case
                          vecBody <- vecBodyGen results
                          return (vecExpr, Vec.BodyStatement vecBody)
                  return (changed, vecLeafGen)
-        (changedElse, vecBodyElseGen)
-            <- vectorizeBody funcSigs (multiIf ^. multiIfElse)
-        let changed = nub $ changedElse ++ concat changedList
+        let changed = nub $ concat changedList
         let accessChanged = map Access changed
         vecMultiIf <- lift
              $  Vec.MultiIf
             <$> mapM ($ accessChanged) vecLeafGens
-            <*> fmap Vec.BodyStatement (vecBodyElseGen accessChanged)
         return $ (changed, vecMultiIf)
     _ -> throwError InvalidOperation
 

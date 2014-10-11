@@ -46,7 +46,6 @@ data ForCycle
 data MultiIf
 	= MultiIf
 	{ _multiIfLeafs :: [(Expression, Body)]
-	, _multiIfElse  :: Body
 	} deriving (Show)
 
 data Expression

@@ -30,7 +30,7 @@ inlineBody = evalState unconsBind where
               = runWriter
               $ flip runReaderT ((name, i), expr)
               $ subOnce body'
-        guard (count <= 1)
+        when (expr ^? _Access == Nothing) $ guard (count <= 1)
         return body
 
 -- check if a statement contains any side-effects
@@ -88,9 +88,7 @@ instance SubOnce ForCycle where
 		>=> (forAction subOnce)
 
 instance SubOnce a => SubOnce (MultiIf a) where
-    subOnce
-         = (multiIfLeafs . traversed) (_1 subOnce >=> _2 subOnce)
-        >=> multiIfElse subOnce
+    subOnce = (multiIfLeafs . traversed) (_1 subOnce >=> _2 subOnce)
 
 instance SubOnce Body where
     subOnce
