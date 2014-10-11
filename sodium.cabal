@@ -9,6 +9,7 @@ cabal-version:       >=1.18
 
 library
   exposed-modules:     Sodium
+                       Sodium.Util
                        Sodium.Error
                        Sodium.Pascal.Program
                        Sodium.Pascal.Parse

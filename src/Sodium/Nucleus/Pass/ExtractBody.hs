@@ -6,16 +6,13 @@ import qualified Data.Map as M
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
 import Sodium.Nucleus.Pattern
+import Sodium.Util (tryApply)
 
 extractBody :: Program -> Program
-extractBody = over recmapped extractBodyStatement
+extractBody = over recmapped (tryApply bodyMatch)
 
-extractBodyStatement :: Statement -> Statement
-extractBodyStatement statement@(BodyStatement body)
-    = maybe statement id (bodyMatch body)
-extractBodyStatement statement = statement
-
-bodyMatch body
+bodyMatch :: Statement -> Maybe Statement
+bodyMatch (BodyStatement body)
     | M.null (body ^. bodyVars) && null (body ^. bodyBinds)
         = return $ Assign (body ^. bodyResult)
     | otherwise = do
@@ -25,3 +22,4 @@ bodyMatch body
         [bind] <- return (body ^. bodyBinds)
         guard $ expMatch (bind ^. bindPattern) (body ^. bodyResult)
         return (bind ^. bindStatement)
+bodyMatch _ = Nothing

@@ -9,7 +9,10 @@ import Control.Monad.State
 import Control.Lens
 
 import Sodium.Nucleus.Pattern
+import Sodium.Nucleus.Name
 import Sodium.Nucleus.Program.Vector
+
+import Sodium.Util (mAsList)
 
 unshadow :: Program -> Program
 unshadow program = program & programFuncs . traversed . funcStatement %~ unshadow'
@@ -64,63 +67,7 @@ instance Unshadow Body where
         bound' <- getBound
         local (S.union bound') $ unsh' (bodyBinds . traversed . bindStatement)
 
-class Mask a where
-    mask :: a -> Reader (S.Set Name) a
-
 mask' :: Mask a => S.Set Name -> a -> a
-mask' shadowed a = runReader (mask a) shadowed
-
-instance (Mask a, Mask b) => Mask (a, b) where
-    mask = _1 mask >=> _2 mask
-
-instance (Mask a, Mask b, Mask c) => Mask (a, b, c) where
-    mask = _1 mask >=> _2 mask >=> _3 mask
-
-instance Mask a => Mask [a] where
-    mask = traverse mask
-
-instance Mask Name where
-    mask name = do
-        shadowed <- asks (S.member name)
-        let shadow = if shadowed then Shadow else id
-        return (shadow name)
-
-instance Mask Pattern where
-    mask  = (_PAccess . _1) mask
-         >=> _PTuple mask
-
-instance Mask Expression where
-    mask  =  (_Access . _1) mask
-         >=> _Tuple mask
-         >=> _Fold  mask
-         >=> _Call  mask
-         >=> _MultiIfExpression mask
-
-instance Mask ForCycle where
-    mask  =  forArgPattern mask
-         >=> forArgExpr    mask
-         >=> forName       mask
-         >=> forRange      mask
-         >=> forAction     mask
-
-instance Mask a => Mask (MultiIf a) where
-    mask  =  multiIfLeafs mask
-         >=> multiIfElse  mask
-
-instance Mask Statement where
-    mask  =  _Assign  mask
-         >=> _Execute mask
-         >=> _ForStatement mask
-         >=> _MultiIfStatement mask
-         >=> _BodyStatement mask
-
-instance Mask Body where
-    mask  = (bodyVars . mAsList . traversed . _1) mask
-         >=> bodyBinds  mask
-         >=> bodyResult mask
-
-instance Mask Bind where
-    mask  =  bindPattern   mask
-         >=> bindStatement mask
-
-mAsList = iso M.toList M.fromList
+mask' shadowed a = runIdentity (runReaderT (mask a) (Identity . handle))
+    where handle name | S.member name shadowed = Shadow name
+                      | otherwise = name

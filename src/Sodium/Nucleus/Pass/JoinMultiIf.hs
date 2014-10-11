@@ -4,6 +4,8 @@ import Control.Lens
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
 
+import Sodium.Util (tryApply)
+
 joinMultiIf :: Program -> Program
 joinMultiIf = over recmapped joinMultiIfExpression
             . over recmapped joinMultiIfStatement
@@ -27,6 +29,3 @@ matchExpression multiIf = do
     exprLeafs <- (traversed . _2) (preview _Assign) (multiIf ^. multiIfLeafs)
     exprElse  <- multiIf ^? multiIfElse . _Assign
     return $ MultiIfExpression $ MultiIf exprLeafs exprElse
-
-tryApply :: (a -> Maybe a) -> (a -> a)
-tryApply f a = maybe a id (f a)
