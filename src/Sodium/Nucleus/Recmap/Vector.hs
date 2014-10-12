@@ -32,7 +32,7 @@ instance Recmap Vector where
         r1 = recmap_first  rm
         r2 = recmap_second rm
         onMultiIf = _MultiIfStatement $ (multiIfLeafs . traversed . _2) r2
-        onFor = _ForStatement (forAction r2)
+        onFor = _ForStatement $ (forLambda . lamAction) r2
         onBody = _BodyStatement r1
 
 

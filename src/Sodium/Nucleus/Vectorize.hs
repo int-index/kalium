@@ -106,16 +106,14 @@ vectorizeStatement funcSigs = \case
         return $ (resnames ++ sidenames, vecExecute)
     ForStatement forCycle -> over _2 Vec.ForStatement <$> do
         vecRange <- vectorizeAtom (forCycle ^. forRange)
+        let np f = f (forCycle ^. forName) Vec.Immutable
         (changed, vecBody)
-            <- local (M.insert (forCycle ^. forName) Vec.Immutable)
+            <- local (np M.insert)
              $ vectorizeBody' funcSigs (forCycle ^. forBody)
         argIndices <- closedIndices changed
-        let vecForCycle = Vec.ForCycle
-                (patTuple argIndices)
-                (expTuple argIndices)
-                (forCycle ^. forName)
-                vecRange
-                (Vec.BodyStatement vecBody)
+        let vecLambda = Vec.Lambda [patTuple argIndices, np Vec.PAccess]
+                        (Vec.BodyStatement vecBody)
+        let vecForCycle = Vec.ForCycle vecLambda (expTuple argIndices) vecRange
         return (changed, vecForCycle)
     MultiIfStatement multiIf -> over _2 Vec.MultiIfStatement <$> do
         (unzip -> (changedList, vecLeafGens))

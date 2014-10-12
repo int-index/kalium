@@ -43,11 +43,15 @@ data Statement
 
 data ForCycle
     = ForCycle
-    { _forArgPattern :: Pattern
-    , _forArgExpr    :: Expression
-    , _forName   :: Name
-    , _forRange  :: Expression
-    , _forAction :: Statement
+    { _forLambda  :: Lambda
+    , _forArgExpr :: Expression
+    , _forRange   :: Expression
+    } deriving (Eq, Show)
+
+data Lambda
+    = Lambda
+    { _lamPatterns :: [Pattern]
+    , _lamAction :: Statement
     } deriving (Eq, Show)
 
 data MultiIf a
@@ -82,6 +86,7 @@ data Pattern
 makeLenses ''Func
 makeLenses ''Bind
 makeLenses ''Body
+makeLenses ''Lambda
 makeLenses ''ForCycle
 makeLenses ''MultiIf
 makeLenses ''Program
@@ -89,5 +94,3 @@ makeLenses ''Program
 makePrisms ''Expression
 makePrisms ''Statement
 makePrisms ''Pattern
-
-

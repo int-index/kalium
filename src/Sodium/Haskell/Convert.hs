@@ -99,25 +99,23 @@ instance Conv S.Body where
 
 instance Conv S.ForCycle where
     type Norm S.ForCycle = H.Exp
-    conv (S.ForCycle argPattern argExpr name exprRange clBody) = do
+    conv (S.ForCycle lam argExpr exprRange) = do
         hsRange <- conv exprRange
         hsArgExpr <- conv argExpr
-        hsFoldLambda <- conv (FoldLambda argPattern name) <*> conv clBody
+        hsLam <- conv lam
         return $ betaL
             [ D.access "foldM"
-            , hsFoldLambda
+            , hsLam
             , hsArgExpr
             , hsRange
             ]
 
     type Pure S.ForCycle = H.Exp
-    pureconv (S.ForCycle argPattern argExpr name exprRange clBody) = do
+    pureconv (S.ForCycle lam argExpr exprRange) = do
         hsRange <- pureconv exprRange
         hsArgExpr <- pureconv argExpr
-        hsFoldLambda
-            <-  pureconv (FoldLambda argPattern name)
-            <*> pureconv clBody
-        return $ betaL [D.access "foldl", hsFoldLambda, hsArgExpr, hsRange]
+        hsLam <- pureconv lam
+        return $ betaL [D.access "foldl", hsLam, hsArgExpr, hsRange]
 
 
 instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.MultiIf a) where
@@ -204,17 +202,16 @@ instance Conv S.Func where
         <$> pureconv clBody
         where paramNames = map transformName (map fst params)
 
-data FoldLambda = FoldLambda S.Pattern S.Name
+instance Conv S.Lambda where
+    type Norm S.Lambda = H.Exp
+    conv (S.Lambda pats act) = H.Lambda H.noLoc
+        <$> mapM conv pats
+        <*> conv act
 
-instance Conv FoldLambda where
-    type Norm FoldLambda = H.Exp -> H.Exp
-    conv = pureconv
-
-    type Pure FoldLambda = H.Exp -> H.Exp
-    pureconv (FoldLambda pattern name) = do
-        hsPat  <- conv pattern
-        hsName <- conv (S.PAccess name S.Immutable)
-        return $ H.Lambda H.noLoc [hsPat, hsName]
+    type Pure S.Lambda = H.Exp
+    pureconv (S.Lambda pats act) = H.Lambda H.noLoc
+        <$> mapM pureconv pats
+        <*> pureconv act
 
 
 betaL = foldl1 H.App

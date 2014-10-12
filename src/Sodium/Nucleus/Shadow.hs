@@ -40,18 +40,16 @@ instance Unshadow a => Unshadow (MultiIf a) where
 
 instance Unshadow ForCycle where
     unsh = execStateT $ do
-        let getBound = liftA2 S.union
-                (uses forName S.singleton)
-                (uses forArgPattern (S.fromList . patBound))
+        let getBound = S.unions <$> uses
+                (forLambda . lamPatterns)
+                (map (S.fromList . patBound))
         scope <- ask
         bound <- getBound
         let shadow = mask' (scope `S.intersection` bound)
-        forName %= shadow
-        forArgPattern %= shadow
-        forAction %= shadow
+        forLambda %= shadow
 
         bound' <- getBound
-        local (S.union bound') $ unsh' forAction
+        local (S.union bound') $ unsh' (forLambda . lamAction)
 
 instance Unshadow Body where
     unsh = execStateT $ do

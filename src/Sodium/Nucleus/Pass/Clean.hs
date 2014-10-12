@@ -1,7 +1,6 @@
 module Sodium.Nucleus.Pass.Clean (clean) where
 
 import Control.Lens hiding (Index, Fold)
-import Control.Monad.Reader
 import Control.Monad.Writer
 import qualified Data.Map as M
 import Data.List
@@ -43,4 +42,5 @@ cleanStatement = over _ForStatement cleanForCycle
   where
     cleanForCycle :: ForCycle -> ForCycle
     cleanForCycle forCycle
-      = forCycle & forArgPattern %~ cleanUsage (forCycle ^. forAction)
+      = forCycle &  forLambda . lamPatterns . traversed
+                 %~ cleanUsage (forCycle ^. forLambda . lamAction)

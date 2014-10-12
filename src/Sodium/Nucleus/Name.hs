@@ -57,11 +57,13 @@ instance Mask Expression where
          >=> _MultiIfExpression mask
 
 instance Mask ForCycle where
-    mask  =  forArgPattern mask
-         >=> forArgExpr    mask
-         >=> forName       mask
-         >=> forRange      mask
-         >=> forAction     mask
+    mask  =  forLambda   mask
+         >=> forArgExpr  mask
+         >=> forRange    mask
+
+instance Mask Lambda where
+    mask  =  lamPatterns mask
+         >=> lamAction   mask
 
 instance Mask a => Mask (MultiIf a) where
     mask  =  multiIfLeafs mask
