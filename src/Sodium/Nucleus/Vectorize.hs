@@ -22,7 +22,7 @@ type E = Except Error
 type R m a = ReaderT Vec.Indices m a
 type S m a = StateT  Vec.Indices m a
 
-vectorize :: Program -> E Vec.Program
+vectorize :: Program Atom -> E Vec.Program
 vectorize program = do
     let funcSigs = program ^.. programFuncs . traversed . funcSig
     vecFuncs <- mapM (vectorizeFunc funcSigs) (program ^. programFuncs)
@@ -34,19 +34,19 @@ references funcSig = do
     guard (by == ByReference)
     return name
 
-vectorizeFunc :: [FuncSig] -> Func -> E Vec.Func
+vectorizeFunc :: [FuncSig] -> Func Atom -> E Vec.Func
 vectorizeFunc funcSigs func = do
     (_, vecBodyGen)
             <- runReaderT (vectorizeBody funcSigs (func ^. funcBody))
             $ initIndices (Vec.Index 0) (func ^. funcSig . funcParams . to M.fromList)
-    let refs = map (review _Access') (func ^. funcSig . to references)
+    let refs = map Access (func ^. funcSig . to references)
     vecBody <- vecBodyGen (func ^. funcResult : refs)
     return $ Vec.Func (func ^. funcSig) (Vec.BodyStatement vecBody)
 
 patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
 expTuple = Vec.Tuple  . map (uncurry Vec.Access)
 
-vectorizeBody :: [FuncSig] -> Body -> R E ([Name], [Expression] -> E Vec.Body)
+vectorizeBody :: [FuncSig] -> Body Atom -> R E ([Name], [Atom] -> E Vec.Body)
 vectorizeBody funcSigs body = do
     closure <- ask
     lift $ do
@@ -63,27 +63,27 @@ vectorizeBody funcSigs body = do
         let vecBodyGen results
                 = Vec.Body (body ^. bodyVars)
                 (map (\(indices, expr) -> Vec.Bind (patTuple indices) expr) vecStatements)
-                <$> runReaderT (Vec.Tuple <$> mapM vectorizeExpression results) indices'
+                <$> runReaderT (Vec.Tuple <$> mapM vectorizeAtom results) indices'
         return (changed, vecBodyGen)
 
-vectorizeBody' :: [FuncSig] -> Body -> R E ([Name], Vec.Body)
+vectorizeBody' :: [FuncSig] -> Body Atom -> R E ([Name], Vec.Body)
 vectorizeBody' funcSigs body = do
     (changed, vecBodyGen) <- vectorizeBody funcSigs body
-    vecBody <- lift $ vecBodyGen (map (review _Access') changed)
+    vecBody <- lift $ vecBodyGen (map Access changed)
     return (changed, vecBody)
 
-vectorizeStatement' :: [FuncSig] -> Statement -> S E ([(Name, Vec.Index)], Vec.Statement)
+vectorizeStatement' :: [FuncSig] -> Statement Atom -> S E ([(Name, Vec.Index)], Vec.Statement)
 vectorizeStatement' funcSigs statement
     = _1 (mapM registerIndexUpdate)
     =<< readerToState (vectorizeStatement funcSigs statement)
 
-vectorizeStatement :: [FuncSig] -> Statement -> R E ([Name], Vec.Statement)
+vectorizeStatement :: [FuncSig] -> Statement Atom -> R E ([Name], Vec.Statement)
 vectorizeStatement funcSigs = \case
     BodyStatement body
          -> over _2 Vec.BodyStatement
         <$> vectorizeBody' funcSigs body
-    Execute mres name args -> do
-        vecArgs <- mapM vectorizeExpression args
+    Execute (Exec mres name args) -> do
+        vecArgs <- mapM vectorizeAtom args
         let byReference (_, (ByReference, _)) = \case
               Vec.Access name _ -> Just [name]
               _                 -> Nothing
@@ -105,7 +105,7 @@ vectorizeStatement funcSigs = \case
               | otherwise = Vec.Assign (Vec.Call name vecArgs)
         return $ (resnames ++ sidenames, vecExecute)
     ForStatement forCycle -> over _2 Vec.ForStatement <$> do
-        vecRange <- vectorizeExpression (forCycle ^. forRange)
+        vecRange <- vectorizeAtom (forCycle ^. forRange)
         (changed, vecBody)
             <- local (M.insert (forCycle ^. forName) Vec.Immutable)
              $ vectorizeBody' funcSigs (forCycle ^. forBody)
@@ -121,23 +121,18 @@ vectorizeStatement funcSigs = \case
         (unzip -> (changedList, vecLeafGens))
             <- forM (multiIf ^. multiIfLeafs)
              $ \(expr, body) -> do
-                 vecExpr <- vectorizeExpression expr
+                 vecExpr <- vectorizeAtom expr
                  (changed, vecBodyGen) <- vectorizeBody funcSigs body
                  let vecLeafGen = \results -> do
                          vecBody <- vecBodyGen results
                          return (vecExpr, Vec.BodyStatement vecBody)
                  return (changed, vecLeafGen)
         let changed = nub $ concat changedList
-        let accessChanged = map (review _Access') changed
+        let accessChanged = map Access changed
         vecMultiIf <- lift
              $  Vec.MultiIf
             <$> mapM ($ accessChanged) vecLeafGens
         return $ (changed, vecMultiIf)
-
-vectorizeExpression :: Expression -> R E Vec.Expression
-vectorizeExpression expr = case expr ^? _Atom of
-    Nothing -> error "InvalidOperation"
-    Just atom -> vectorizeAtom atom
 
 vectorizeAtom :: Atom -> R E Vec.Expression
 vectorizeAtom = \case

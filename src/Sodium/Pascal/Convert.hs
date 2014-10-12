@@ -16,7 +16,7 @@ import qualified Sodium.Pascal.Program as S
 import qualified Sodium.Nucleus.Program.Scalar as D
 import Sodium.Nucleus.Name
 
-convert :: NameStack t m => S.Program -> m D.Program
+convert :: NameStack t m => S.Program -> m (D.Program D.Expression)
 convert program = runReaderT (conv program) M.empty
 
 nameV = D.Name ["v"]
@@ -25,12 +25,12 @@ nameF = D.Name ["f"]
 class Conv s d | s -> d where
 	conv :: NameStack t m => s -> ReaderT (M.Map S.Name S.PasType) m d
 
-instance Conv S.Program D.Program where
+instance Conv S.Program (D.Program D.Expression) where
 	conv (S.Program funcs vars body) = do
 		clMain <- do
 			clBody <- conv (VB vars body)
 			let clFuncSig = D.FuncSig D.NameMain [] D.TypeUnit
-			return $ D.Func clFuncSig clBody (D._Primary' # D.LitUnit)
+			return $ D.Func clFuncSig clBody (D._Primary # D.LitUnit)
 		clFuncs <- mapM conv funcs
 		return $ D.Program (clMain:clFuncs)
 
@@ -46,7 +46,7 @@ maybeBodySingleton
 
 data VB = VB S.Vars S.Body
 
-instance Conv VB D.Body where
+instance Conv VB (D.Body D.Expression) where
     conv (VB vardecls statements)
         = D.Body
        <$> (M.fromList <$> mapM conv varDecls)
@@ -54,15 +54,15 @@ instance Conv VB D.Body where
             (mapM conv statements)
        where varDecls = splitVarDecls vardecls
 
-instance Conv S.Func D.Func where
+instance Conv S.Func (D.Func D.Expression) where
     conv (S.Func name params pasType vars body)
         = do
             (retExpr, retType, retVars) <- case pasType of
-                Nothing -> return (D._Primary' # D.LitUnit, D.TypeUnit, [])
+                Nothing -> return (D._Primary # D.LitUnit, D.TypeUnit, [])
                 Just ty -> do
                     let retName = nameV name
                     retType <- conv ty
-                    return (D._Access' # retName, retType, [S.VarDecl [name] ty])
+                    return (D._Access # retName, retType, [S.VarDecl [name] ty])
             let paramDecls = splitParamDecls params
             clParamDecls <- mapM conv paramDecls
             let clFuncSig = D.FuncSig (nameF name) clParamDecls retType
@@ -108,7 +108,7 @@ multifyIf expr bodyThen bodyElse = D.MultiIf
 convReadLn [S.Access name] = do
     ty <- lookupType name
     clType <- conv ty
-    return $ D.Execute
+    return $ D.Exec
         (Just $ nameV name)
         (D.NameOp $ D.OpReadLn clType)
         []
@@ -126,30 +126,31 @@ convWriteLn exprs = do
             _ -> return False
           let wrap = if noShow then id else (\e -> D.Call (D.NameOp D.OpShow) [e])
           wrap <$> conv expr
-    D.Execute Nothing (D.NameOp D.OpPrintLn) <$> mapM convArg exprs
+    D.Exec Nothing (D.NameOp D.OpPrintLn) <$> mapM convArg exprs
 
 
 lookupType name = do
     mtype <- asks (M.lookup name)
     maybe (error "IOMagic lookup error") return mtype
 
-instance Conv S.Statement D.Statement where
+instance Conv S.Statement (D.Statement D.Expression) where
     conv = \case
-        S.BodyStatement body
-             -> D.BodyStatement
-            <$> conv (VB [] body)
+        S.BodyStatement body -> D.statement <$> conv (VB [] body)
         S.Assign name expr -> D.assign (nameV name) <$> conv expr
-        S.Execute "readln"  exprs -> convReadLn  exprs
-        S.Execute "writeln" exprs -> convWriteLn exprs
-        S.Execute name exprs -> D.Execute Nothing (nameF name) <$> mapM conv exprs
+        S.Execute "readln"  exprs -> D.statement <$> convReadLn  exprs
+        S.Execute "writeln" exprs -> D.statement <$> convWriteLn exprs
+        S.Execute name exprs
+             -> fmap D.statement
+             $  D.Exec Nothing (nameF name)
+            <$> mapM conv exprs
         S.ForCycle name fromExpr toExpr statement
-            -> (D.ForStatement <$>)
+             -> fmap D.statement
              $  D.ForCycle
             <$> return (nameV name)
             <*> (binary (D.NameOp D.OpRange) <$> conv fromExpr <*> conv toExpr)
             <*> convBodyStatement statement
         S.IfBranch expr bodyThen mBodyElse
-            -> (D.MultiIfStatement <$>)
+             -> fmap D.statement
              $  multifyIf
             <$> conv expr
             <*> convBodyStatement bodyThen
@@ -170,9 +171,9 @@ instance Conv S.Statement D.Statement where
                     <*> convBodyStatement body
             leafs <- mapM instLeaf leafs
             leafElse <- maybeBodySingleton <$> mapM conv mBodyElse
-            let statement = D.MultiIfStatement $ D.MultiIf
+            let statement = D.statement $ D.MultiIf
                  $ snoc leafs (D._Primary' # D.LitBoolean True, leafElse)
-            return $ D.BodyStatement $ D.Body
+            return $ D.statement $ D.Body
                         (M.singleton clName clType)
                         [D.assign clName clExpr, statement]
 

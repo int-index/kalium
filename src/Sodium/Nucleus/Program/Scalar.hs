@@ -5,43 +5,56 @@ module Sodium.Nucleus.Program.Scalar
 	) where
 
 import Control.Lens
-import Control.Lens.TH
 import qualified Data.Map as M
 
 import Sodium.Nucleus.Program
 
-data Program = Program
-    { _programFuncs :: [Func]
+data Program a = Program
+    { _programFuncs :: [Func a]
     }
 
-data Func = Func
+data Func a = Func
     { _funcSig :: FuncSig
-    , _funcBody :: Body
-    , _funcResult :: Expression
+    , _funcBody :: Body a
+    , _funcResult :: Atom
     }
 
-data Body = Body
+data Body a = Body
     { _bodyVars :: Vars
-    , _bodyStatements :: [Statement]
+    , _bodyStatements :: [Statement a]
     }
 
-data Statement
-    = Execute (Maybe Name) Name [Expression]
-    | ForStatement ForCycle
-    | MultiIfStatement MultiIf
-    | BodyStatement Body
+data Statement a
+    = Execute (Exec a)
+    | ForStatement (ForCycle a)
+    | MultiIfStatement (MultiIf a)
+    | BodyStatement (Body a)
 
-assign :: Name -> Expression -> Statement
-assign name expr = Execute (Just name) (NameOp OpId) [expr]
+assign :: Name -> a -> Statement a
+assign name a = statement $ Exec (Just name) (NameOp OpId) [a]
 
-data ForCycle
+class LiftStatement f where
+    statement :: f a -> Statement a
+
+instance LiftStatement Exec     where statement = Execute
+instance LiftStatement ForCycle where statement = ForStatement
+instance LiftStatement MultiIf  where statement = MultiIfStatement
+instance LiftStatement Body     where statement = BodyStatement
+
+data Exec a = Exec
+    { _execRet :: Maybe Name
+    , _execOp :: Name
+    , _execArgs :: [a]
+    }
+
+data ForCycle a
     = ForCycle
     { _forName :: Name
-    , _forRange :: Expression
-    , _forBody :: Body
+    , _forRange :: a
+    , _forBody :: Body a
     }
 
-data MultiIf = MultiIf { _multiIfLeafs :: [(Expression, Body)] }
+data MultiIf a = MultiIf { _multiIfLeafs :: [(a, Body a)] }
 
 data Expression
     = Atom Atom
@@ -51,7 +64,7 @@ data Atom
     = Access Name
     | Primary Literal
 
-bodyEmpty :: Body
+bodyEmpty :: Body a
 bodyEmpty = Body M.empty []
 
 makeLenses ''Func
@@ -59,6 +72,7 @@ makeLenses ''Body
 makeLenses ''ForCycle
 makeLenses ''MultiIf
 makeLenses ''Program
+makeLenses ''Exec
 
 makePrisms ''Statement
 makePrisms ''Expression

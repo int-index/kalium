@@ -1,58 +1,60 @@
-{-# LANGUAGE FlexibleContexts, ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts, ConstraintKinds, ViewPatterns #-}
 module Sodium.Nucleus.Side (side) where
 
 import Control.Lens
 import Control.Monad.Writer
 import Control.Applicative
-import Data.Either
 import qualified Data.Map as M
 import Sodium.Nucleus.Program.Scalar
-import Sodium.Nucleus.Recmap.Scalar
 import Sodium.Nucleus.Name
 
 type VarDecl = (Name, Type)
 
-side :: NameStack t m => Program -> m Program
-side = recmapped sideStatement
+class Side a where
+    side :: NameStack t m => a Expression -> m (a Atom)
 
-sideStatement :: NameStack t m => Statement -> m Statement
-sideStatement = \case
-    MultiIfStatement multiIf -> BodyStatement <$> sideMultiIf multiIf
-    Execute mname op exprs -> BodyStatement <$> sideExecute mname op exprs
-    ForStatement forCycle -> BodyStatement <$> sideForCycle forCycle
-    statement -> return statement
+instance Side Program where side = (programFuncs . traversed) side
+instance Side Func    where side = funcBody side
+instance Side Body    where side = (bodyStatements . traversed) side
+
+instance Side Statement where
+    side = \case
+        Execute          a -> BodyStatement <$> side' a
+        ForStatement     a -> BodyStatement <$> side' a
+        MultiIfStatement a -> BodyStatement <$> side' a
+        BodyStatement    a -> BodyStatement <$> side' a
 
 
-sideExpression
-    :: NameStack t m => Expression
-    -> WriterT [Either VarDecl Statement] m Expression
+class Side' a where
+    side' :: NameStack t m => a Expression -> m (Body Atom)
+
+instance Side' Body where
+    side' = side
+
+instance Side' MultiIf where
+    side' (MultiIf leafs) =
+        MultiIf `sideWith` (traverse (_1 sideExpression >=> _2 side) leafs)
+
+instance Side' ForCycle where
+    side' (ForCycle name range body) =
+        uncurry (ForCycle name) `sideWith`
+            liftA2 (,) (sideExpression range) (side body)
+
+instance Side' Exec where
+    side' (Exec mname op exprs) =
+        Exec mname op `sideWith` mapM sideExpression exprs
+
+sideWith k w = do
+    (a, unzip -> (vardecls, sidecalls)) <- runWriterT w
+    return $ Body (M.fromList vardecls) (sidecalls `snoc` statement (k a))
+
+sideExpression :: NameStack t m => Expression
+               -> WriterT [(VarDecl, Statement Atom)] m Atom
 sideExpression = \case
-    Atom atom -> return (Atom atom)
+    Atom atom -> return atom
     Call op args -> do
         eArgs <- mapM sideExpression args
-        name <- namepop
+        name  <- namepop
         let vardecl = (name, TypeUnit) -- TODO: the real type
-        tell [Left vardecl]
-        tell [Right $ Execute (Just name) op eArgs]
-        return (Atom (Access name))
-
-sideMultiIf :: NameStack t m => MultiIf -> m Body
-sideMultiIf multiIf = do
-    (leafs, xs) <- runWriterT (mapM (_1 sideExpression) $ view multiIfLeafs multiIf)
-    let (vardecls, assigns) = partitionEithers xs
-    let statements = assigns ++ [MultiIfStatement $ set multiIfLeafs leafs multiIf]
-    return $ Body (M.fromList vardecls) statements
-
-sideExecute :: NameStack t m => Maybe Name -> Name -> [Expression] -> m Body
-sideExecute mname op exprs = do
-    (exprs', xs) <- runWriterT $ mapM sideExpression exprs
-    let (vardecls, sidecalls) = partitionEithers xs
-    let statements = sidecalls ++ [Execute mname op exprs']
-    return $ Body (M.fromList vardecls) statements
-
-sideForCycle :: NameStack t m => ForCycle -> m Body
-sideForCycle forCycle = do
-    (expr, xs) <- runWriterT (sideExpression $ view forRange forCycle)
-    let (vardecls, sidecalls) = partitionEithers xs
-    let statements = sidecalls ++ [ForStatement $ set forRange expr forCycle]
-    return $ Body (M.fromList vardecls) statements
+        tell [(vardecl, Execute $ Exec (Just name) op eArgs)]
+        return (Access name)

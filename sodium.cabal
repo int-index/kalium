@@ -31,7 +31,6 @@ library
                        Sodium.Nucleus.Pass.BindClean
                        Sodium.Nucleus.Pass.Clean
                        Sodium.Nucleus.Pass.Compute
-                       Sodium.Nucleus.Recmap.Scalar
                        Sodium.Nucleus.Recmap.Vector
                        Sodium.Nucleus.Recmap
                        Sodium.Nucleus.Pattern
