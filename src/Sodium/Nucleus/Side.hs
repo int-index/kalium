@@ -17,33 +17,24 @@ side = recmapped sideStatement
 
 sideStatement :: NameStack t m => Statement -> m Statement
 sideStatement = \case
-    Assign name expr -> BodyStatement <$> sideAssign name expr
     MultiIfStatement multiIf -> BodyStatement <$> sideMultiIf multiIf
     Execute mname op exprs -> BodyStatement <$> sideExecute mname op exprs
     ForStatement forCycle -> BodyStatement <$> sideForCycle forCycle
     statement -> return statement
-
-sideAssign :: NameStack t m => Name -> Expression -> m Body
-sideAssign name expr = do
-    (e, xs) <- runWriterT (sideExpression expr)
-    let (vardecls, sidecalls) = partitionEithers xs
-    let statements = sidecalls ++ [Execute (Just name) (NameOp OpId) [e]]
-    return $ Body (M.fromList vardecls) statements
 
 
 sideExpression
     :: NameStack t m => Expression
     -> WriterT [Either VarDecl Statement] m Expression
 sideExpression = \case
-    Access name -> return (Access name)
-    Primary lit -> return (Primary lit)
+    Atom atom -> return (Atom atom)
     Call op args -> do
         eArgs <- mapM sideExpression args
         name <- namepop
         let vardecl = (name, TypeUnit) -- TODO: the real type
         tell [Left vardecl]
         tell [Right $ Execute (Just name) op eArgs]
-        return (Access name)
+        return (Atom (Access name))
 
 sideMultiIf :: NameStack t m => MultiIf -> m Body
 sideMultiIf multiIf = do

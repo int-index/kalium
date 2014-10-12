@@ -16,7 +16,6 @@ data Error
     | NoFunction Name
     | UpdateImmutable Name
     | NoReference
-    | InvalidOperation
     deriving (Show)
 
 type E = Except Error
@@ -40,8 +39,8 @@ vectorizeFunc funcSigs func = do
     (_, vecBodyGen)
             <- runReaderT (vectorizeBody funcSigs (func ^. funcBody))
             $ initIndices (Vec.Index 0) (func ^. funcSig . funcParams . to M.fromList)
-    let refs = map Access (func ^. funcSig . to references)
-    vecBody <- vecBodyGen (func ^. funcResults ++ refs)
+    let refs = map (review _Access') (func ^. funcSig . to references)
+    vecBody <- vecBodyGen (func ^. funcResult : refs)
     return $ Vec.Func (func ^. funcSig) (Vec.BodyStatement vecBody)
 
 patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
@@ -70,7 +69,7 @@ vectorizeBody funcSigs body = do
 vectorizeBody' :: [FuncSig] -> Body -> R E ([Name], Vec.Body)
 vectorizeBody' funcSigs body = do
     (changed, vecBodyGen) <- vectorizeBody funcSigs body
-    vecBody <- lift $ vecBodyGen (map Access changed)
+    vecBody <- lift $ vecBodyGen (map (review _Access') changed)
     return (changed, vecBody)
 
 vectorizeStatement' :: [FuncSig] -> Statement -> S E ([(Name, Vec.Index)], Vec.Statement)
@@ -129,18 +128,21 @@ vectorizeStatement funcSigs = \case
                          return (vecExpr, Vec.BodyStatement vecBody)
                  return (changed, vecLeafGen)
         let changed = nub $ concat changedList
-        let accessChanged = map Access changed
+        let accessChanged = map (review _Access') changed
         vecMultiIf <- lift
              $  Vec.MultiIf
             <$> mapM ($ accessChanged) vecLeafGens
         return $ (changed, vecMultiIf)
-    _ -> throwError InvalidOperation
 
 vectorizeExpression :: Expression -> R E Vec.Expression
-vectorizeExpression = \case
+vectorizeExpression expr = case expr ^? _Atom of
+    Nothing -> error "InvalidOperation"
+    Just atom -> vectorizeAtom atom
+
+vectorizeAtom :: Atom -> R E Vec.Expression
+vectorizeAtom = \case
     Primary a -> return (Vec.Primary a)
     Access name -> Vec.Access name <$> lookupIndex name
-    _ -> throwError InvalidOperation
 
 readerToState :: (Functor m, Monad m) => ReaderT x m a -> StateT x m a
 readerToState reader = StateT $ \x -> (,x) <$> runReaderT reader x

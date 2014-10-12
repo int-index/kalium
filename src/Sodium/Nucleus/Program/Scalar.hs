@@ -4,65 +4,55 @@ module Sodium.Nucleus.Program.Scalar
 	, module Sodium.Nucleus.Program
 	) where
 
-import Control.Lens (prism', Simple, Prism)
+import Control.Lens
 import Control.Lens.TH
 import qualified Data.Map as M
 
 import Sodium.Nucleus.Program
 
-data Program
-	= Program
-	{ _programFuncs :: [Func]
-	} deriving (Show)
+data Program = Program
+    { _programFuncs :: [Func]
+    }
 
-data Func
-	= Func
-	{ _funcSig :: FuncSig
-	, _funcBody :: Body
-	, _funcResults :: [Expression]
-	} deriving (Show)
+data Func = Func
+    { _funcSig :: FuncSig
+    , _funcBody :: Body
+    , _funcResult :: Expression
+    }
 
-data Body
-	= Body
-	{ _bodyVars :: Vars
-	, _bodyStatements :: [Statement]
-	} deriving (Show)
+data Body = Body
+    { _bodyVars :: Vars
+    , _bodyStatements :: [Statement]
+    }
 
 data Statement
-	= Assign Name Expression
-	| Execute (Maybe Name) Name [Expression]
-	| ForStatement ForCycle
-	| MultiIfStatement MultiIf
-	| BodyStatement Body
-	deriving (Show)
+    = Execute (Maybe Name) Name [Expression]
+    | ForStatement ForCycle
+    | MultiIfStatement MultiIf
+    | BodyStatement Body
+
+assign :: Name -> Expression -> Statement
+assign name expr = Execute (Just name) (NameOp OpId) [expr]
 
 data ForCycle
-	= ForCycle
-	{ _forName :: Name
-	, _forRange :: Expression
-	, _forBody :: Body
-	} deriving (Show)
+    = ForCycle
+    { _forName :: Name
+    , _forRange :: Expression
+    , _forBody :: Body
+    }
 
-data MultiIf
-	= MultiIf
-	{ _multiIfLeafs :: [(Expression, Body)]
-	} deriving (Show)
+data MultiIf = MultiIf { _multiIfLeafs :: [(Expression, Body)] }
 
 data Expression
-	= Access Name
-	| Call Name [Expression]
-	| Primary Literal
-	deriving (Show)
+    = Atom Atom
+    | Call Name [Expression]
+
+data Atom
+    = Access Name
+    | Primary Literal
 
 bodyEmpty :: Body
 bodyEmpty = Body M.empty []
-
-bodySingleton :: Simple Prism Body Statement
-bodySingleton
-	= prism' (\s -> Body M.empty [s])
-	$ \case
-		Body vars [statement] | M.null vars -> Just statement
-		_ -> Nothing
 
 makeLenses ''Func
 makeLenses ''Body
@@ -71,3 +61,11 @@ makeLenses ''MultiIf
 makeLenses ''Program
 
 makePrisms ''Statement
+makePrisms ''Expression
+makePrisms ''Atom
+
+_Primary' :: Prism' Expression Literal
+_Primary' = _Atom . _Primary
+
+_Access' :: Prism' Expression Name
+_Access'  = _Atom . _Access

@@ -12,7 +12,6 @@ data Error = ParseError String Int Int
            | NoFunction N.Name
            | NoReference
            | UpdateImmutable N.Name
-           | InvalidOperation
     deriving (Show)
 
 parseError :: P.ParseError -> Error
@@ -28,4 +27,3 @@ vectorizeError = \case
     V.NoFunction name       -> NoFunction name
     V.UpdateImmutable name  -> UpdateImmutable name
     V.NoReference           -> NoReference
-    V.InvalidOperation      -> InvalidOperation

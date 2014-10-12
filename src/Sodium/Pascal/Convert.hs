@@ -29,17 +29,19 @@ instance Conv S.Program D.Program where
 		clMain <- do
 			clBody <- conv (VB vars body)
 			let clFuncSig = D.FuncSig D.NameMain [] D.TypeUnit
-			return $ D.Func clFuncSig clBody []
+			return $ D.Func clFuncSig clBody (D._Primary' # D.LitUnit)
 		clFuncs <- mapM conv funcs
 		return $ D.Program (clMain:clFuncs)
 
+bodySingleton s = D.Body M.empty [s]
+
 convBodyStatement statement
-	 =  review D.bodySingleton
+	 =  bodySingleton
 	<$> conv statement
 
 maybeBodySingleton
 	= maybe D.bodyEmpty
-	$ review D.bodySingleton
+	$ bodySingleton
 
 data VB = VB S.Vars S.Body
 
@@ -52,20 +54,20 @@ instance Conv VB D.Body where
 instance Conv S.Func D.Func where
     conv (S.Func name params pasType vars body)
         = do
-            (retExprs, retType, enclose) <- case pasType of
-                Nothing -> return ([], D.TypeUnit, id)
+            (retExpr, retType, enclose) <- case pasType of
+                Nothing -> return (D._Primary' # D.LitUnit, D.TypeUnit, id)
                 Just ty -> do
                     let retName = nameV name
                     retType <- conv ty
                     let enclose = D.bodyVars %~ (M.insert retName retType)
-                    return ([D.Access retName], retType, enclose)
+                    return (D._Access' # retName, retType, enclose)
             clFuncSig
                 <-  D.FuncSig
                 <$> return (nameF name)
                 <*> mapM conv (splitParamDecls params)
                 <*> return retType
             clBody <- enclose <$> conv (VB vars body)
-            return $ D.Func clFuncSig clBody retExprs
+            return $ D.Func clFuncSig clBody retExpr
 
 splitVarDecls vardecls
     = [VarDecl name t | S.VarDecl names t <- vardecls, name <- names]
@@ -97,14 +99,14 @@ instance Conv S.PasType D.Type where
 binary op a b = D.Call op [a,b]
 
 multifyIf expr bodyThen bodyElse = D.MultiIf
-    [(expr, bodyThen), (D.Primary (D.LitBoolean True), bodyElse)] 
+    [(expr, bodyThen), (D._Primary' # D.LitBoolean True, bodyElse)] 
 
 instance Conv S.Statement D.Statement where
     conv = \case
         S.BodyStatement body
              -> D.BodyStatement
             <$> conv (VB [] body)
-        S.Assign name expr -> D.Assign (nameV name) <$> conv expr
+        S.Assign name expr -> D.assign (nameV name) <$> conv expr
         S.Execute name exprs
              -> D.Execute Nothing
             <$> case name of
@@ -128,7 +130,7 @@ instance Conv S.Statement D.Statement where
             clExpr <- conv expr
             clName <- namepop
             let clType = D.TypeUnit -- typeof(expr)
-            let clCaseExpr = D.Access clName
+            let clCaseExpr = D._Access' # clName
             let instRange = \case
                     S.Binary S.OpRange exprFrom exprTo
                          -> (binary (D.NameOp D.OpElem) clCaseExpr)
@@ -141,10 +143,10 @@ instance Conv S.Statement D.Statement where
             leafs <- mapM instLeaf leafs
             leafElse <- maybeBodySingleton <$> mapM conv mBodyElse
             let statement = D.MultiIfStatement $ D.MultiIf
-                 $ snoc leafs (D.Primary (D.LitBoolean True), leafElse)
+                 $ snoc leafs (D._Primary' # D.LitBoolean True, leafElse)
             return $ D.BodyStatement $ D.Body
                         (M.singleton clName clType)
-                        [D.Assign clName clExpr, statement]
+                        [D.assign clName clExpr, statement]
 
 inumber intSection = D.LitInteger $ parseInt intSection
 fnumber intSection fracSection = D.LitDouble $ parseFrac intSection fracSection
@@ -165,22 +167,19 @@ parseExp intSection fracSection eSign eSection
         (10 ^ parseInt eSection)
 
 instance Conv S.Expression D.Expression where
-	conv = \case
-		S.Access name -> return $ D.Access (nameV name)
-		S.Call name exprs
-			 -> D.Call
-			<$> pure (nameF name)
-			<*> mapM conv exprs
-		S.INumber intSection -> return (D.Primary $ inumber intSection)
-		S.FNumber intSection fracSection
-			-> return (D.Primary $ fnumber intSection fracSection)
-		S.ENumber intSection fracSection eSign eSection
-			-> return (D.Primary $ enumber intSection fracSection eSign eSection)
-		S.Quote cs -> return $ D.Primary (D.LitString  cs)
-		S.BTrue  -> return $ D.Primary (D.LitBoolean True)
-		S.BFalse -> return $ D.Primary (D.LitBoolean False)
-		S.Binary op x y -> binary <$> conv op <*> conv x <*> conv y
-		S.Unary op x -> D.Call <$> conv op <*> mapM conv [x]
+    conv = \case
+        S.Access name -> return $ D._Access' # nameV name
+        S.Call name exprs -> D.Call <$> pure (nameF name) <*> mapM conv exprs
+        S.INumber intSection -> return $ D._Primary' # inumber intSection
+        S.FNumber intSection fracSection
+            -> return $ D._Primary' # fnumber intSection fracSection
+        S.ENumber intSection fracSection eSign eSection
+            -> return $ D._Primary' # enumber intSection fracSection eSign eSection
+        S.Quote cs -> return $ D._Primary' # D.LitString  cs
+        S.BTrue    -> return $ D._Primary' # D.LitBoolean True
+        S.BFalse   -> return $ D._Primary' # D.LitBoolean False
+        S.Binary op x y -> binary <$> conv op <*> conv x <*> conv y
+        S.Unary  op x   -> D.Call <$> conv op <*> mapM conv [x]
 
 instance Conv S.Operator D.Name where
     conv = return . D.NameOp . \case

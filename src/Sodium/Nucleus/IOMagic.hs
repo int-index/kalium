@@ -10,7 +10,6 @@ import Sodium.Nucleus.Recmap.Scalar
 data Error
     = NoAccess Name
     deriving (Show)
-
 uncurse :: Program -> Program
 uncurse program
     = either (error . show) id
@@ -22,7 +21,7 @@ uncurseStatement :: Statement -> ReaderT Vars (Either Error) Statement
 uncurseStatement = _Execute
     $ \(mres, name, args) -> case name of
         NameOp (OpReadLn _) -> case (mres, args) of
-            (Nothing, [Access name])
+            (Nothing, [Atom (Access name)])
                  -> lookupType name
                 <&> \t -> (Just name, NameOp (OpReadLn t), [])
             _ -> error "IOMagic supports only single-value read operations"
@@ -34,11 +33,11 @@ uncurseStatement = _Execute
 uncurseArgument = \case
     -- TODO: apply `show` only to non-String
     -- expressions as soon as typecheck is implemented
-    Access name
+    Atom (Access name)
          -> lookupType name
         <&> \case
-            TypeString -> Access name
-            _ -> Call (NameOp OpShow) [Access name]
+            TypeString -> Atom (Access name)
+            _ -> Call (NameOp OpShow) [Atom (Access name)]
     expr -> return expr
 
 lookupType name = do
