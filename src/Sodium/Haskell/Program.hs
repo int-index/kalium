@@ -6,9 +6,12 @@ import qualified Language.Haskell.Exts.SrcLoc as H
 
 type Name = String
 
-funcDef name args exp = H.FunBind [H.Match H.noLoc (H.Ident name) (map (H.PVar . H.Ident) args) Nothing (H.UnGuardedRhs exp) (H.BDecls [])]
+funcDef name args exp = H.FunBind [H.Match H.noLoc (H.Ident name) (map (H.PVar . H.Ident) args) Nothing (rhs exp) (H.BDecls [])]
 
-valueDef pat exp = H.PatBind H.noLoc pat (H.UnGuardedRhs exp) (H.BDecls [])
+rhs (H.MultiIf alts) = H.GuardedRhss alts
+rhs exp = H.UnGuardedRhs exp
+
+valueDef pat exp = H.PatBind H.noLoc pat (rhs exp) (H.BDecls [])
 
 pureLet []   = id
 pureLet defs = H.Let (H.BDecls defs)
