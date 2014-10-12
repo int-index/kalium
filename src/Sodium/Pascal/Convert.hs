@@ -5,6 +5,7 @@ module Sodium.Pascal.Convert (convert) where
 
 import Prelude hiding (mapM)
 import Control.Applicative
+import Control.Monad.Reader hiding (mapM)
 import qualified Data.Map  as M
 import qualified Data.Char as C
 import Data.Ratio
@@ -16,13 +17,13 @@ import qualified Sodium.Nucleus.Program.Scalar as D
 import Sodium.Nucleus.Name
 
 convert :: NameStack t m => S.Program -> m D.Program
-convert = conv
+convert program = runReaderT (conv program) M.empty
 
 nameV = D.Name ["v"]
 nameF = D.Name ["f"]
 
 class Conv s d | s -> d where
-	conv :: NameStack t m => s -> m d
+	conv :: NameStack t m => s -> ReaderT (M.Map S.Name S.PasType) m d
 
 instance Conv S.Program D.Program where
 	conv (S.Program funcs vars body) = do
@@ -46,27 +47,27 @@ maybeBodySingleton
 data VB = VB S.Vars S.Body
 
 instance Conv VB D.Body where
-	conv (VB vardecls statements)
-		 =  D.Body
-		<$> (M.fromList <$> mapM conv (splitVarDecls vardecls))
-		<*> mapM conv statements
+    conv (VB vardecls statements)
+        = D.Body
+       <$> (M.fromList <$> mapM conv varDecls)
+       <*> local (M.union (M.fromList $ map varDeclToTup varDecls))
+            (mapM conv statements)
+       where varDecls = splitVarDecls vardecls
 
 instance Conv S.Func D.Func where
     conv (S.Func name params pasType vars body)
         = do
-            (retExpr, retType, enclose) <- case pasType of
-                Nothing -> return (D._Primary' # D.LitUnit, D.TypeUnit, id)
+            (retExpr, retType, retVars) <- case pasType of
+                Nothing -> return (D._Primary' # D.LitUnit, D.TypeUnit, [])
                 Just ty -> do
                     let retName = nameV name
                     retType <- conv ty
-                    let enclose = D.bodyVars %~ (M.insert retName retType)
-                    return (D._Access' # retName, retType, enclose)
-            clFuncSig
-                <-  D.FuncSig
-                <$> return (nameF name)
-                <*> mapM conv (splitParamDecls params)
-                <*> return retType
-            clBody <- enclose <$> conv (VB vars body)
+                    return (D._Access' # retName, retType, [S.VarDecl [name] ty])
+            let paramDecls = splitParamDecls params
+            clParamDecls <- mapM conv paramDecls
+            let clFuncSig = D.FuncSig (nameF name) clParamDecls retType
+            clBody <- local (M.union (M.fromList $ map paramDeclToTup paramDecls))
+                    $ conv (VB (vars ++ retVars) body)
             return $ D.Func clFuncSig clBody retExpr
 
 splitVarDecls vardecls
@@ -74,6 +75,9 @@ splitVarDecls vardecls
 
 splitParamDecls paramdecls
     = [ParamDecl name r t | S.ParamDecl names r t <- paramdecls, name <- names]
+
+varDeclToTup (VarDecl name ty) = (name, ty)
+paramDeclToTup (ParamDecl name _ ty) = (name, ty)
 
 data VarDecl   = VarDecl   S.Name      S.PasType
 data ParamDecl = ParamDecl S.Name Bool S.PasType
@@ -101,19 +105,43 @@ binary op a b = D.Call op [a,b]
 multifyIf expr bodyThen bodyElse = D.MultiIf
     [(expr, bodyThen), (D._Primary' # D.LitBoolean True, bodyElse)] 
 
+convReadLn [S.Access name] = do
+    ty <- lookupType name
+    clType <- conv ty
+    return $ D.Execute
+        (Just $ nameV name)
+        (D.NameOp $ D.OpReadLn clType)
+        []
+convReadLn _ = error "IOMagic supports only single-value read operations"
+
+convWriteLn exprs = do
+    let convArg expr = do
+          -- TODO: apply `show` only to non-String
+          -- expressions as soon as typecheck is implemented
+          noShow <- case expr of
+            S.Quote _ -> return True
+            S.Access name -> do
+                ty <- lookupType name
+                return (ty == S.PasString)
+            _ -> return False
+          let wrap = if noShow then id else (\e -> D.Call (D.NameOp D.OpShow) [e])
+          wrap <$> conv expr
+    D.Execute Nothing (D.NameOp D.OpPrintLn) <$> mapM convArg exprs
+
+
+lookupType name = do
+    mtype <- asks (M.lookup name)
+    maybe (error "IOMagic lookup error") return mtype
+
 instance Conv S.Statement D.Statement where
     conv = \case
         S.BodyStatement body
              -> D.BodyStatement
             <$> conv (VB [] body)
         S.Assign name expr -> D.assign (nameV name) <$> conv expr
-        S.Execute name exprs
-             -> D.Execute Nothing
-            <$> case name of
-                "readln"  -> return (D.NameOp $ D.OpReadLn undefined)
-                "writeln" -> return (D.NameOp D.OpPrintLn)
-                name -> return (nameF name)
-            <*> mapM conv exprs
+        S.Execute "readln"  exprs -> convReadLn  exprs
+        S.Execute "writeln" exprs -> convWriteLn exprs
+        S.Execute name exprs -> D.Execute Nothing (nameF name) <$> mapM conv exprs
         S.ForCycle name fromExpr toExpr statement
             -> (D.ForStatement <$>)
              $  D.ForCycle

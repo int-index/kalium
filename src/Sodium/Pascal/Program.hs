@@ -75,4 +75,4 @@ data PasType
 	| PasString
 	| PasArray PasType
 	| PasType Name
-	deriving (Show)
+	deriving (Eq, Show)
