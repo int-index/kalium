@@ -1,15 +1,13 @@
 module Sodium.Nucleus.Pass.JoinMultiIf (joinMultiIf) where
 
-import Data.List
 import Control.Lens
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
-import Sodium.Nucleus.Pass.Compute (recursively)
 
 import Sodium.Util (tryApply)
 
 joinMultiIf :: Program -> Program
-joinMultiIf = over recmapped (recursively joinMultiIfExpression)
+joinMultiIf = over recmapped joinMultiIfExpression
             . over recmapped joinMultiIfStatement
 
 joinMultiIfExpression :: Expression -> Expression

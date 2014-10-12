@@ -1,13 +1,13 @@
-module Sodium.Nucleus.Pass.Clean (clean) where
+module Sodium.Nucleus.Pass.Clean (clean, checkRef) where
 
-import Control.Applicative
 import Control.Lens hiding (Index, Fold)
 import Control.Monad.Reader
+import Control.Monad.Writer
 import qualified Data.Map as M
-import Data.Monoid
 import Data.List
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Name
 
 clean :: Program -> Program
 clean = runIdentity . recmap cleaner
@@ -18,7 +18,8 @@ cleaner =  recmapper (return . cleanVars)
 
 cleanVars :: Body -> Body
 cleanVars body = (bodyVars %~ M.filterWithKey cc) body where
-    cc name _ = runReader (checkRef $ bodyComponents body) name
+    cc name _ = checkRef (bodyComponents body) name
+    bodyComponents body = (body ^. bodyResult, body ^. bodyBinds)
 
 cleanBody :: Body -> Body
 cleanBody body = body & bodyBinds .~ binds where
@@ -27,14 +28,14 @@ cleanBody body = body & bodyBinds .~ binds where
         where scope = (binds, body ^. bodyResult)
     binds = tails (body ^. bodyBinds) >>= cleanBind
 
-cleanUsage :: CheckRef scope => scope -> Pattern -> Pattern
+cleanUsage :: Mask scope => scope -> Pattern -> Pattern
 cleanUsage scope (PTuple ps)
   = case cleanUsage scope `map` ps of
       []  -> PWildCard
       [p] -> p
       ps' -> PTuple ps'
 cleanUsage scope (PAccess name _)
-  | not (checkRef scope `runReader` name) = PWildCard
+  | not (checkRef scope name) = PWildCard
 cleanUsage _ pat = pat
 
 cleanStatement :: Statement -> Statement
@@ -44,50 +45,9 @@ cleanStatement = over _ForStatement cleanForCycle
     cleanForCycle forCycle
       = forCycle & forArgPattern %~ cleanUsage (forCycle ^. forAction)
 
-class CheckRef a where
-    checkRef :: a -> Reader Name Bool
-
-
--- Helper instances
-
-instance CheckRef a => CheckRef [a] where
-    checkRef as = or <$> traversed checkRef as
-
-instance (CheckRef a, CheckRef b) => CheckRef (a, b) where
-    checkRef (a, b) = (||) <$> checkRef a <*> checkRef b
-
-
--- Actual instances
-
-instance CheckRef Expression where
-    checkRef = \case
-        Primary _ -> return False
-        Tuple exprs -> checkRef exprs
-        Access name _ -> (==name) <$> ask
-        Call _ exprs -> -- Check the operator?
-            checkRef exprs
-        Fold _ exprs range -> checkRef (exprs, range)
-        MultiIfExpression multiIf -> checkRef multiIf
-
-instance CheckRef Statement where
-    checkRef = \case
-        Execute _ exprs -> checkRef exprs
-        Assign expr -> checkRef expr
-        BodyStatement body -> checkRef body
-        ForStatement forCycle -> checkRef forCycle
-        MultiIfStatement multiIf -> checkRef multiIf
-
-instance CheckRef Bind where
-    checkRef = checkRef . view bindStatement
-
-instance CheckRef ForCycle where
-    checkRef forCycle = checkRef
-        ((forCycle ^. forRange, forCycle ^. forArgExpr), forCycle ^. forAction)
-
-instance CheckRef a => CheckRef (MultiIf a) where
-    checkRef multiIf = checkRef (multiIf ^. multiIfLeafs)
-
-bodyComponents body = (body ^. bodyResult, body ^. bodyBinds)
-
-instance CheckRef Body where
-    checkRef body = checkRef (bodyComponents body)
+checkRef :: Mask a => a -> Name -> Bool
+checkRef a name' = getAny . execWriter
+                 $ runReaderT (mask a) check
+    where check name = do
+            tell $ Any (name == name')
+            return name

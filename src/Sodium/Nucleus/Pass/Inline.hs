@@ -16,8 +16,9 @@ inlineBody :: Body -> Body
 inlineBody = evalState unconsBind where
     unconsBind :: State Body Body
     unconsBind = uses bodyBinds uncons >>= maybe get go
-    go (bind, binds) = do
+    go (bind', binds) = do
         bodyBinds .= binds
+        bind <- bindPattern merge bind'
         elim bind <$> get >>= \case
             Just body -> put body >> unconsBind
             Nothing   -> over bodyBinds (bind:) <$> unconsBind
@@ -29,9 +30,17 @@ inlineBody = evalState unconsBind where
         let (body, count)
               = runWriter
               $ flip runReaderT ((name, i), expr)
-              $ inl body'
+              $ recmapped inl body'
         when (expr ^? _Access == Nothing) $ guard (count <= 1)
         return body
+    -- TODO: pattern merging
+    merge :: Pattern -> State Body Pattern
+    merge (PTuple pats)
+        | topsm <- pats ^.. traversed . to (preview _PAccess)
+        , Just tops <- sequence topsm
+        , expr <- map (review _Access) tops
+        = return (PTuple pats)
+    merge pat = return pat
 
 -- check if a statement contains any side-effects
 noExec :: Statement -> Bool
@@ -42,55 +51,12 @@ noExec = r where
         Execute _ _ -> Nothing
         statement -> Just statement
 
+type Inline = ReaderT ((Name, Index), Expression) (Writer (Sum Integer))
 
-type InlineEnv = ((Name, Index), Expression)
-
-class Inline a where
-    inl :: a -> ReaderT InlineEnv (Writer (Sum Integer)) a
-
-instance Inline a => Inline [a] where
-    inl = traverse inl
-
-instance (Inline a, Inline b) => Inline (a, b) where
-    inl = _1 inl >=> _2 inl
-
-instance (Inline a, Inline b, Inline c) => Inline (a, b, c) where
-    inl = _1 inl >=> _2 inl >=> _3 inl
-
-instance Inline Name where
-    inl = return
-
-instance Inline Expression where
-    inl expr = recInline expr >>= \case
-        expr'@(Access name' j) -> do
-            (name, expr) <- ask
-            if name == (name', j)
-                then tell (Sum 1) >> return expr
-                else return expr'
-        expr' -> return expr'
-        where recInline
-                =  _Tuple inl
-               >=> _Call  inl
-               >=> _Fold  inl
-               >=> _MultiIfExpression inl
-
-instance Inline Statement where
-    inl  =  _Execute inl
-        >=> _Assign  inl
-        >=> _BodyStatement    inl
-        >=> _ForStatement     inl
-        >=> _MultiIfStatement inl
-
-instance Inline Bind where
-    inl = bindStatement inl
-
-instance Inline ForCycle where
-    inl  =  forRange   inl
-        >=> forArgExpr inl
-        >=> forAction  inl
-
-instance Inline a => Inline (MultiIf a) where
-    inl = multiIfLeafs inl
-
-instance Inline Body where
-    inl = bodyBinds inl >=> bodyResult inl
+inl :: Expression -> Inline Expression
+inl expr'@(Access name' j) = do
+        (name, expr) <- ask
+        if name == (name', j)
+            then tell (Sum 1) >> return expr
+            else return expr'
+inl expr' = return expr'

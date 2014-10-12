@@ -1,26 +1,11 @@
-module Sodium.Nucleus.Pass.Compute (compute, recursively) where
+module Sodium.Nucleus.Pass.Compute (compute) where
 
 import Control.Lens hiding (Index, Fold)
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector (recmapped)
 
 compute :: Program -> Program
-compute = over recmapped computeExpression
-
-computeExpression :: Expression -> Expression
-computeExpression = recursively match
-
-recursively :: (Expression -> Expression) -> (Expression -> Expression)
-recursively f = \case
-    e@(Access _ _) -> f e
-    e@(Primary  _) -> f e
-    Call op exprs  -> f $ Call op (map rf exprs)
-    Tuple   exprs  -> f $ Tuple (map rf exprs)
-    Fold op expr range -> f $ Fold op (rf expr) (rf range)
-    MultiIfExpression multiIf -> f
-        $ MultiIfExpression
-        $ multiIf & multiIfLeafs . traversed . both %~ rf
-    where rf = recursively f
+compute = over recmapped match
 
 match :: Expression -> Expression
 match = \case

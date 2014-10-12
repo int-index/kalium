@@ -11,8 +11,9 @@ module Sodium.Nucleus.Recmap.Vector
 
 import qualified Data.Map as M
 
+import Control.Applicative
 import Control.Monad
-import Control.Lens
+import Control.Lens hiding (Fold)
 import Data.Monoid
 import Sodium.Nucleus.Recmap
 import Sodium.Nucleus.Program.Vector
@@ -62,9 +63,10 @@ instance RecmapMk Statement where
     recmapper rm = mempty { recmap_parent_second = rm }
 
 instance RecmapMk Expression where
-    recmapper rmExpr = mempty { recmap_parent_first  = rmBody
-                              , recmap_parent_second = rmStatement }
-        where rmStatement
+    recmapper rmExpr' = mempty { recmap_parent_first  = rmBody
+                               , recmap_parent_second = rmStatement }
+        where rmExpr = recExpr rmExpr'
+              rmStatement
                      =  _Assign rmExpr
                     >=> (_Execute . _2 . traversed) rmExpr
                     >=> _ForStatement     rmForCycle
@@ -72,6 +74,18 @@ instance RecmapMk Expression where
               rmBody = bodyResult rmExpr
               rmForCycle = forArgExpr rmExpr >=> forRange rmExpr
               rmMultiIf = (multiIfLeafs . traversed . _1) rmExpr
+
+recExpr :: Monad' m => LensLike' m Expression Expression
+recExpr f = \case
+    e@(Access _ _) -> f e
+    e@(Primary  _) -> f e
+    Call op exprs  -> (Call op <$> traverse rf exprs) >>= f
+    Tuple   exprs  -> (Tuple <$> traverse rf exprs) >>= f
+    Fold op expr range -> (Fold op <$> rf expr <*> rf range) >>= f
+    MultiIfExpression multiIf ->
+        (MultiIfExpression <$> (multiIfLeafs . traversed . both) rf multiIf)
+        >>= f
+    where rf = recExpr f
 
 localizer :: Monad' m => (forall a . Vars -> m a -> m a) -> Recmapper Vector m
 localizer lc = mempty { localize = lc }
