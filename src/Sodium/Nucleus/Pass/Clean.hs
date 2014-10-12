@@ -1,4 +1,4 @@
-module Sodium.Nucleus.Pass.Clean (clean, checkRef) where
+module Sodium.Nucleus.Pass.Clean (clean) where
 
 import Control.Lens hiding (Index, Fold)
 import Control.Monad.Reader
@@ -44,10 +44,3 @@ cleanStatement = over _ForStatement cleanForCycle
     cleanForCycle :: ForCycle -> ForCycle
     cleanForCycle forCycle
       = forCycle & forArgPattern %~ cleanUsage (forCycle ^. forAction)
-
-checkRef :: Mask a => a -> Name -> Bool
-checkRef a name' = getAny . execWriter
-                 $ runReaderT (mask a) check
-    where check name = do
-            tell $ Any (name == name')
-            return name

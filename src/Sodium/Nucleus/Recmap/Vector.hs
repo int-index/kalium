@@ -7,6 +7,7 @@ module Sodium.Nucleus.Recmap.Vector
     , recmap
     , localizer
     , recmapped
+    , recExpr
     ) where
 
 import qualified Data.Map as M

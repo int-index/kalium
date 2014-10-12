@@ -5,6 +5,7 @@ import Control.Lens
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Reader
+import Control.Monad.Writer
 import Sodium.Nucleus.Program.Vector
 
 import Sodium.Util (mAsList)
@@ -20,6 +21,12 @@ type NameStack t m = (Applicative m, MonadState t m, HasNameSource t)
 namepop :: NameStack t m => m Name
 namepop = (nameSource `uses` head) <* (nameSource %= tail)
 
+checkRef :: Mask a => a -> Name -> Bool
+checkRef a name' = getAny . execWriter
+                 $ runReaderT (mask a) check
+    where check name = do
+            tell $ Any (name == name')
+            return name
 
 class Mask a where
     mask :: (Applicative m, Monad m) => a -> ReaderT (Name -> m Name) m a

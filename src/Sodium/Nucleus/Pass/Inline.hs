@@ -5,9 +5,12 @@ import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.State
+import qualified Data.Set as S
 import Control.Lens hiding (Index, Fold)
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
+
+import Debug.Trace
 
 inline :: Program -> Program
 inline = over recmapped inlineBody
@@ -33,14 +36,35 @@ inlineBody = evalState unconsBind where
               $ recmapped inl body'
         when (expr ^? _Access == Nothing) $ guard (count <= 1)
         return body
-    -- TODO: pattern merging
     merge :: Pattern -> State Body Pattern
-    merge (PTuple pats)
+    merge p@(PTuple pats)
         | topsm <- pats ^.. traversed . to (preview _PAccess)
         , Just tops <- sequence topsm
-        , expr <- map (review _Access) tops
-        = return (PTuple pats)
+        -- TODO: generate a name!
+        , top <- (Name ["merge"] "a", Immutable)
+        = do let model =  Tuple (map (review _Access) tops)
+             let pat   = _PAccess # top
+             let expr  =  _Access # top
+             gets (over recmapped (model `subst` expr))
+                >>= \case body | eb1 <- execWriter (body  & recmapped exprBound)
+                               , eb2 <- execWriter (model & recExpr   exprBound)
+                               , S.null (join traceShow $ eb1 `S.intersection` eb2)
+                            -> put body >> return pat
+                          _ -> return p
     merge pat = return pat
+
+subst :: Expression -> Expression -> (Expression -> Expression)
+subst model expr expr'
+    | model == expr' = expr
+    | otherwise = expr'
+
+exprBound :: Expression -> Writer (S.Set (Name, Index)) Expression
+exprBound expr = do
+    case expr of
+        Access name i -> tell (S.singleton (name, i))
+        _ -> return ()
+    return expr
+
 
 -- check if a statement contains any side-effects
 noExec :: Statement -> Bool

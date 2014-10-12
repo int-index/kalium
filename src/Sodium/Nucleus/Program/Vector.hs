@@ -68,7 +68,7 @@ data Index
     = Index Integer
     | Immutable
     | Uninitialized
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 type Indices
     = M.Map Name Index
