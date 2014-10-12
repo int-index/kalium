@@ -9,6 +9,10 @@ type Name = String
 funcDef name args exp = H.FunBind [H.Match H.noLoc (H.Ident name) (map (H.PVar . H.Ident) args) Nothing (rhs exp) (H.BDecls [])]
 
 rhs (H.MultiIf alts) = H.GuardedRhss alts
+rhs (H.If cond expr1 expr2) = rhs
+    $ H.MultiIf [ ifAlt (cond, expr1)
+                , ifAlt (H.Con (H.UnQual (H.Ident "otherwise")), expr2)
+                ]
 rhs exp = H.UnGuardedRhs exp
 
 valueDef pat exp = H.PatBind H.noLoc pat (rhs exp) (H.BDecls [])
@@ -31,9 +35,12 @@ access [] = error "Null name"
 
 hsName = H.UnQual . H.Ident
 
-multiIf alts = H.MultiIf (map handleAlt alts)
-  where
-    handleAlt (cond, expr) = H.GuardedRhs H.noLoc [H.Qualifier cond] expr
+multiIf = \case
+    [(cond, expr1), (H.Con (H.UnQual (H.Ident "True")), expr2)]
+         -> H.If cond expr1 expr2
+    alts -> H.MultiIf (map ifAlt alts)
+
+ifAlt (cond, expr) = H.GuardedRhs H.noLoc [H.Qualifier cond] expr
 
 doBind H.PWildCard = doExecute
 doBind pat = \case
