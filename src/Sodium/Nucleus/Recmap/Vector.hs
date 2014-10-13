@@ -47,7 +47,7 @@ instance Recmappable Statement where
 
 instance Recmappable Func where
     recmap rm func
-        = localize rm (fmap snd $ func ^. funcSig . funcParams . to M.fromList)
+        = localize rm (func ^. funcSig . funcParams . to M.fromList)
         $ funcStatement (recmap rm) func
 
 instance Recmappable Program where

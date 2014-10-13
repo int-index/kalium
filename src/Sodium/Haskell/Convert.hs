@@ -190,14 +190,14 @@ instance Conv S.Statement where
 
 instance Conv S.Func where
     type Norm S.Func = H.Decl
-    conv (S.Func (S.FuncSig S.NameMain params S.TypeUnit) clBody) = do
+    conv (S.Func (S.FuncSig S.NameMain params S.TypeUnit []) clBody) = do
         guard $ null params
         hsBody <- conv clBody
         return $ D.funcDef "main" [] hsBody
     conv fun = pureconv fun
 
     type Pure S.Func = H.Decl
-    pureconv (S.Func (S.FuncSig name params _) clBody)
+    pureconv (S.Func (S.FuncSig name params _ _) clBody)
          = D.funcDef (transformName name) paramNames
         <$> pureconv clBody
         where paramNames = map transformName (map fst params)

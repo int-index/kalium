@@ -28,20 +28,25 @@ vectorize program = do
     vecFuncs <- mapM (vectorizeFunc funcSigs) (program ^. programFuncs)
     return $ Vec.Program vecFuncs
 
-references :: FuncSig -> [Name]
+references :: FuncSig -> [(Name, Type)]
 references funcSig = do
-    (name, (by, _)) <- funcSig ^. funcParams
+    (name, (by, ty)) <- funcSig ^. funcParams
     guard (by == ByReference)
-    return name
+    return (name, ty)
 
 vectorizeFunc :: [FuncSig] -> Func Atom -> E Vec.Func
 vectorizeFunc funcSigs func = do
     (_, vecBodyGen)
             <- runReaderT (vectorizeBody funcSigs (func ^. funcBody))
             $ initIndices (Vec.Index 0) (func ^. funcSig . funcParams . to M.fromList)
-    let refs = map Access (func ^. funcSig . to references)
-    vecBody <- vecBodyGen (func ^. funcResult : refs)
-    return $ Vec.Func (func ^. funcSig) (Vec.BodyStatement vecBody)
+    let (refnames, reftypes) = unzip (func ^. funcSig . to references)
+    let vecFuncSig = Vec.FuncSig
+          (func ^. funcSig . funcName)
+          (map (_2 %~ snd) $ func ^. funcSig . funcParams)
+          (func ^. funcSig . funcRetType)
+          reftypes
+    vecBody <- vecBodyGen (func ^. funcResult : map Access refnames)
+    return $ Vec.Func vecFuncSig (Vec.BodyStatement vecBody)
 
 patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
 expTuple = Vec.Tuple  . map (uncurry Vec.Access)

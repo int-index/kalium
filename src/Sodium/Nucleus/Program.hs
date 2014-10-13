@@ -1,7 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Sodium.Nucleus.Program where
 
-import Control.Lens.TH
 import qualified Data.Map as M
 
 type NameSpace = [String]
@@ -12,13 +11,6 @@ data Name
     | NameOp Operator
     | Shadow Name
     deriving (Eq, Ord, Show)
-
-data FuncSig
-    = FuncSig
-    { _funcName :: Name
-    , _funcParams  :: Params
-    , _funcRetType :: Type
-    } deriving (Eq, Show)
 
 data Operator
     = OpAdd
@@ -65,17 +57,5 @@ data Type
     | TypeUnit
     deriving (Eq, Ord, Show)
 
-data By
-    = ByValue
-    | ByReference
-    deriving (Eq, Show)
-
-type ByType = (By, Type)
-
 type Vars
     = M.Map Name Type
-
-type Params
-    = [(Name, ByType)]
-
-makeLenses ''FuncSig

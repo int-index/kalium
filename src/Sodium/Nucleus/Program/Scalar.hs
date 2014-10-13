@@ -13,6 +13,23 @@ data Program a = Program
     { _programFuncs :: [Func a]
     }
 
+data FuncSig
+    = FuncSig
+    { _funcName :: Name
+    , _funcParams  :: Params
+    , _funcRetType :: Type
+    } deriving (Eq, Show)
+
+data By
+    = ByValue
+    | ByReference
+    deriving (Eq, Show)
+
+type ByType = (By, Type)
+
+type Params
+    = [(Name, ByType)]
+
 data Func a = Func
     { _funcSig :: FuncSig
     , _funcBody :: Body a
@@ -67,6 +84,7 @@ data Atom
 bodyEmpty :: Body a
 bodyEmpty = Body M.empty []
 
+makeLenses ''FuncSig
 makeLenses ''Func
 makeLenses ''Body
 makeLenses ''ForCycle

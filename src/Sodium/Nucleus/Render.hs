@@ -61,14 +61,13 @@ instance Render Operator where
 instance Render FuncSig where
     render funcSig = unwords
         [ render (funcSig ^. funcName)
-        , let r (name, (by, ty)) = render name ++ ": " ++ rby by (render ty)
-              rby ByValue     = id
-              rby ByReference = ('$':)
+        , let r (name, ty) = render name ++ ": " ++ render ty
               cat [] = "_"
               cat xs = commas xs
           in cat $ map r (funcSig ^. funcParams)
         , "->"
         , render (funcSig ^. funcRetType)
+        , commas (map render (funcSig ^. funcRetRefs))
         ]
 
 instance Render Literal where

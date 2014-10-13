@@ -14,6 +14,17 @@ data Program
     { _programFuncs :: [Func]
     } deriving (Eq, Show)
 
+data FuncSig
+    = FuncSig
+    { _funcName :: Name
+    , _funcParams  :: Params
+    , _funcRetType :: Type
+    , _funcRetRefs :: [Type]
+    } deriving (Eq, Show)
+
+type Params
+    = [(Name, Type)]
+
 data Func
     = Func
     { _funcSig :: FuncSig
@@ -83,6 +94,7 @@ data Pattern
     | PWildCard
     deriving (Eq, Show)
 
+makeLenses ''FuncSig
 makeLenses ''Func
 makeLenses ''Bind
 makeLenses ''Body
