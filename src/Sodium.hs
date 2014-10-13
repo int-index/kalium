@@ -12,6 +12,7 @@ import Sodium.Nucleus.Pass.ExtractBody (extractBody)
 import Sodium.Nucleus.Pass.BindClean   (bindClean)
 import Sodium.Nucleus.Pass.Clean       (clean)
 import Sodium.Nucleus.Pass.Compute     (compute)
+import Sodium.Nucleus.Pass.ArgClean    (argClean)
 import Sodium.Pascal.Parse   (parse)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified  Sodium.Pascal.Convert as P (convert)
@@ -44,6 +45,7 @@ liftErr h m = either (throwError . h) return (runExcept m)
 pass :: MonadWriter [V.Program] m => V.Program -> m V.Program
 pass program = tell [program] >> f program
     where f = return
+            . argClean
             . compute   . flatten     . inline
             . foldMatch . joinMultiIf . extractBody
             . bindClean . clean
