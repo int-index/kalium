@@ -153,7 +153,7 @@ lookupIndex name = do
 
 lookupFuncSig :: [FuncSig] -> Name -> E FuncSig
 -- TODO: real signatures for builtin operators
-lookupFuncSig _ (NameOp _) = return $ FuncSig (Name [] "") [] (TypeUnit)
+lookupFuncSig _ (NameOp _) = return $ FuncSig (Name "") [] (TypeUnit)
 lookupFuncSig funcSigs name
     = find (\funcSig -> view funcName funcSig == name) funcSigs
     & maybe (throwError $ NoFunction name) return

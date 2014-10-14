@@ -4,6 +4,7 @@ module Sodium (translate) where
 import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.Shadow      (unshadow)
 import Sodium.Nucleus.Side        (side)
+import Sodium.Nucleus.Strip (strip)
 import Sodium.Nucleus.Pass.Flatten     (flatten)
 import Sodium.Nucleus.Pass.JoinMultiIf (joinMultiIf)
 import Sodium.Nucleus.Pass.Inline      (inline)
@@ -16,7 +17,7 @@ import Sodium.Nucleus.Pass.ArgClean    (argClean)
 import Sodium.Pascal.Parse   (parse)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified  Sodium.Pascal.Convert as P (convert)
-import qualified Sodium.Haskell.Convert as H (convert)
+import qualified Sodium.Haskell.Convert as H (convert, reserved)
 import qualified Sodium.Error as E
 import qualified Sodium.Nucleus.Program.Vector as V
 import qualified Sodium.Nucleus.Render as R
@@ -32,12 +33,12 @@ translate :: MonadError E.Error m => String -> m String
 translate src = do
     pas <- liftErr E.parseError (parse src)
     let scalar = (side <=< P.convert) pas
-          `evalState` map (V.Name ["g"] . show) [0..]
+          `evalState` map (V.NameSpace "g" . V.Name . show) [0..]
     vector <- liftErr E.vectorizeError (vectorize scalar)
     let noshadow = unshadow vector
     let optimal = let (a, log) = runWriter (closureM pass noshadow)
                   in trace (concat $ map R.render log) a
-    return $ prettyPrint (H.convert optimal)
+    return $ prettyPrint (H.convert (strip H.reserved optimal))
 
 liftErr :: MonadError e' m => (e -> e') -> Except e a -> m a
 liftErr h m = either (throwError . h) return (runExcept m)

@@ -19,8 +19,8 @@ import Sodium.Nucleus.Name
 convert :: NameStack t m => S.Program -> m (D.Program D.Expression)
 convert program = runReaderT (conv program) M.empty
 
-nameV = D.Name ["v"]
-nameF = D.Name ["f"]
+nameV = D.NameSpace "v" . D.Name
+nameF = D.NameSpace "f" . D.Name
 
 class Conv s d | s -> d where
 	conv :: NameStack t m => s -> ReaderT (M.Map S.Name S.PasType) m d

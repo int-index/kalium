@@ -45,6 +45,10 @@ instance Mask Name where
         k <- ask
         lift (k name)
 
+instance Mask Type where
+    -- no user-defined types yet
+    mask = return
+
 instance Mask Pattern where
     mask  = (_PAccess . _1) mask
          >=> _PTuple mask
@@ -83,3 +87,16 @@ instance Mask Body where
 instance Mask Bind where
     mask  =  bindPattern   mask
          >=> bindStatement mask
+
+instance Mask Func where
+    mask  =  funcSig       mask
+         >=> funcStatement mask
+
+instance Mask FuncSig where
+    mask  =  funcName    mask
+         >=> funcParams  mask
+         >=> funcRetType mask
+         >=> funcRetRefs mask
+
+instance Mask Program where
+    mask  =  programFuncs mask

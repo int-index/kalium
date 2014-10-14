@@ -41,7 +41,7 @@ inlineBody = evalState unconsBind where
         | topsm <- pats ^.. traversed . to (preview _PAccess)
         , Just tops <- sequence topsm
         -- TODO: generate a name!
-        , top <- (Name ["merge"] "a", Immutable)
+        , top <- (NameSpace "merge" (Name "a"), Immutable)
         = do let model =  Tuple (map (review _Access) tops)
              let pat   = _PAccess # top
              let expr  =  _Access # top

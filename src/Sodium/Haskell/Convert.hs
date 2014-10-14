@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances, FlexibleContexts  #-}
 {-# LANGUAGE TypeFamilies #-}
-module Sodium.Haskell.Convert (convert) where
+module Sodium.Haskell.Convert (convert, reserved) where
 
 import Data.List (genericReplicate)
 import Control.Monad
@@ -43,12 +43,19 @@ instance Conv S.Program where
 transformName :: S.Name -> D.Name
 transformName = \case
     S.NameMain -> "main"
-    S.Name namespaces cs -> concatMap (++"'") namespaces ++ cs
     S.NameOp op -> convOp op
-    S.Shadow name -> "shadow'" ++ transformName name
-    where reserved = flip elem
-               [ "let", "show", "read", "readLn", "getLine", "return", "foldl"
-               , "map", "filter", "undefined", "main", "import", "_"]
+    S.Name name -> name
+    S.NameSpace namespace name -> namespace ++ "'" ++ transformName name
+
+-- TODO: the complete list of unqualified names
+reserved = keywords ++ words
+    " show read readLn getLine return foldl \
+    \ map filter undefined foldM main       "
+keywords = words
+      " _ as case class data default deriving do else hiding \
+      \   if import in infix infixl infixr instance let      \
+      \   module newtype of qualified then type where        "
+
 
 data Name = Name S.Name S.Index
     deriving (Eq)

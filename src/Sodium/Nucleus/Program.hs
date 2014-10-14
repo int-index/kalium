@@ -3,13 +3,11 @@ module Sodium.Nucleus.Program where
 
 import qualified Data.Map as M
 
-type NameSpace = [String]
-
 data Name
-    = Name NameSpace String
+    = NameSpace String Name
     | NameMain
     | NameOp Operator
-    | Shadow Name
+    | Name String
     deriving (Eq, Ord, Show)
 
 data Operator

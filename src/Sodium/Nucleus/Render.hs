@@ -25,7 +25,8 @@ commas = parens . intercalate ", "
 
 instance Render Name where
     render = \case
-        Name namespaces cs -> concatMap (++"'") namespaces ++ cs
+        NameSpace namespace name -> namespace ++ "'" ++ render name
+        Name name -> name
         NameMain  -> tick : "main"
         NameOp op -> render op
 
