@@ -42,7 +42,7 @@ data Body a = Body
 data Statement a
     = Execute (Exec a)
     | ForStatement (ForCycle a)
-    | MultiIfStatement (MultiIf a)
+    | IfStatement (If a)
     | BodyStatement (Body a)
 
 assign :: Name -> a -> Statement a
@@ -53,7 +53,7 @@ class LiftStatement f where
 
 instance LiftStatement Exec     where statement = Execute
 instance LiftStatement ForCycle where statement = ForStatement
-instance LiftStatement MultiIf  where statement = MultiIfStatement
+instance LiftStatement If       where statement = IfStatement
 instance LiftStatement Body     where statement = BodyStatement
 
 data Exec a = Exec
@@ -69,7 +69,11 @@ data ForCycle a
     , _forBody :: Body a
     }
 
-data MultiIf a = MultiIf { _multiIfLeafs :: [(a, Body a)] }
+data If a = If
+    { _ifCond :: a
+    , _ifThen :: Body a
+    , _ifElse :: Body a
+    }
 
 data Expression
     = Atom Atom
@@ -86,7 +90,7 @@ makeLenses ''FuncSig
 makeLenses ''Func
 makeLenses ''Body
 makeLenses ''ForCycle
-makeLenses ''MultiIf
+makeLenses ''If
 makeLenses ''Program
 makeLenses ''Exec
 

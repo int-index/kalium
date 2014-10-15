@@ -21,7 +21,7 @@ instance Side Statement where
     side = \case
         Execute          a -> BodyStatement <$> side' a
         ForStatement     a -> BodyStatement <$> side' a
-        MultiIfStatement a -> BodyStatement <$> side' a
+        IfStatement      a -> BodyStatement <$> side' a
         BodyStatement    a -> BodyStatement <$> side' a
 
 
@@ -31,22 +31,24 @@ class Side' a where
 instance Side' Body where
     side' = side
 
-instance Side' MultiIf where
-    side' (MultiIf leafs) =
-        MultiIf `sideWith` (traverse (_1 sideExpression >=> _2 side) leafs)
+instance Side' If where
+    side' (If cond thenb elseb) = sideStatement $
+        If <$> sideExpression cond
+           <*> side thenb
+           <*> side elseb
+
 
 instance Side' ForCycle where
-    side' (ForCycle name range body) =
-        uncurry (ForCycle name) `sideWith`
-            liftA2 (,) (sideExpression range) (side body)
+    side' (ForCycle name range body) = sideStatement $
+        ForCycle name <$> sideExpression range <*> side body
 
 instance Side' Exec where
-    side' (Exec mname op exprs) =
-        Exec mname op `sideWith` mapM sideExpression exprs
+    side' (Exec mname op exprs) = sideStatement $
+        Exec mname op <$> mapM sideExpression exprs
 
-sideWith k w = do
+sideStatement w = do
     (a, unzip -> (vardecls, sidecalls)) <- runWriterT w
-    return $ Body (M.fromList vardecls) (sidecalls `snoc` statement (k a))
+    return $ Body (M.fromList vardecls) (sidecalls `snoc` statement a)
 
 sideExpression :: NameStack t m => Expression
                -> WriterT [(VarDecl, Statement Atom)] m Atom

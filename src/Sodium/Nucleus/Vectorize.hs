@@ -120,22 +120,19 @@ vectorizeStatement funcSigs = \case
                         (Vec.BodyStatement vecBody)
         let vecForCycle = Vec.ForCycle vecLambda (expTuple argIndices) vecRange
         return (changed, vecForCycle)
-    MultiIfStatement multiIf -> over _2 Vec.MultiIfStatement <$> do
-        (unzip -> (changedList, vecLeafGens))
-            <- forM (multiIf ^. multiIfLeafs)
-             $ \(expr, body) -> do
-                 vecExpr <- vectorizeAtom expr
-                 (changed, vecBodyGen) <- vectorizeBody funcSigs body
-                 let vecLeafGen = \results -> do
-                         vecBody <- vecBodyGen results
-                         return (vecExpr, Vec.BodyStatement vecBody)
-                 return (changed, vecLeafGen)
-        let changed = nub $ concat changedList
+    IfStatement ifb -> over _2 Vec.MultiIfStatement <$> do
+        vecCond <- vectorizeAtom (ifb ^. ifCond)
+        (changedThen, vecBodyThenGen) <- vectorizeBody funcSigs (ifb ^. ifThen)
+        (changedElse, vecBodyElseGen) <- vectorizeBody funcSigs (ifb ^. ifElse)
+        let changed = nub $ changedThen ++ changedElse
         let accessChanged = map Access changed
-        vecMultiIf <- lift
-             $  Vec.MultiIf
-            <$> mapM ($ accessChanged) vecLeafGens
-        return $ (changed, vecMultiIf)
+        vecBodyThen <- lift $ vecBodyThenGen accessChanged
+        vecBodyElse <- lift $ vecBodyElseGen accessChanged
+        let vecMultiIf = Vec.MultiIf
+                [ (vecCond, Vec.BodyStatement vecBodyThen)
+                , (Vec.Primary (LitBoolean True), Vec.BodyStatement vecBodyElse)
+                ]
+        return $ (changed, vecMultiIf :: Vec.MultiIf Vec.Statement)
 
 vectorizeAtom :: Atom -> R E Vec.Expression
 vectorizeAtom = \case

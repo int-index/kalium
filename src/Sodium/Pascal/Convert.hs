@@ -102,9 +102,6 @@ instance Conv S.PasType D.Type where
 
 binary op a b = D.Call op [a,b]
 
-multifyIf expr bodyThen bodyElse = D.MultiIf
-    [(expr, bodyThen), (D._Primary' # D.LitBoolean True, bodyElse)] 
-
 convReadLn [S.Access name] = do
     ty <- lookupType name
     clType <- conv ty
@@ -151,7 +148,7 @@ instance Conv S.Statement (D.Statement D.Expression) where
             <*> convBodyStatement statement
         S.IfBranch expr bodyThen mBodyElse
              -> fmap D.statement
-             $  multifyIf
+             $  D.If
             <$> conv expr
             <*> convBodyStatement bodyThen
             <*> (maybeBodySingleton <$> mapM conv mBodyElse)
@@ -171,8 +168,10 @@ instance Conv S.Statement (D.Statement D.Expression) where
                     <*> convBodyStatement body
             leafs <- mapM instLeaf leafs
             leafElse <- maybeBodySingleton <$> mapM conv mBodyElse
-            let statement = D.statement $ D.MultiIf
-                 $ snoc leafs (D._Primary' # D.LitBoolean True, leafElse)
+            let statement = foldr
+                    (\(cond, ifThen) ifElse ->
+                        D.statement $ D.If cond ifThen (bodySingleton ifElse))
+                     (D.statement leafElse) leafs
             return $ D.statement $ D.Body
                         (M.singleton clName clType)
                         [D.assign clName clExpr, statement]
