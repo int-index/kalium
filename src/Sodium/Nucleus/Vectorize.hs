@@ -28,9 +28,9 @@ vectorize program = do
     vecFuncs <- mapM (vectorizeFunc funcSigs) (program ^. programFuncs)
     return $ Vec.Program vecFuncs
 
-references :: FuncSig -> [(Name, Type)]
-references funcSig = do
-    (name, (by, ty)) <- funcSig ^. funcParams
+references :: [Name] -> [ByType] -> ([Name], [Type])
+references params paramTypes = unzip $ do
+    (name, (by, ty)) <- zip params paramTypes
     guard (by == ByReference)
     return (name, ty)
 
@@ -38,15 +38,15 @@ vectorizeFunc :: [FuncSig] -> Func Atom -> E Vec.Func
 vectorizeFunc funcSigs func = do
     (_, vecBodyGen)
             <- runReaderT (vectorizeBody funcSigs (func ^. funcBody))
-            $ initIndices (Vec.Index 0) (func ^. funcSig . funcParams . to M.fromList)
-    let (refnames, reftypes) = unzip (func ^. funcSig . to references)
+            $ M.fromList $ map (, Vec.Index 0) (func ^. funcParams)
+    let (refnames, reftypes) = references (func ^. funcParams) (func ^. funcSig . funcParamTypes)
     let vecFuncSig = Vec.FuncSig
           (func ^. funcSig . funcName)
-          (map (_2 %~ snd) $ func ^. funcSig . funcParams)
+          (map snd $ func ^. funcSig . funcParamTypes)
           (func ^. funcSig . funcRetType)
           reftypes
     vecBody <- vecBodyGen (func ^. funcResult : map Access refnames)
-    return $ Vec.Func vecFuncSig (Vec.BodyStatement vecBody)
+    return $ Vec.Func vecFuncSig (func ^. funcParams) (Vec.BodyStatement vecBody)
 
 patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
 expTuple = Vec.Tuple  . map (uncurry Vec.Access)
@@ -89,12 +89,12 @@ vectorizeStatement funcSigs = \case
         <$> vectorizeBody' funcSigs body
     Execute (Exec mres name args) -> do
         vecArgs <- mapM vectorizeAtom args
-        let byReference (_, (ByReference, _)) = \case
+        let byReference (ByReference, _) = \case
               Vec.Access name _ -> Just [name]
               _                 -> Nothing
-            byReference (_, (ByValue, _)) = const (Just [])
+            byReference (ByValue, _) = const (Just [])
         funcSig <- lift (lookupFuncSig funcSigs name)
-        sidenames <- case zipWith byReference (funcSig ^. funcParams) vecArgs
+        sidenames <- case zipWith byReference (funcSig ^. funcParamTypes) vecArgs
                           & sequence
                      of Nothing -> throwError NoReference
                         Just ns -> return (concat ns)

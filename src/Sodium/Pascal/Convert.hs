@@ -30,7 +30,7 @@ instance Conv S.Program (D.Program D.Expression) where
 		clMain <- do
 			clBody <- conv (VB vars body)
 			let clFuncSig = D.FuncSig D.NameMain [] D.TypeUnit
-			return $ D.Func clFuncSig clBody (D._Primary # D.LitUnit)
+			return $ D.Func clFuncSig [] clBody (D._Primary # D.LitUnit)
 		clFuncs <- mapM conv funcs
 		return $ D.Program (clMain:clFuncs)
 
@@ -64,11 +64,11 @@ instance Conv S.Func (D.Func D.Expression) where
                     retType <- conv ty
                     return (D._Access # retName, retType, [S.VarDecl [name] ty])
             let paramDecls = splitParamDecls params
-            clParamDecls <- mapM conv paramDecls
-            let clFuncSig = D.FuncSig (nameF name) clParamDecls retType
+            (clParams, clParamTypes) <- unzip <$> mapM conv paramDecls
+            let clFuncSig = D.FuncSig (nameF name) clParamTypes retType
             clBody <- local (M.union (M.fromList $ map paramDeclToTup paramDecls))
                     $ conv (VB (vars ++ retVars) body)
-            return $ D.Func clFuncSig clBody retExpr
+            return $ D.Func clFuncSig clParams clBody retExpr
 
 splitVarDecls vardecls
     = [VarDecl name t | S.VarDecl names t <- vardecls, name <- names]

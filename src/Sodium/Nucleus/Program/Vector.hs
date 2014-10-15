@@ -17,17 +17,15 @@ data Program
 data FuncSig
     = FuncSig
     { _funcName :: Name
-    , _funcParams  :: Params
+    , _funcParamTypes :: [Type]
     , _funcRetType :: Type
     , _funcRetRefs :: [Type]
     } deriving (Eq, Show)
 
-type Params
-    = [(Name, Type)]
-
 data Func
     = Func
     { _funcSig :: FuncSig
+    , _funcParams :: [Name]
     , _funcStatement :: Statement
     } deriving (Eq, Show)
 

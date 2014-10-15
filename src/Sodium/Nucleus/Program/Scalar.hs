@@ -16,7 +16,7 @@ data Program a = Program
 data FuncSig
     = FuncSig
     { _funcName :: Name
-    , _funcParams  :: Params
+    , _funcParamTypes :: [ByType]
     , _funcRetType :: Type
     } deriving (Eq, Show)
 
@@ -27,11 +27,9 @@ data By
 
 type ByType = (By, Type)
 
-type Params
-    = [(Name, ByType)]
-
 data Func a = Func
     { _funcSig :: FuncSig
+    , _funcParams :: [Name]
     , _funcBody :: Body a
     , _funcResult :: Atom
     }

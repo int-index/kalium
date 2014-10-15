@@ -46,9 +46,7 @@ instance Recmappable Statement where
     recmap = recmap_second
 
 instance Recmappable Func where
-    recmap rm func
-        = localize rm (func ^. funcSig . funcParams . to M.fromList)
-        $ funcStatement (recmap rm) func
+    recmap rm func = funcStatement (recmap rm) func
 
 instance Recmappable Program where
     recmap rm = (programFuncs . traversed) (recmap rm)
