@@ -40,7 +40,7 @@ cleanUsage _ pat = pat
 cleanStatement :: Statement -> Statement
 cleanStatement = over _ForStatement cleanForCycle
   where
-    cleanForCycle :: ForCycle -> ForCycle
+    cleanForCycle :: ForCycle Statement -> ForCycle Statement
     cleanForCycle forCycle
       = forCycle &  forLambda . lamPatterns . traversed
                  %~ cleanUsage (forCycle ^. forLambda . lamAction)

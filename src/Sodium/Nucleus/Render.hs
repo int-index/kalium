@@ -110,7 +110,7 @@ instance Render Body where
         [ unwords ["=>", render (body ^. bodyResult)]
         ]
 
-instance Render Bind where
+instance Render (Bind Statement) where
     render bind = render (bind ^. bindPattern)
                 ++ " =\n"
                 ++ indent (render (bind ^. bindStatement))
@@ -157,5 +157,5 @@ instance Render (MultiIf Expression) where
                 = "| " ++ render cond ++ ": " ++ render expression ++ ";"
         in "(" ++ unwords (map rLeaf $ multiIf ^. multiIfLeafs) ++ ")"
 
-instance Render ForCycle where
+instance Render (ForCycle a) where
     render _ = "LOOP"

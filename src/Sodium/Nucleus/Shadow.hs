@@ -38,7 +38,7 @@ instance Unshadow Statement where
 instance Unshadow a => Unshadow (MultiIf a) where
     unsh  = (multiIfLeafs . traversed . _2) unsh
 
-instance Unshadow ForCycle where
+instance (Mask a, Unshadow a) => Unshadow (ForCycle a) where
     unsh = execStateT $ do
         let getBound = S.unions <$> uses
                 (forLambda . lamPatterns)

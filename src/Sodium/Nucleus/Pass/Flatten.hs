@@ -12,12 +12,12 @@ flatten = over recmapped flattenBody
 flattenBody :: Body -> Body
 flattenBody = bodyBinds %~ concatMap flattenBind
 
-flattenBodyBind :: Body -> ([Bind], Body)
+flattenBodyBind :: Body -> ([Bind Statement], Body)
 flattenBodyBind body = (freeBinds, set bodyBinds closedBinds body)
     where (freeBinds, closedBinds) = span isFree (body ^. bodyBinds)
           isFree = view (bindPattern . to patBound . to null)
 
-flattenBind :: Bind -> [Bind]
+flattenBind :: Bind Statement -> [Bind Statement]
 flattenBind bind = maybe [bind] id $ do
     BodyStatement body <- return (bind ^. bindStatement)
     let (binds, body') = flattenBodyBind body

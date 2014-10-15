@@ -104,8 +104,8 @@ instance Conv S.Body where
         return $ D.pureLet hsValueDefs hsRetValue
 
 
-instance Conv S.ForCycle where
-    type Norm S.ForCycle = H.Exp
+instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.ForCycle a) where
+    type Norm (S.ForCycle a) = H.Exp
     conv (S.ForCycle lam argExpr exprRange) = do
         hsRange <- conv exprRange
         hsArgExpr <- conv argExpr
@@ -117,7 +117,7 @@ instance Conv S.ForCycle where
             , hsRange
             ]
 
-    type Pure S.ForCycle = H.Exp
+    type Pure (S.ForCycle a) = H.Exp
     pureconv (S.ForCycle lam argExpr exprRange) = do
         hsRange <- pureconv exprRange
         hsArgExpr <- pureconv argExpr
@@ -147,16 +147,16 @@ instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.MultiIf a) where
         leafGens <- mapM convLeaf leafs
         return $ D.multiIf leafGens
 
-instance Conv S.Bind where
+instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.Bind a) where
 
-    type Norm S.Bind = H.Stmt
+    type Norm (S.Bind a) = H.Stmt
     conv (S.Bind S.PWildCard statement) = D.doExecute <$> conv statement
     conv (S.Bind pattern statement)
          =  D.doBind
         <$> conv pattern
         <*> conv statement
 
-    type Pure S.Bind = H.Decl
+    type Pure (S.Bind a) = H.Decl
     pureconv (S.Bind pattern statement)
          =  D.valueDef
         <$> pureconv pattern
@@ -209,13 +209,13 @@ instance Conv S.Func where
         <$> pureconv clBody
         where paramNames = map transformName (map fst params)
 
-instance Conv S.Lambda where
-    type Norm S.Lambda = H.Exp
+instance (Conv a, Norm a ~ H.Exp, Pure a ~ H.Exp) => Conv (S.Lambda a) where
+    type Norm (S.Lambda a) = H.Exp
     conv (S.Lambda pats act) = H.Lambda H.noLoc
         <$> mapM conv pats
         <*> conv act
 
-    type Pure S.Lambda = H.Exp
+    type Pure (S.Lambda a) = H.Exp
     pureconv (S.Lambda pats act) = H.Lambda H.noLoc
         <$> mapM pureconv pats
         <*> pureconv act

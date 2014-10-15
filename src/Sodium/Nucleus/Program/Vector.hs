@@ -34,35 +34,35 @@ data Func
 data Body
     = Body
     { _bodyVars  :: Vars
-    , _bodyBinds :: [Bind]
+    , _bodyBinds :: [Bind Statement]
     , _bodyResult :: Expression
     } deriving (Eq, Show)
 
-data Bind
+data Bind a
     = Bind
     { _bindPattern :: Pattern
-    , _bindStatement :: Statement
+    , _bindStatement :: a
     } deriving (Eq, Show)
 
 data Statement
     = Assign Expression
     | Execute Name [Expression]
-    | ForStatement ForCycle
+    | ForStatement (ForCycle Statement)
     | MultiIfStatement (MultiIf Statement)
     | BodyStatement Body
     deriving (Eq, Show)
 
-data ForCycle
+data ForCycle a
     = ForCycle
-    { _forLambda  :: Lambda
+    { _forLambda  :: Lambda a
     , _forArgExpr :: Expression
     , _forRange   :: Expression
     } deriving (Eq, Show)
 
-data Lambda
+data Lambda a
     = Lambda
     { _lamPatterns :: [Pattern]
-    , _lamAction :: Statement
+    , _lamAction :: a
     } deriving (Eq, Show)
 
 data MultiIf a

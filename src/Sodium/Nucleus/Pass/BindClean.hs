@@ -15,14 +15,14 @@ bindClean = over recmapped bindCleanBody
 bindCleanBody :: Body -> Body
 bindCleanBody = bodyBinds . traversed %~ bindCleanBind
 
-bindCleanBind :: Bind -> Bind
+bindCleanBind :: Bind Statement -> Bind Statement
 bindCleanBind bind
     = maybe bind id
     $ getFirst . mconcat . map First
     $ map (subst bind)
     $ patClean (bind ^. bindPattern)
 
-subst :: Bind -> (Pattern, Cleaner) -> Maybe Bind
+subst :: Bind Statement -> (Pattern, Cleaner) -> Maybe (Bind Statement)
 subst bind (pat, cleaner)
     = bind & bindPattern .~ pat
            & bindStatement (cleanRet cleaner)
@@ -69,7 +69,7 @@ instance CleanRet Body where
 instance CleanRet (MultiIf Statement) where
     cleanRet cc  = (multiIfLeafs . traversed . _2) (cleanRet cc)
 
-instance CleanRet ForCycle where
+instance CleanRet (ForCycle Statement) where
     -- even if the value is not
     -- used outside the loop, it
     -- still needs to be passed
