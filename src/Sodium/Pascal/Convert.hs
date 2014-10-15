@@ -34,7 +34,7 @@ instance Conv S.Program (D.Program D.Expression) where
 		clFuncs <- mapM conv funcs
 		return $ D.Program (clMain:clFuncs)
 
-bodySingleton s = D.Body M.empty [s]
+bodySingleton = D.Body M.empty
 
 convBodyStatement statement
 	 =  bodySingleton
@@ -51,7 +51,7 @@ instance Conv VB (D.Body D.Expression) where
         = D.Body
        <$> (M.fromList <$> mapM conv varDecls)
        <*> local (M.union (M.fromList $ map varDeclToTup varDecls))
-            (mapM conv statements)
+            (D.Group <$> mapM conv statements)
        where varDecls = splitVarDecls vardecls
 
 instance Conv S.Func (D.Func D.Expression) where
@@ -174,7 +174,7 @@ instance Conv S.Statement (D.Statement D.Expression) where
                      (D.statement leafElse) leafs
             return $ D.statement $ D.Body
                         (M.singleton clName clType)
-                        [D.assign clName clExpr, statement]
+                        (D.Group [D.assign clName clExpr, statement])
 
 inumber intSection = D.LitInteger $ parseInt intSection
 fnumber intSection fracSection = D.LitDouble $ parseFrac intSection fracSection

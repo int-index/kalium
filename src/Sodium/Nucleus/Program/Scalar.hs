@@ -36,7 +36,7 @@ data Func a = Func
 
 data Body a = Body
     { _bodyVars :: Vars
-    , _bodyStatements :: [Statement a]
+    , _bodyStatement :: Statement a
     }
 
 data Statement a
@@ -44,6 +44,7 @@ data Statement a
     | ForStatement (ForCycle a)
     | IfStatement (If a)
     | BodyStatement (Body a)
+    | Group [Statement a]
 
 assign :: Name -> a -> Statement a
 assign name a = statement $ Exec (Just name) (NameOp OpId) [a]
@@ -84,7 +85,7 @@ data Atom
     | Primary Literal
 
 bodyEmpty :: Body a
-bodyEmpty = Body M.empty []
+bodyEmpty = Body M.empty (Group [])
 
 makeLenses ''FuncSig
 makeLenses ''Func

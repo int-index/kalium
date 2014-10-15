@@ -11,6 +11,8 @@ import qualified Data.Map as M
 import Sodium.Nucleus.Program.Scalar
 import qualified Sodium.Nucleus.Program.Vector as Vec
 
+import Debug.Trace
+
 data Error
     = NoAccess Name Vec.Indices
     | NoFunction Name
@@ -51,39 +53,74 @@ vectorizeFunc funcSigs func = do
 patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
 expTuple = Vec.Tuple  . map (uncurry Vec.Access)
 
-vectorizeBody :: [FuncSig] -> Body Atom -> R E ([Name], [Atom] -> E Vec.Body)
-vectorizeBody funcSigs body = do
+vectorizeScope :: [FuncSig] -> Vars -> Statement Atom -> R E ([Name], [Atom] -> E Vec.Body)
+vectorizeScope funcSigs vars statement = do
     closure <- ask
     lift $ do
-        let isLocal = flip elem (body ^. bodyVars . to M.keys)
-        let indices = initIndices Vec.Uninitialized (body ^. bodyVars) `M.union` closure
-        (vecStatements, indices')
-                <- flip runStateT indices
-                 $ mapM (vectorizeStatement' funcSigs) (body ^. bodyStatements)
+        let isLocal = flip elem (M.keys vars)
+        let indices = initIndices Vec.Uninitialized vars `M.union` closure
+        (vecStatement, indices')
+                 <- (`runStateT` indices) $ do
+                        (changed, vecStatement) <- readerToState (vectorizeStatement funcSigs statement)
+                        changed' <- mapM registerIndexUpdate changed
+                        return (changed', vecStatement)
         let changed
                 = M.keys
                 $ M.filterWithKey ((&&) . not . isLocal)
                 $ M.intersectionWith (/=)
                 indices indices'
         let vecBodyGen results
-                = Vec.Body (body ^. bodyVars)
-                (map (\(indices, expr) -> Vec.Bind (patTuple indices) expr) vecStatements)
+                = Vec.Body vars
+                [(\(indices, expr) -> Vec.Bind (patTuple indices) expr) vecStatement]
                 <$> runReaderT (Vec.Tuple <$> mapM vectorizeAtom results) indices'
         return (changed, vecBodyGen)
 
-vectorizeBody' :: [FuncSig] -> Body Atom -> R E ([Name], Vec.Body)
-vectorizeBody' funcSigs body = do
-    (changed, vecBodyGen) <- vectorizeBody funcSigs body
+vectorizeVS funcSigs vars statement = do
+    vectorizeScope funcSigs vars statement
+
+vectorizeVS' :: [FuncSig] -> Vars -> Statement Atom -> R E ([Name], Vec.Body)
+vectorizeVS' funcSigs vars statement = do
+    (changed, vecBodyGen) <- vectorizeVS funcSigs vars statement
     vecBody <- lift $ vecBodyGen (map Access changed)
     return (changed, vecBody)
 
+
+
+
+vectorizeBody :: [FuncSig] -> Body Atom -> R E ([Name], [Atom] -> E Vec.Body)
+vectorizeBody funcSigs body = vectorizeVS funcSigs (body ^. bodyVars) (body ^. bodyStatement)
+
+vectorizeBody' :: [FuncSig] -> Body Atom -> R E ([Name], Vec.Body)
+vectorizeBody' funcSigs body = vectorizeVS' funcSigs (body ^. bodyVars) (body ^. bodyStatement)
+
+
+
+
 vectorizeStatement' :: [FuncSig] -> Statement Atom -> S E ([(Name, Vec.Index)], Vec.Statement)
 vectorizeStatement' funcSigs statement
-    = _1 (mapM registerIndexUpdate)
-    =<< readerToState (vectorizeStatement funcSigs statement)
+    = do
+        (changed, vecStatement) <- readerToState (vectorizeStatement funcSigs statement)
+        changed' <- mapM registerIndexUpdate changed
+        return (changed', vecStatement)
 
 vectorizeStatement :: [FuncSig] -> Statement Atom -> R E ([Name], Vec.Statement)
 vectorizeStatement funcSigs = \case
+    Group statements -> do
+        indices <- trace "group!" ask
+        lift $ do
+            (vecStatements, indices')
+                    <- flip runStateT indices
+                     $ mapM (vectorizeStatement' funcSigs) statements
+            let changed
+                    = M.keys
+                    $ M.filter id
+                    $ M.intersectionWith (/=)
+                    indices indices'
+            vecBody
+                    <- Vec.Body M.empty
+                    (map (\(indices, expr) -> Vec.Bind (patTuple indices) expr) vecStatements)
+                    <$> runReaderT (Vec.Tuple <$> mapM vectorizeAtom (map Access changed)) indices'
+            return (changed, Vec.BodyStatement vecBody)
     BodyStatement body
          -> over _2 Vec.BodyStatement
         <$> vectorizeBody' funcSigs body
@@ -157,7 +194,7 @@ lookupFuncSig funcSigs name
 
 registerIndexUpdate :: Name -> S E (Name, Vec.Index)
 registerIndexUpdate name = do
-    index <- readerToState (lookupIndex name) >>= indexUpdate
+    index <- readerToState (lookupIndex name >>= indexUpdate)
     modify $ M.insert name index
     return (name, index)
     where indexUpdate = \case

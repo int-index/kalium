@@ -15,7 +15,7 @@ class Side a where
 
 instance Side Program where side = (programFuncs . traversed) side
 instance Side Func    where side = funcBody side
-instance Side Body    where side = (bodyStatements . traversed) side
+instance Side Body    where side = bodyStatement side
 
 instance Side Statement where
     side = \case
@@ -23,6 +23,7 @@ instance Side Statement where
         ForStatement     a -> BodyStatement <$> side' a
         IfStatement      a -> BodyStatement <$> side' a
         BodyStatement    a -> BodyStatement <$> side' a
+        Group as -> Group <$> traverse side as
 
 
 class Side' a where
@@ -37,7 +38,6 @@ instance Side' If where
            <*> side thenb
            <*> side elseb
 
-
 instance Side' ForCycle where
     side' (ForCycle name range body) = sideStatement $
         ForCycle name <$> sideExpression range <*> side body
@@ -48,7 +48,7 @@ instance Side' Exec where
 
 sideStatement w = do
     (a, unzip -> (vardecls, sidecalls)) <- runWriterT w
-    return $ Body (M.fromList vardecls) (sidecalls `snoc` statement a)
+    return $ Body (M.fromList vardecls) (Group (sidecalls `snoc` statement a))
 
 sideExpression :: NameStack t m => Expression
                -> WriterT [(VarDecl, Statement Atom)] m Atom
