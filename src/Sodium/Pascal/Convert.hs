@@ -34,21 +34,13 @@ instance Conv S.Program (D.Program D.Expression) where
 		clFuncs <- mapM conv funcs
 		return $ D.Program (clMain:clFuncs)
 
-bodySingleton = D.Body M.empty
-
-convBodyStatement statement
-	 =  bodySingleton
-	<$> conv statement
-
-maybeBodySingleton
-	= maybe D.bodyEmpty
-	$ bodySingleton
+maybeStatement = maybe (D.Group []) id
 
 data VB = VB S.Vars S.Body
 
-instance Conv VB (D.Body D.Expression) where
+instance Conv VB (D.Scope D.Expression) where
     conv (VB vardecls statements)
-        = D.Body
+        = D.Scope
        <$> (M.fromList <$> mapM conv varDecls)
        <*> local (M.union (M.fromList $ map varDeclToTup varDecls))
             (D.Group <$> mapM conv statements)
@@ -66,9 +58,9 @@ instance Conv S.Func (D.Func D.Expression) where
             let paramDecls = splitParamDecls params
             (clParams, clParamTypes) <- unzip <$> mapM conv paramDecls
             let clFuncSig = D.FuncSig (nameF name) clParamTypes retType
-            clBody <- local (M.union (M.fromList $ map paramDeclToTup paramDecls))
+            clScope <- local (M.union (M.fromList $ map paramDeclToTup paramDecls))
                     $ conv (VB (vars ++ retVars) body)
-            return $ D.Func clFuncSig clParams clBody retExpr
+            return $ D.Func clFuncSig clParams clScope retExpr
 
 splitVarDecls vardecls
     = [VarDecl name t | S.VarDecl names t <- vardecls, name <- names]
@@ -145,13 +137,13 @@ instance Conv S.Statement (D.Statement D.Expression) where
              $  D.ForCycle
             <$> return (nameV name)
             <*> (binary (D.NameOp D.OpRange) <$> conv fromExpr <*> conv toExpr)
-            <*> convBodyStatement statement
+            <*> conv statement
         S.IfBranch expr bodyThen mBodyElse
              -> fmap D.statement
              $  D.If
             <$> conv expr
-            <*> convBodyStatement bodyThen
-            <*> (maybeBodySingleton <$> mapM conv mBodyElse)
+            <*> conv bodyThen
+            <*> (maybeStatement <$> mapM conv mBodyElse)
         S.CaseBranch expr leafs mBodyElse -> do
             clExpr <- conv expr
             clName <- namepop
@@ -165,14 +157,14 @@ instance Conv S.Statement (D.Statement D.Expression) where
             let instLeaf (exprs, body)
                      =  (,)
                     <$> (foldl1 (binary (D.NameOp D.OpOr)) <$> mapM instRange exprs)
-                    <*> convBodyStatement body
+                    <*> conv body
             leafs <- mapM instLeaf leafs
-            leafElse <- maybeBodySingleton <$> mapM conv mBodyElse
+            leafElse <- maybeStatement <$> mapM conv mBodyElse
             let statement = foldr
                     (\(cond, ifThen) ifElse ->
-                        D.statement $ D.If cond ifThen (bodySingleton ifElse))
-                     (D.statement leafElse) leafs
-            return $ D.statement $ D.Body
+                        D.statement $ D.If cond ifThen ifElse)
+                     leafElse leafs
+            return $ D.statement $ D.Scope
                         (M.singleton clName clType)
                         (D.Group [D.assign clName clExpr, statement])
 

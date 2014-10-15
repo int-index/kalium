@@ -38,8 +38,9 @@ references params paramTypes = unzip $ do
 
 vectorizeFunc :: [FuncSig] -> Func Atom -> E Vec.Func
 vectorizeFunc funcSigs func = do
+    let r = vectorizeScope funcSigs (func ^. funcScope)
     (_, vecBodyGen)
-            <- runReaderT (vectorizeBody funcSigs (func ^. funcBody))
+            <- runReaderT r
             $ M.fromList $ map (, Vec.Index 0) (func ^. funcParams)
     let (refnames, reftypes) = references (func ^. funcParams) (func ^. funcSig . funcParamTypes)
     let vecFuncSig = Vec.FuncSig
@@ -53,15 +54,16 @@ vectorizeFunc funcSigs func = do
 patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
 expTuple = Vec.Tuple  . map (uncurry Vec.Access)
 
-vectorizeScope :: [FuncSig] -> Vars -> Statement Atom -> R E ([Name], [Atom] -> E Vec.Body)
-vectorizeScope funcSigs vars statement = do
+vectorizeScope :: [FuncSig] -> Scope Atom -> R E ([Name], [Atom] -> E Vec.Body)
+vectorizeScope funcSigs scope = do
+    let vars = scope ^. scopeVars
     closure <- ask
     lift $ do
         let isLocal = flip elem (M.keys vars)
         let indices = initIndices Vec.Uninitialized vars `M.union` closure
         (vecStatement, indices')
                  <- (`runStateT` indices) $ do
-                        (changed, vecStatement) <- readerToState (vectorizeStatement funcSigs statement)
+                        (changed, vecStatement) <- readerToState (vectorizeStatement funcSigs (scope ^. scopeStatement))
                         changed' <- mapM registerIndexUpdate changed
                         return (changed', vecStatement)
         let changed
@@ -74,26 +76,6 @@ vectorizeScope funcSigs vars statement = do
                 [(\(indices, expr) -> Vec.Bind (patTuple indices) expr) vecStatement]
                 <$> runReaderT (Vec.Tuple <$> mapM vectorizeAtom results) indices'
         return (changed, vecBodyGen)
-
-vectorizeVS funcSigs vars statement = do
-    vectorizeScope funcSigs vars statement
-
-vectorizeVS' :: [FuncSig] -> Vars -> Statement Atom -> R E ([Name], Vec.Body)
-vectorizeVS' funcSigs vars statement = do
-    (changed, vecBodyGen) <- vectorizeVS funcSigs vars statement
-    vecBody <- lift $ vecBodyGen (map Access changed)
-    return (changed, vecBody)
-
-
-
-
-vectorizeBody :: [FuncSig] -> Body Atom -> R E ([Name], [Atom] -> E Vec.Body)
-vectorizeBody funcSigs body = vectorizeVS funcSigs (body ^. bodyVars) (body ^. bodyStatement)
-
-vectorizeBody' :: [FuncSig] -> Body Atom -> R E ([Name], Vec.Body)
-vectorizeBody' funcSigs body = vectorizeVS' funcSigs (body ^. bodyVars) (body ^. bodyStatement)
-
-
 
 
 vectorizeStatement' :: [FuncSig] -> Statement Atom -> S E ([(Name, Vec.Index)], Vec.Statement)
@@ -121,9 +103,10 @@ vectorizeStatement funcSigs = \case
                     (map (\(indices, expr) -> Vec.Bind (patTuple indices) expr) vecStatements)
                     <$> runReaderT (Vec.Tuple <$> mapM vectorizeAtom (map Access changed)) indices'
             return (changed, Vec.BodyStatement vecBody)
-    BodyStatement body
-         -> over _2 Vec.BodyStatement
-        <$> vectorizeBody' funcSigs body
+    ScopeStatement scope -> over _2 Vec.BodyStatement <$> do
+        (changed, vecBodyGen) <- vectorizeScope funcSigs scope
+        vecBody <- lift $ vecBodyGen (map Access changed)
+        return (changed, vecBody)
     Execute (Exec mres name args) -> do
         vecArgs <- mapM vectorizeAtom args
         let byReference (ByReference, _) = \case
@@ -149,18 +132,17 @@ vectorizeStatement funcSigs = \case
     ForStatement forCycle -> over _2 Vec.ForStatement <$> do
         vecRange <- vectorizeAtom (forCycle ^. forRange)
         let np f = f (forCycle ^. forName) Vec.Immutable
-        (changed, vecBody)
+        (changed, vecStatement)
             <- local (np M.insert)
-             $ vectorizeBody' funcSigs (forCycle ^. forBody)
+             $ vectorizeStatement funcSigs (forCycle ^. forStatement)
         argIndices <- closedIndices changed
-        let vecLambda = Vec.Lambda [patTuple argIndices, np Vec.PAccess]
-                        (Vec.BodyStatement vecBody)
+        let vecLambda = Vec.Lambda [patTuple argIndices, np Vec.PAccess] vecStatement
         let vecForCycle = Vec.ForCycle vecLambda (expTuple argIndices) vecRange
         return (changed, vecForCycle)
     IfStatement ifb -> over _2 Vec.MultiIfStatement <$> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
-        (changedThen, vecBodyThenGen) <- vectorizeBody funcSigs (ifb ^. ifThen)
-        (changedElse, vecBodyElseGen) <- vectorizeBody funcSigs (ifb ^. ifElse)
+        (changedThen, vecBodyThenGen) <- vectorizeScope funcSigs (Scope M.empty (ifb ^. ifThen))
+        (changedElse, vecBodyElseGen) <- vectorizeScope funcSigs (Scope M.empty (ifb ^. ifElse))
         let changed = nub $ changedThen ++ changedElse
         let accessChanged = map Access changed
         vecBodyThen <- lift $ vecBodyThenGen accessChanged

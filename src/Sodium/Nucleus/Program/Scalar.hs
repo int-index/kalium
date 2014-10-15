@@ -30,20 +30,15 @@ type ByType = (By, Type)
 data Func a = Func
     { _funcSig :: FuncSig
     , _funcParams :: [Name]
-    , _funcBody :: Body a
+    , _funcScope :: Scope a
     , _funcResult :: Atom
-    }
-
-data Body a = Body
-    { _bodyVars :: Vars
-    , _bodyStatement :: Statement a
     }
 
 data Statement a
     = Execute (Exec a)
     | ForStatement (ForCycle a)
     | IfStatement (If a)
-    | BodyStatement (Body a)
+    | ScopeStatement (Scope a)
     | Group [Statement a]
 
 assign :: Name -> a -> Statement a
@@ -55,7 +50,7 @@ class LiftStatement f where
 instance LiftStatement Exec     where statement = Execute
 instance LiftStatement ForCycle where statement = ForStatement
 instance LiftStatement If       where statement = IfStatement
-instance LiftStatement Body     where statement = BodyStatement
+instance LiftStatement Scope    where statement = ScopeStatement
 
 data Exec a = Exec
     { _execRet :: Maybe Name
@@ -67,13 +62,18 @@ data ForCycle a
     = ForCycle
     { _forName :: Name
     , _forRange :: a
-    , _forBody :: Body a
+    , _forStatement :: Statement a
     }
 
 data If a = If
     { _ifCond :: a
-    , _ifThen :: Body a
-    , _ifElse :: Body a
+    , _ifThen :: Statement a
+    , _ifElse :: Statement a
+    }
+
+data Scope a = Scope
+    { _scopeVars :: Vars
+    , _scopeStatement :: Statement a
     }
 
 data Expression
@@ -84,12 +84,9 @@ data Atom
     = Access Name
     | Primary Literal
 
-bodyEmpty :: Body a
-bodyEmpty = Body M.empty (Group [])
-
 makeLenses ''FuncSig
 makeLenses ''Func
-makeLenses ''Body
+makeLenses ''Scope
 makeLenses ''ForCycle
 makeLenses ''If
 makeLenses ''Program
