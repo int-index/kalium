@@ -3,7 +3,7 @@ module Sodium (translate) where
 
 import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.Shadow      (unshadow)
-import Sodium.Nucleus.Side        (side)
+import Sodium.Nucleus.Atomize     (atomize)
 import Sodium.Nucleus.Strip (strip)
 import Sodium.Nucleus.Pass.Flatten     (flatten)
 import Sodium.Nucleus.Pass.JoinMultiIf (joinMultiIf)
@@ -32,7 +32,7 @@ import Debug.Trace
 translate :: MonadError E.Error m => String -> m String
 translate src = do
     pas <- liftErr E.parseError (parse src)
-    let scalar = (side <=< P.convert) pas
+    let scalar = (atomize <=< P.convert) pas
           `evalState` map (V.NameSpace "g" . V.Name . show) [0..]
     vector <- liftErr E.vectorizeError (vectorize scalar)
     let noshadow = unshadow vector
