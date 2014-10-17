@@ -108,6 +108,9 @@ vectorizeStatement funcSigs = \case
                      of Nothing -> throwError NoReference
                         Just ns -> return (concat ns)
         let resnames = maybe empty pure mres
+        -- BUG: if a function is called without a return value (mres = Nothing)
+        -- then its value isn't bound anywhere, resulting in a pattern tuple
+        -- with incorrect amount of variables
 
         -- TODO: purity flag in function signature
         let impure = case name of
