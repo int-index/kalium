@@ -3,7 +3,7 @@ module Sodium (translate) where
 
 import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.Shadow      (unshadow)
-import Sodium.Nucleus.Atomize     (atomize)
+import Sodium.Nucleus.Atomize     (atomize')
 import Sodium.Nucleus.Strip (strip)
 import Sodium.Nucleus.Pass.Flatten     (flatten)
 import Sodium.Nucleus.Pass.JoinMultiIf (joinMultiIf)
@@ -23,18 +23,20 @@ import qualified Sodium.Nucleus.Program.Vector as V
 import qualified Sodium.Nucleus.Render as R
 
 import Data.Bool
+import Control.Applicative
 import Control.Monad.Writer hiding (pass)
 import Control.Monad.State
 import Control.Monad.Except
 
 import Debug.Trace
 
-translate :: MonadError E.Error m => String -> m String
+translate :: (Applicative m, MonadError E.Error m) => String -> m String
 translate src = do
     pas <- liftErr E.parseError (parse src)
-    let scalar = (atomize <=< P.convert) pas
-          `evalState` map (V.NameSpace "g" . V.Name . show) [0..]
-    vector <- liftErr E.vectorizeError (vectorize scalar)
+    let namestack0 = map (V.NameSpace "g" . V.Name . show) [0..]
+    (scalar, namestack1) <- P.convert pas `runStateT` namestack0
+    (atomic, _) <- liftErr E.typeError (atomize' scalar `runStateT` namestack1)
+    vector <- liftErr E.vectorizeError (vectorize atomic)
     let noshadow = unshadow vector
     let optimal = let (a, log) = runWriter (closureM pass noshadow)
                   in trace (concat $ map R.render log) a

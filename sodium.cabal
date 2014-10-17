@@ -20,6 +20,7 @@ library
                        Sodium.Nucleus.Program
                        Sodium.Nucleus.Program.Scalar
                        Sodium.Nucleus.Program.Vector
+                       Sodium.Nucleus.Scalar.Typecheck
                        Sodium.Nucleus.Vectorize
                        Sodium.Nucleus.Atomize
                        Sodium.Nucleus.Shadow

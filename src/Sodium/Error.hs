@@ -6,6 +6,7 @@ import qualified Data.Map as M
 
 import qualified Text.Parsec as P
 import qualified Sodium.Nucleus.Vectorize as V
+import qualified Sodium.Nucleus.Scalar.Typecheck as T
 
 data Error = ParseError String Int Int
            | NoAccess   N.Name [N.Name]
@@ -27,3 +28,8 @@ vectorizeError = \case
     V.NoFunction name       -> NoFunction name
     V.UpdateImmutable name  -> UpdateImmutable name
     V.NoReference           -> NoReference
+
+typeError :: T.TypeError -> Error
+typeError = \case
+    T.NoAccess name vars -> NoAccess name (M.keys vars)
+    T.NoFunction name    -> NoFunction name
