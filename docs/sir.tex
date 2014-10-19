@@ -1,0 +1,52 @@
+\documentclass [a4paper] {article}
+\title { Sir: Sodium Internal Representation }
+\author { Index Int }
+
+\usepackage{indentfirst}
+
+\begin {document}
+
+\maketitle
+
+\emph{Sodium} defines several internal (intermediate) representations. Thus
+translation can be split into simpler steps: parsing, source conversion,
+atomization, vectorization, target conversion, and rendering. The intermediate
+representations between source and target conversions are called internal and
+their specifications are provided in this document.
+
+\section { The Scalar Representation }
+
+The scalar representation comes in two flavors: non-atomic and atomic.
+Translation of the former to the latter is called \emph{atomization}. The only
+difference between the two is that in the atomic scalar representation
+every expression is atomic, whereas in the non-atomic one some are not.
+
+\subsection { Program Structure }
+
+\begin {description}
+
+\item [Program] is a set of functions. Every function is uniquely identified by
+its signature, so a program that contains multiple functions with the same
+signature is ill-formed.
+
+\item [Function signature] contains the name of that function, types of its
+parameters and the type of its result (return value).
+
+\item [Function] consists of its signature, parameter list and a body. The
+latter consists of a scope, a statement and an atomic expression---the result
+that the function returns. Every parameter can be passed either by value or by
+reference, and it is reflected in the signature.
+
+The function defines two nested scopes:
+\begin {enumerate}
+\item Parameters scope introduces the names of parameters
+\item Body scope introduces the names of local variables
+\end {enumerate}
+
+They are nested, meaning that the body scope in considered to be inside the
+parameters scope. It has implications on the name shadowing.
+
+
+\end {description}
+
+\end {document}
