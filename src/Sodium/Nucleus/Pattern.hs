@@ -25,7 +25,7 @@ expMatch :: Pattern -> Expression -> Bool
 expMatch PWildCard _ = False
 expMatch (PTuple xs) (Tuple ys)
     =  length xs == length ys
-    && and (zipWith patMatch xs ys)
+    && and (zipWith expMatch xs ys)
 expMatch (PAccess name1 i) (Access name2 j)
     = name1 == name2 && i == j
 expMatch _ _ = False
