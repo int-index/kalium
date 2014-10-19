@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ConstraintKinds #-}
-module Sodium.Nucleus.Atomize (atomize, atomize') where
+module Sodium.Nucleus.Scalar.Atomize (atomize, atomize') where
 
 import Data.Monoid
 import Control.Lens
@@ -9,7 +9,8 @@ import Control.Monad.Reader
 import Control.Monad.Except
 import Control.Applicative
 import qualified Data.Map as M
-import Sodium.Nucleus.Program.Scalar
+import Sodium.Nucleus.Scalar.Program
+import Sodium.Nucleus.Scalar.Build (statement)
 import Sodium.Nucleus.Scalar.Typecheck
 import Sodium.Nucleus.Name
 

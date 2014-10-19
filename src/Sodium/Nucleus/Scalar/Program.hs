@@ -1,8 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Sodium.Nucleus.Program.Scalar
-	( module Sodium.Nucleus.Program.Scalar
-	, module Sodium.Nucleus.Program
-	) where
+module Sodium.Nucleus.Scalar.Program
+    ( module Sodium.Nucleus.Scalar.Program
+    , module Sodium.Nucleus.Program
+    ) where
 
 import Control.Lens
 import qualified Data.Map as M
@@ -41,17 +41,6 @@ data Statement a
     | ScopeStatement (Scope a)
     | Group [Statement a]
 
-assign :: Name -> a -> Statement a
-assign name a = statement $ Exec (Just name) (NameOp OpId) [a]
-
-class LiftStatement f where
-    statement :: f a -> Statement a
-
-instance LiftStatement Exec     where statement = Execute
-instance LiftStatement ForCycle where statement = ForStatement
-instance LiftStatement If       where statement = IfStatement
-instance LiftStatement Scope    where statement = ScopeStatement
-
 data Exec a = Exec
     { _execRet :: Maybe Name
     , _execOp :: Name
@@ -72,7 +61,7 @@ data If a = If
     }
 
 data Scope a = Scope
-    { _scopeVars :: Vars
+    { _scopeVars :: M.Map Name Type
     , _scopeStatement :: Statement a
     }
 
@@ -95,9 +84,3 @@ makeLenses ''Exec
 makePrisms ''Statement
 makePrisms ''Expression
 makePrisms ''Atom
-
-_Primary' :: Prism' Expression Literal
-_Primary' = _Atom . _Primary
-
-_Access' :: Prism' Expression Name
-_Access'  = _Atom . _Access

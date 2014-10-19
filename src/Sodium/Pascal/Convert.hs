@@ -13,7 +13,8 @@ import Data.Traversable
 import Control.Lens
 -- S for Src, D for Dest
 import qualified Sodium.Pascal.Program as S
-import qualified Sodium.Nucleus.Program.Scalar as D
+import qualified Sodium.Nucleus.Scalar.Program as D
+import qualified Sodium.Nucleus.Scalar.Build   as D
 import Sodium.Nucleus.Name
 
 convert :: NameStack t m => S.Program -> m (D.Program D.Expression)
@@ -30,7 +31,7 @@ instance Conv S.Program (D.Program D.Expression) where
 		clMain <- do
 			clBody <- conv (VB vars body)
 			let clFuncSig = D.FuncSig D.NameMain [] D.TypeUnit
-			return $ D.Func clFuncSig [] clBody (D._Primary # D.LitUnit)
+			return $ D.Func clFuncSig [] clBody (D.atom ())
 		clFuncs <- mapM conv funcs
 		return $ D.Program (clMain:clFuncs)
 
@@ -50,11 +51,11 @@ instance Conv S.Func (D.Func D.Expression) where
     conv (S.Func name params pasType vars body)
         = do
             (retExpr, retType, retVars) <- case pasType of
-                Nothing -> return (D._Primary # D.LitUnit, D.TypeUnit, [])
+                Nothing -> return (D.atom (), D.TypeUnit, [])
                 Just ty -> do
                     let retName = nameV name
                     retType <- conv ty
-                    return (D._Access # retName, retType, [S.VarDecl [name] ty])
+                    return (D.atom retName, retType, [S.VarDecl [name] ty])
             let paramDecls = splitParamDecls params
             (clParams, clParamTypes) <- unzip <$> mapM conv paramDecls
             let clFuncSig = D.FuncSig (nameF name) clParamTypes retType
@@ -148,7 +149,7 @@ instance Conv S.Statement (D.Statement D.Expression) where
             clExpr <- conv expr
             clName <- namepop
             let clType = D.TypeUnit -- typeof(expr)
-            let clCaseExpr = D._Access' # clName
+            let clCaseExpr = D.expression clName
             let instRange = \case
                     S.Binary S.OpRange exprFrom exprTo
                          -> (binary (D.NameOp D.OpElem) clCaseExpr)
@@ -168,11 +169,6 @@ instance Conv S.Statement (D.Statement D.Expression) where
                         (M.singleton clName clType)
                         (D.Group [D.assign clName clExpr, statement])
 
-inumber intSection = D.LitInteger $ parseInt intSection
-fnumber intSection fracSection = D.LitDouble $ parseFrac intSection fracSection
-enumber intSection fracSection eSign eSection
-    = D.LitDouble $ parseExp intSection fracSection eSign eSection
-
 parseInt :: String -> Integer
 parseInt = foldl (\acc c -> fromIntegral (C.digitToInt c) + acc * 10) 0
 
@@ -188,16 +184,16 @@ parseExp intSection fracSection eSign eSection
 
 instance Conv S.Expression D.Expression where
     conv = \case
-        S.Access name -> return $ D._Access' # nameV name
+        S.Access name -> return $ D.expression (nameV name)
         S.Call name exprs -> D.Call <$> pure (nameF name) <*> mapM conv exprs
-        S.INumber intSection -> return $ D._Primary' # inumber intSection
+        S.INumber intSection -> return $ D.expression (parseInt intSection)
         S.FNumber intSection fracSection
-            -> return $ D._Primary' # fnumber intSection fracSection
+            -> return $ D.expression (parseFrac intSection fracSection)
         S.ENumber intSection fracSection eSign eSection
-            -> return $ D._Primary' # enumber intSection fracSection eSign eSection
-        S.Quote cs -> return $ D._Primary' # D.LitString  cs
-        S.BTrue    -> return $ D._Primary' # D.LitBoolean True
-        S.BFalse   -> return $ D._Primary' # D.LitBoolean False
+            -> return $ D.expression (parseExp intSection fracSection eSign eSection)
+        S.Quote cs -> return (D.expression cs)
+        S.BTrue    -> return (D.expression True)
+        S.BFalse   -> return (D.expression False)
         S.Binary op x y -> binary <$> conv op <*> conv x <*> conv y
         S.Unary  op x   -> D.Call <$> conv op <*> mapM conv [x]
 

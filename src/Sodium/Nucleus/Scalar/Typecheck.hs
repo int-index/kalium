@@ -11,7 +11,7 @@ import Control.Monad.Except
 import qualified Data.List as L
 import qualified Data.Map  as M
 
-import Sodium.Nucleus.Program.Scalar
+import Sodium.Nucleus.Scalar.Program
 
 data TypeError
     = NoAccess Name Vars

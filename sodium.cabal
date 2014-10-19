@@ -18,11 +18,12 @@ library
                        Sodium.Haskell.Program
                        Sodium.Haskell.Convert
                        Sodium.Nucleus.Program
-                       Sodium.Nucleus.Program.Scalar
                        Sodium.Nucleus.Program.Vector
+                       Sodium.Nucleus.Scalar.Program
+                       Sodium.Nucleus.Scalar.Build
                        Sodium.Nucleus.Scalar.Typecheck
+                       Sodium.Nucleus.Scalar.Atomize
                        Sodium.Nucleus.Vectorize
-                       Sodium.Nucleus.Atomize
                        Sodium.Nucleus.Shadow
                        Sodium.Nucleus.Pass.Flatten
                        Sodium.Nucleus.Pass.JoinMultiIf

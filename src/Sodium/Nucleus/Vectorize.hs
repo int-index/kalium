@@ -10,7 +10,7 @@ import Control.Monad.State.Lazy
 import Control.Monad.Except
 import Control.Lens hiding (Index)
 import qualified Data.Map as M
-import Sodium.Nucleus.Program.Scalar
+import Sodium.Nucleus.Scalar.Program
 import qualified Sodium.Nucleus.Program.Vector as Vec
 
 data Error

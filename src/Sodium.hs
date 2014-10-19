@@ -3,7 +3,7 @@ module Sodium (translate) where
 
 import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.Shadow      (unshadow)
-import Sodium.Nucleus.Atomize     (atomize')
+import Sodium.Nucleus.Scalar.Atomize (atomize')
 import Sodium.Nucleus.Strip (strip)
 import Sodium.Nucleus.Pass.Flatten     (flatten)
 import Sodium.Nucleus.Pass.JoinMultiIf (joinMultiIf)
