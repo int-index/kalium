@@ -5,6 +5,7 @@
 
 module Sodium.Nucleus.Scalar.Build where
 
+import Data.Foldable
 import Sodium.Nucleus.Scalar.Program
 
 class LiftLiteral a where
@@ -35,6 +36,9 @@ instance LiftStatement Exec      where statement = Execute
 instance LiftStatement ForCycle  where statement = ForStatement
 instance LiftStatement If        where statement = IfStatement
 instance LiftStatement Scope     where statement = ScopeStatement
+
+statements :: (Foldable c, LiftStatement f) => c (f a) -> Statement a
+statements ss = Group (map statement $ toList ss)
 
 assign :: Name -> a -> Statement a
 assign name a = statement $ Exec (Just name) (NameOp OpId) [a]

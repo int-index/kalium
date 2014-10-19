@@ -10,7 +10,6 @@ import qualified Data.Map  as M
 import qualified Data.Char as C
 import Data.Ratio
 import Data.Traversable
-import Control.Lens
 -- S for Src, D for Dest
 import qualified Sodium.Pascal.Program as S
 import qualified Sodium.Nucleus.Scalar.Program as D
@@ -24,44 +23,41 @@ nameV = D.NameSpace "v" . D.Name
 nameF = D.NameSpace "f" . D.Name
 
 class Conv s d | s -> d where
-	conv :: NameStack t m => s -> ReaderT (M.Map S.Name S.PasType) m d
+    conv :: NameStack t m => s -> ReaderT (M.Map S.Name S.PasType) m d
 
 instance Conv S.Program (D.Program D.Expression) where
-	conv (S.Program funcs vars body) = do
-		clMain <- do
-			clBody <- conv (VB vars body)
-			let clFuncSig = D.FuncSig D.NameMain [] D.TypeUnit
-			return $ D.Func clFuncSig [] clBody (D.atom ())
-		clFuncs <- mapM conv funcs
-		return $ D.Program (clMain:clFuncs)
+    conv (S.Program funcs vars body) = do
+        clMain <- do
+            clBody <- convScope vars (conv body)
+            let clFuncSig = D.FuncSig D.NameMain [] D.TypeUnit
+            return $ D.Func clFuncSig [] clBody (D.atom ())
+        clFuncs <- mapM conv funcs
+        return $ D.Program (clMain:clFuncs)
 
-maybeStatement = maybe (D.Group []) id
-
-data VB = VB S.Vars S.Body
-
-instance Conv VB (D.Scope D.Expression) where
-    conv (VB vardecls statements)
+convScope vardecls inner
         = D.Scope
        <$> (M.fromList <$> mapM conv varDecls)
-       <*> local (M.union (M.fromList $ map varDeclToTup varDecls))
-            (D.Group <$> mapM conv statements)
-       where varDecls = splitVarDecls vardecls
+       <*> local (M.union (M.fromList $ map varDeclToTup varDecls)) inner
+   where varDecls = splitVarDecls vardecls
+
+instance Conv S.Body (D.Statement D.Expression) where
+    conv statements = D.Group <$> mapM conv statements
 
 instance Conv S.Func (D.Func D.Expression) where
-    conv (S.Func name params pasType vars body)
-        = do
-            (retExpr, retType, retVars) <- case pasType of
-                Nothing -> return (D.atom (), D.TypeUnit, [])
-                Just ty -> do
-                    let retName = nameV name
-                    retType <- conv ty
-                    return (D.atom retName, retType, [S.VarDecl [name] ty])
-            let paramDecls = splitParamDecls params
-            (clParams, clParamTypes) <- unzip <$> mapM conv paramDecls
-            let clFuncSig = D.FuncSig (nameF name) clParamTypes retType
-            clScope <- local (M.union (M.fromList $ map paramDeclToTup paramDecls))
-                    $ conv (VB (vars ++ retVars) body)
-            return $ D.Func clFuncSig clParams clScope retExpr
+    conv (S.Func name params pasType vars body) = do
+        (retExpr, retType, retVars) <- case pasType of
+            Nothing -> return (D.atom (), D.TypeUnit, [])
+            Just ty -> do
+                let retName = nameV name
+                retType <- conv ty
+                return (D.atom retName, retType, [S.VarDecl [name] ty])
+        let paramDecls = splitParamDecls params
+        (clParams, clParamTypes) <- unzip <$> mapM conv paramDecls
+        let clFuncSig = D.FuncSig (nameF name) clParamTypes retType
+        clScope <- local (M.union (M.fromList $ map paramDeclToTup paramDecls))
+                $ convScope retVars
+                $ D.statement <$> convScope vars (conv body)
+        return $ D.Func clFuncSig clParams clScope retExpr
 
 splitVarDecls vardecls
     = [VarDecl name t | S.VarDecl names t <- vardecls, name <- names]
@@ -85,13 +81,14 @@ instance Conv ParamDecl (D.Name, D.ByType) where
         where annotate = (,) (if r then D.ByReference else D.ByValue)
 
 instance Conv S.PasType D.Type where
-	conv = \case
-		S.PasInteger -> return D.TypeInteger
-		S.PasLongInt -> return D.TypeInteger
-		S.PasReal    -> return D.TypeDouble
-		S.PasBoolean -> return D.TypeBoolean
-		S.PasString  -> return D.TypeString
-		S.PasType _  -> error "Custom types are not implemented"
+    conv = \case
+        S.PasInteger -> return D.TypeInteger
+        S.PasLongInt -> return D.TypeInteger
+        S.PasReal    -> return D.TypeDouble
+        S.PasBoolean -> return D.TypeBoolean
+        S.PasString  -> return D.TypeString
+        S.PasArray _ -> error "Arrays are not implemented"
+        S.PasType _  -> error "Custom types are not implemented"
 
 binary op a b = D.Call op [a,b]
 
@@ -125,7 +122,7 @@ lookupType name = do
 
 instance Conv S.Statement (D.Statement D.Expression) where
     conv = \case
-        S.BodyStatement body -> D.statement <$> conv (VB [] body)
+        S.BodyStatement body -> D.statement <$> conv body
         S.Assign name expr -> D.assign (nameV name) <$> conv expr
         S.Execute "readln"  exprs -> D.statement <$> convReadLn  exprs
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn exprs
@@ -133,18 +130,20 @@ instance Conv S.Statement (D.Statement D.Expression) where
              -> fmap D.statement
              $  D.Exec Nothing (nameF name)
             <$> mapM conv exprs
-        S.ForCycle name fromExpr toExpr statement
-             -> fmap D.statement
-             $  D.ForCycle
-            <$> return (nameV name)
-            <*> (binary (D.NameOp D.OpRange) <$> conv fromExpr <*> conv toExpr)
-            <*> conv statement
+        S.ForCycle name fromExpr toExpr statement -> do
+            let clName = nameV name
+            clFromExpr <- conv fromExpr
+            clToExpr   <- conv toExpr
+            let clRange = binary (D.NameOp D.OpRange) clFromExpr clToExpr
+            clAction <- conv statement
+            let clForCycle = D.statement (D.ForCycle clName clRange clAction)
+            return $ D.Group [clForCycle, D.assign clName clToExpr]
         S.IfBranch expr bodyThen mBodyElse
              -> fmap D.statement
              $  D.If
             <$> conv expr
             <*> conv bodyThen
-            <*> (maybeStatement <$> mapM conv mBodyElse)
+            <*> (D.statements <$> mapM conv mBodyElse)
         S.CaseBranch expr leafs mBodyElse -> do
             clExpr <- conv expr
             clName <- namepop
@@ -160,7 +159,7 @@ instance Conv S.Statement (D.Statement D.Expression) where
                     <$> (foldl1 (binary (D.NameOp D.OpOr)) <$> mapM instRange exprs)
                     <*> conv body
             leafs <- mapM instLeaf leafs
-            leafElse <- maybeStatement <$> mapM conv mBodyElse
+            leafElse <- D.statements <$> mapM conv mBodyElse
             let statement = foldr
                     (\(cond, ifThen) ifElse ->
                         D.statement $ D.If cond ifThen ifElse)
