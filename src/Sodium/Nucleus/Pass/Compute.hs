@@ -10,6 +10,10 @@ compute = over recmapped match
 match :: Expression -> Expression
 match = \case
     Call (NameOp OpId) [expr] -> expr
+    Call (NameOp op) [x]
+        | Primary (LitInteger a) <- x
+        , Just f <- unaryIntegerOp op
+        -> Primary (LitInteger (f a))
     Call (NameOp op) [x, y]
         | Primary (LitInteger a) <- x
         , Primary (LitInteger b) <- y
@@ -34,4 +38,9 @@ binaryIntegerOp = \case
     OpMultiply -> Just (*)
     OpDiv -> Just div
     OpMod -> Just mod
+    _ -> Nothing
+
+unaryIntegerOp :: Operator -> Maybe (Integer -> Integer)
+unaryIntegerOp = \case
+    OpNegate -> Just negate
     _ -> Nothing

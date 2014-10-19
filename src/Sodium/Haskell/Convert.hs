@@ -243,8 +243,8 @@ instance Conv S.Expression where
 
 convexpr :: S.Expression -> Maybe H.Exp
 convexpr (S.Primary prim) = return $ case prim of
-    S.LitInteger n -> H.Lit (H.Int  n)
-    S.LitDouble  x -> H.Lit (H.Frac x)
+    S.LitInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
+    S.LitDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
     S.LitString cs -> H.Lit (H.String cs)
     S.LitBoolean a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
     S.LitUnit -> H.Con (H.Special H.UnitCon)
