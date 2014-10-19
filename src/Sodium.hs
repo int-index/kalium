@@ -33,7 +33,7 @@ import Debug.Trace
 translate :: (Applicative m, MonadError E.Error m) => String -> m String
 translate src = do
     pas <- liftErr E.parseError (parse src)
-    let namestack0 = map (V.NameSpace "g" . V.Name . show) [0..]
+    let namestack0 = map (V.NameSpace "g" . V.Name . ('g':) . show) [0..]
     (scalar, namestack1) <- P.convert pas `runStateT` namestack0
     (atomic, _) <- liftErr E.typeError (atomize' scalar `runStateT` namestack1)
     vector <- liftErr E.vectorizeError (vectorize atomic)
