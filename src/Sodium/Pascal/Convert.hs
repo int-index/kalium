@@ -28,15 +28,15 @@ class Conv s d | s -> d where
 instance Conv S.Program (D.Program D.Expression) where
     conv (S.Program funcs vars body) = do
         clMain <- do
-            clBody <- convScope vars (conv body)
+            clBody <- convScope vars $ D.Body <$> conv body <*> pure (D.atom ())
             let clFuncSig = D.FuncSig D.NameMain [] D.TypeUnit
-            return $ D.Func clFuncSig [] clBody (D.atom ())
+            return $ D.Func clFuncSig [] clBody
         clFuncs <- mapM conv funcs
         return $ D.Program (clMain:clFuncs)
 
 convScope vardecls inner
         = D.Scope
-       <$> (M.fromList <$> mapM conv varDecls)
+       <$> (D.store id <$> (M.fromList <$> mapM conv varDecls))
        <*> local (M.union (M.fromList $ map varDeclToTup varDecls)) inner
    where varDecls = splitVarDecls vardecls
 
@@ -54,10 +54,10 @@ instance Conv S.Func (D.Func D.Expression) where
         let paramDecls = splitParamDecls params
         (clParams, clParamTypes) <- unzip <$> mapM conv paramDecls
         let clFuncSig = D.FuncSig (nameF name) clParamTypes retType
-        clScope <- local (M.union (M.fromList $ map paramDeclToTup paramDecls))
-                $ convScope retVars
-                $ D.statement <$> convScope vars (conv body)
-        return $ D.Func clFuncSig clParams clScope retExpr
+        clBody <- local (M.union (M.fromList $ map paramDeclToTup paramDecls))
+                $ convScope (vars ++ retVars)
+                $ D.Body <$> conv body <*> pure retExpr
+        return $ D.Func clFuncSig clParams clBody
 
 splitVarDecls vardecls
     = [VarDecl name t | S.VarDecl names t <- vardecls, name <- names]
@@ -165,7 +165,7 @@ instance Conv S.Statement (D.Statement D.Expression) where
                         D.statement $ D.If cond ifThen ifElse)
                      leafElse leafs
             return $ D.statement $ D.Scope
-                        (M.singleton clName clType)
+                        (D.store id $ M.singleton clName clType)
                         (D.Group [D.assign clName clExpr, statement])
 
 parseInt :: String -> Integer

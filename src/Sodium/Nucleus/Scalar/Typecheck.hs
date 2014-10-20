@@ -90,5 +90,5 @@ instance TypeIntro (Func a) where
             $ zip (func ^. funcParams)
                   (func ^.. funcSig . funcParamTypes . traversed . _2)
 
-instance TypeIntro (Scope a) where
-    typeIntro' scope = tsVariables %~ mappend (scope ^. scopeVars)
+instance TypeIntro (Scope v f a) where
+    typeIntro' scope = tsVariables %~ mappend (scope ^. scopeVars . to (peeks id))

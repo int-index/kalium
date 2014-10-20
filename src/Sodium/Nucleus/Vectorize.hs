@@ -37,28 +37,36 @@ references params paramTypes = unzip $ do
 
 vectorizeFunc :: E m => [FuncSig] -> Func Atom -> m Vec.Func
 vectorizeFunc funcSigs func = do
-    let r = vectorizeScope funcSigs (func ^. funcScope)
-    (_, vecBodyGen)
+    let (refnames, reftypes) = references (func ^. funcParams) (func ^. funcSig . funcParamTypes)
+    let r = vectorizeBody funcSigs (func ^. funcBody) (map Access refnames)
+    (_, vecBody)
             <- runReaderT r
             $ M.fromList $ map (, Vec.Index 0) (func ^. funcParams)
-    let (refnames, reftypes) = references (func ^. funcParams) (func ^. funcSig . funcParamTypes)
     let vecFuncSig = Vec.FuncSig
           (func ^. funcSig . funcName)
           (map snd $ func ^. funcSig . funcParamTypes)
           (func ^. funcSig . funcRetType)
           reftypes
-    vecBody <- vecBodyGen (func ^. funcResult : map Access refnames)
     return $ Vec.Func vecFuncSig (func ^. funcParams) (Vec.BodyStatement vecBody)
 
 patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
 expTuple = Vec.Tuple  . map (uncurry Vec.Access)
 
-vectorizeScope :: V t m => [FuncSig] -> Scope Atom -> t m ([Name], [Atom] -> m Vec.Body)
-vectorizeScope funcSigs scope = do
+vectorizeBody :: V t m => [FuncSig] -> Scope v Body Atom -> [Atom] -> t m ([Name], Vec.Body)
+vectorizeBody funcSigs scope results = do
     let vars = scope ^. scopeVars
+    let Body statement result = scope ^. scopeElem
+    (changed, vecBodyGen) <- vectorizeScope funcSigs (Scope vars statement)
+    vecBody <- lift $ vecBodyGen (result:results)
+    return (changed, vecBody)
+
+
+vectorizeScope :: V t m => [FuncSig] -> Scope v Statement Atom -> t m ([Name], [Atom] -> m Vec.Body)
+vectorizeScope funcSigs scope = do
+    let vars = scope ^. scopeVars . to (peeks id)
     local (initIndices Vec.Uninitialized vars `M.union`) $ do
         (boundIndices, vecBind) <- do
-            (changed, vecStatement) <- vectorizeStatement funcSigs (scope ^. scopeStatement)
+            (changed, vecStatement) <- vectorizeStatement funcSigs (scope ^. scopeElem)
             changed' <- mapM (naming indexUpdate) changed
             return (changed', Vec.Bind (patTuple changed') vecStatement)
         let changed = filter (`M.notMember` vars) (map fst boundIndices)
@@ -133,8 +141,8 @@ vectorizeStatement funcSigs = \case
         return (changed, Vec.ForStatement vecForCycle)
     IfStatement ifb -> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
-        (changedThen, vecBodyThenGen) <- vectorizeScope funcSigs (Scope M.empty (ifb ^. ifThen))
-        (changedElse, vecBodyElseGen) <- vectorizeScope funcSigs (Scope M.empty (ifb ^. ifElse))
+        (changedThen, vecBodyThenGen) <- vectorizeScope funcSigs (Scope (store id M.empty) (ifb ^. ifThen))
+        (changedElse, vecBodyElseGen) <- vectorizeScope funcSigs (Scope (store id M.empty) (ifb ^. ifElse))
         let changed = nub $ changedThen ++ changedElse
         let accessChanged = map Access changed
         vecBodyThen <- lift $ vecBodyThenGen accessChanged

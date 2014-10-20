@@ -35,7 +35,8 @@ instance LiftStatement Statement where statement = id
 instance LiftStatement Exec      where statement = Execute
 instance LiftStatement ForCycle  where statement = ForStatement
 instance LiftStatement If        where statement = IfStatement
-instance LiftStatement Scope     where statement = ScopeStatement
+instance LiftStatement (Scope v Statement)
+    where statement = ScopeStatement
 
 statements :: (Foldable c, LiftStatement f) => c (f a) -> Statement a
 statements ss = Group (map statement $ toList ss)

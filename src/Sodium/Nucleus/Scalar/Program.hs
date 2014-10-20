@@ -1,10 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ExistentialQuantification #-}
 module Sodium.Nucleus.Scalar.Program
     ( module Sodium.Nucleus.Scalar.Program
     , module Sodium.Nucleus.Program
+    , pos, peeks, store
     ) where
 
 import Control.Lens
+import Control.Comonad.Store
 import qualified Data.Map as M
 
 import Sodium.Nucleus.Program
@@ -30,15 +33,19 @@ type ByType = (By, Type)
 data Func a = Func
     { _funcSig :: FuncSig
     , _funcParams :: [Name]
-    , _funcScope :: Scope a
-    , _funcResult :: Atom
+    , _funcBody :: Scope Vars Body a
+    }
+
+data Body a = Body
+    { _bodyStatement :: Statement a
+    , _bodyResult :: Atom
     }
 
 data Statement a
     = Execute (Exec a)
     | ForStatement (ForCycle a)
     | IfStatement (If a)
-    | ScopeStatement (Scope a)
+    | forall v . ScopeStatement (Scope v Statement a)
     | Group [Statement a]
 
 data Exec a = Exec
@@ -60,9 +67,9 @@ data If a = If
     , _ifElse :: Statement a
     }
 
-data Scope a = Scope
-    { _scopeVars :: M.Map Name Type
-    , _scopeStatement :: Statement a
+data Scope v f a = Scope
+    { _scopeVars :: Store v (M.Map Name Type)
+    , _scopeElem :: f a
     }
 
 data Expression
@@ -75,12 +82,9 @@ data Atom
 
 makeLenses ''FuncSig
 makeLenses ''Func
+makeLenses ''Body
 makeLenses ''Scope
 makeLenses ''ForCycle
 makeLenses ''If
 makeLenses ''Program
 makeLenses ''Exec
-
-makePrisms ''Statement
-makePrisms ''Expression
-makePrisms ''Atom

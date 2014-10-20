@@ -26,10 +26,13 @@ instance Atomize Program where
     atomize = typeIntro $ programFuncs (traverse atomize)
 
 instance Atomize Func where
-    atomize = typeIntro $ funcScope atomize
+    atomize = typeIntro $ funcBody atomize
 
-instance Atomize Scope where
-    atomize = typeIntro $ scopeStatement atomize
+instance Atomize f => Atomize (Scope v f) where
+    atomize = typeIntro $ scopeElem atomize
+
+instance Atomize Body where
+    atomize = bodyStatement atomize
 
 instance Atomize Statement where
 
@@ -50,7 +53,7 @@ instance Atomize Statement where
 atomizeStatement w = do
     (a, (vardecls, statements)) <- runWriterT w
     return $ ScopeStatement
-           $ Scope (M.fromList vardecls) (Group (statements `snoc` statement a))
+           $ Scope (store id (M.fromList vardecls)) (Group (statements `snoc` statement a))
 
 atomizeExpression :: (TypeEnv m, NameStack t m) => Expression
                   -> WriterT ([VarDecl], [Statement Atom]) m Atom
