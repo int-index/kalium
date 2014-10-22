@@ -25,25 +25,21 @@ every expression is atomic, whereas in the non-atomic one some are not.
 
 \begin {description}
 
-\item [Program] is a set of functions. Every function is uniquely identified by
-its signature, so a program that contains multiple functions with the same
-signature is ill-formed.
+\item [Program] is a set of functions, every function is uniquely identified by
+its name.
 
-\item [Function signature] contains the name of that function, types of its
-parameters and the type of its result (return value).
+\item [Function] consists of a parameter list and a scoped body. The body
+consists of a statement and an atomic expression---the result that the function
+returns. Every parameter can be passed either by value or by reference, and it
+is reflected in the signature.
 
-\item [Function] consists of its signature, a parameter list and a scoped body.
-The body consists of a statement and an atomic expression---the result that the
-function returns. Every parameter can be passed either by value or by reference,
-and it is reflected in the signature.
-
-The function defines two nested scopes:
+A function defines two scopes:
 \begin {enumerate}
 \item Parameters scope introduces the names of parameters
 \item Body scope introduces the names of local variables
 \end {enumerate}
 
-They are nested, meaning that the body scope in considered to be inside the
+They are nested, meaning that the body scope is considered to be inside the
 parameters scope. It has implications on the name shadowing.
 
 \item [Scope] contains a set of variable declarations and an arbitary structure,
@@ -51,9 +47,9 @@ in which those variables can be accessed. Variable declarations can be stored in
 arbitary form, from which an associative array can be derived, where the keys
 are variable names, and values are types.
 
-For example, a function defines a scope, where variable declarations are
-stored as a parameter list, and the structure inside the scope is the body
-of that function.
+For example, a function defines a scope, where variable declarations are stored
+as a parameter list, and the structure inside the scope is the body of that
+function.
 
 \end {description}
 

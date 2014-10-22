@@ -25,34 +25,34 @@ type V t m = (MonadTrans t, MonadReader Vec.Indices (t m), E m, E (t m))
 
 vectorize :: E m => Program Atom -> m Vec.Program
 vectorize program = do
-    let funcSigs = program ^.. programFuncs . traversed . funcSig
-    vecFuncs <- mapM (vectorizeFunc funcSigs) (program ^. programFuncs)
+    let funcSigs = program ^. programFuncs & M.map funcSig
+    vecFuncs <- mapM (vectorizeFunc funcSigs) (program ^. programFuncs & M.toList)
     return $ Vec.Program vecFuncs
 
-references :: [Name] -> [ByType] -> ([Name], [Type])
-references params paramTypes = unzip $ do
-    (name, (by, ty)) <- zip params paramTypes
+references :: [(Name, ByType)] -> ([Name], [Type])
+references params = unzip $ do
+    (name, (by, ty)) <- params
     guard (by == ByReference)
     return (name, ty)
 
-vectorizeFunc :: E m => [FuncSig] -> Func Atom -> m Vec.Func
-vectorizeFunc funcSigs func = do
-    let (refnames, reftypes) = references (func ^. funcParams) (func ^. funcSig . funcParamTypes)
+vectorizeFunc :: E m => M.Map Name FuncSig -> (Name, Func Atom) -> m Vec.Func
+vectorizeFunc funcSigs (name, func) = do
+    let params = func ^. funcParams & map fst
+    let (refnames, reftypes) = references (func ^. funcParams)
     let r = vectorizeBody funcSigs (func ^. funcBody) (map Access refnames)
     (_, vecBody)
             <- runReaderT r
-            $ M.fromList $ map (, Vec.Index 0) (func ^. funcParams)
-    let vecFuncSig = Vec.FuncSig
-          (func ^. funcSig . funcName)
-          (map snd $ func ^. funcSig . funcParamTypes)
-          (func ^. funcSig . funcRetType)
+            $ M.fromList $ map (, Vec.Index 0) params
+    let vecFuncSig = Vec.FuncSig name
+          (func & funcSig & funcSigParamTypes & map snd)
+          (func & funcSig & funcSigType)
           reftypes
-    return $ Vec.Func vecFuncSig (func ^. funcParams) (Vec.BodyStatement vecBody)
+    return $ Vec.Func vecFuncSig params (Vec.BodyStatement vecBody)
 
 patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
 expTuple = Vec.Tuple  . map (uncurry Vec.Access)
 
-vectorizeBody :: V t m => [FuncSig] -> Scope v Body Atom -> [Atom] -> t m ([Name], Vec.Body)
+vectorizeBody :: V t m => M.Map Name FuncSig -> Scope v Body Atom -> [Atom] -> t m ([Name], Vec.Body)
 vectorizeBody funcSigs scope results = do
     let vars = scope ^. scopeVars
     let Body statement result = scope ^. scopeElem
@@ -61,7 +61,7 @@ vectorizeBody funcSigs scope results = do
     return (changed, vecBody)
 
 
-vectorizeScope :: V t m => [FuncSig] -> Scope v Statement Atom -> t m ([Name], [Atom] -> m Vec.Body)
+vectorizeScope :: V t m => M.Map Name FuncSig -> Scope v Statement Atom -> t m ([Name], [Atom] -> m Vec.Body)
 vectorizeScope funcSigs scope = do
     let vars = scope ^. scopeVars . to (peeks id)
     local (initIndices Vec.Uninitialized vars `M.union`) $ do
@@ -91,7 +91,7 @@ degroup funcSigs statements act = do
 diff :: (Ord k, Eq v) => M.Map k v -> M.Map k v -> [k]
 diff m1 m2 = M.keys $ M.filter id $ M.intersectionWith (/=) m1 m2
 
-vectorizeStatement :: V t m => [FuncSig] -> Statement Atom -> t m ([Name], Vec.Statement)
+vectorizeStatement :: V t m => M.Map Name FuncSig -> Statement Atom -> t m ([Name], Vec.Statement)
 vectorizeStatement funcSigs = \case
     Group statements -> do
         degroup funcSigs statements
@@ -111,7 +111,7 @@ vectorizeStatement funcSigs = \case
               _                 -> Nothing
             byReference (ByValue, _) = const (Just [])
         funcSig <- lookupFuncSig funcSigs name
-        sidenames <- case zipWith byReference (funcSig ^. funcParamTypes) vecArgs
+        sidenames <- case zipWith byReference (funcSigParamTypes funcSig) vecArgs
                           & sequence
                      of Nothing -> throwError NoReference
                         Just ns -> return (concat ns)
@@ -167,11 +167,11 @@ lookupIndex name = do
     M.lookup name indices
        & maybe (throwError $ NoAccess name indices) return
 
-lookupFuncSig :: E m => [FuncSig] -> Name -> m FuncSig
+lookupFuncSig :: E m => M.Map Name FuncSig -> Name -> m FuncSig
 -- TODO: real signatures for builtin operators
-lookupFuncSig _ (NameOp _) = return $ FuncSig (Name "") [] (TypeUnit)
+lookupFuncSig _ (NameOp _) = return $ FuncSig TypeUnit []
 lookupFuncSig funcSigs name
-    = find (\funcSig -> view funcName funcSig == name) funcSigs
+    = M.lookup name funcSigs
     & maybe (throwError $ NoFunction name) return
 
 indexUpdate :: V t m => Name -> t m Vec.Index

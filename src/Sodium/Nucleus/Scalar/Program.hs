@@ -13,15 +13,8 @@ import qualified Data.Map as M
 import Sodium.Nucleus.Program
 
 data Program a = Program
-    { _programFuncs :: [Func a]
+    { _programFuncs :: M.Map Name (Func a)
     }
-
-data FuncSig
-    = FuncSig
-    { _funcName :: Name
-    , _funcParamTypes :: [ByType]
-    , _funcRetType :: Type
-    } deriving (Eq, Show)
 
 data By
     = ByValue
@@ -31,8 +24,8 @@ data By
 type ByType = (By, Type)
 
 data Func a = Func
-    { _funcSig :: FuncSig
-    , _funcParams :: [Name]
+    { _funcType :: Type
+    , _funcParams :: [(Name, ByType)]
     , _funcBody :: Scope Vars Body a
     }
 
@@ -80,7 +73,6 @@ data Atom
     = Access Name
     | Primary Literal
 
-makeLenses ''FuncSig
 makeLenses ''Func
 makeLenses ''Body
 makeLenses ''Scope
@@ -88,3 +80,11 @@ makeLenses ''ForCycle
 makeLenses ''If
 makeLenses ''Program
 makeLenses ''Exec
+
+data FuncSig = FuncSig
+    { funcSigType :: Type
+    , funcSigParamTypes :: [ByType]
+    } deriving (Eq)
+
+funcSig :: Func a -> FuncSig
+funcSig func = FuncSig (func ^. funcType) (func ^. funcParams & map snd)

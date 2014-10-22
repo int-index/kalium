@@ -29,10 +29,9 @@ instance Conv S.Program (D.Program D.Expression) where
     conv (S.Program funcs vars body) = do
         clMain <- do
             clBody <- convScope vars $ D.Body <$> conv body <*> pure (D.atom ())
-            let clFuncSig = D.FuncSig D.NameMain [] D.TypeUnit
-            return $ D.Func clFuncSig [] clBody
+            return $ D.Func D.TypeUnit [] clBody
         clFuncs <- mapM conv funcs
-        return $ D.Program (clMain:clFuncs)
+        return $ D.Program (M.fromList $ (D.NameMain, clMain):clFuncs)
 
 convScope vardecls inner
         = D.Scope
@@ -43,7 +42,7 @@ convScope vardecls inner
 instance Conv S.Body (D.Statement D.Expression) where
     conv statements = D.Group <$> mapM conv statements
 
-instance Conv S.Func (D.Func D.Expression) where
+instance Conv S.Func (D.Name, D.Func D.Expression) where
     conv (S.Func name params pasType vars body) = do
         (retExpr, retType, retVars) <- case pasType of
             Nothing -> return (D.atom (), D.TypeUnit, [])
@@ -52,12 +51,12 @@ instance Conv S.Func (D.Func D.Expression) where
                 retType <- conv ty
                 return (D.atom retName, retType, [S.VarDecl [name] ty])
         let paramDecls = splitParamDecls params
-        (clParams, clParamTypes) <- unzip <$> mapM conv paramDecls
-        let clFuncSig = D.FuncSig (nameF name) clParamTypes retType
+        clParams <- mapM conv paramDecls
         clBody <- local (M.union (M.fromList $ map paramDeclToTup paramDecls))
                 $ convScope (vars ++ retVars)
                 $ D.Body <$> conv body <*> pure retExpr
-        return $ D.Func clFuncSig clParams clBody
+        let fname = nameF name
+        return $ (fname, D.Func retType clParams clBody)
 
 splitVarDecls vardecls
     = [VarDecl name t | S.VarDecl names t <- vardecls, name <- names]

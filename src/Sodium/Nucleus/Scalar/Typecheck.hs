@@ -8,7 +8,6 @@ import Control.Applicative
 import Control.Lens
 import Control.Monad.Reader
 import Control.Monad.Except
-import qualified Data.List as L
 import qualified Data.Map  as M
 
 import Sodium.Nucleus.Scalar.Program
@@ -20,9 +19,9 @@ data TypeError
 declareLenses [d|
 
     data TypeScope = TypeScope
-        { tsFunctions :: [FuncSig]
+        { tsFunctions :: M.Map Name FuncSig
         , tsVariables :: Vars
-        } deriving (Eq, Show)
+        } deriving (Eq)
 
                 |]
 
@@ -57,7 +56,7 @@ instance Typecheck Atom where
 lookupFuncSig :: TypeEnv m => Name -> m FuncSig
 lookupFuncSig name = do
     funcSigs <- asks (view tsFunctions)
-    L.find ((==name) . view funcName) funcSigs
+    M.lookup name funcSigs
         & maybe (throwError (NoFunction name)) return
 
 instance Typecheck Expression where
@@ -65,7 +64,7 @@ instance Typecheck Expression where
     typecheck (Call name args)
         | NameOp op <- name = do
             mapM typecheck args >>= builtinOpType op
-        | otherwise = view funcRetType <$> lookupFuncSig name
+        | otherwise = funcSigType <$> lookupFuncSig name
 
 builtinOpType :: TypeEnv m => Operator -> [Type] -> m Type
 builtinOpType _ _ = return TypeUnit
@@ -78,17 +77,14 @@ typeIntro :: (TypeIntro a, TypeEnv m) => (a -> m b) -> (a -> m b)
 typeIntro k x = local (typeIntro' x) (k x)
 
 instance TypeIntro (Program a) where
-    typeIntro' program = tsFunctions %~ mappend (program ^.. programFuncSigs)
-      where
-        programFuncSigs = programFuncs . traversed . funcSig
+    typeIntro' program = tsFunctions
+        %~ mappend (program ^. programFuncs & M.map funcSig)
 
 instance TypeIntro (Func a) where
-    typeIntro' func  = tsVariables %~ mappend (funcParamVars func)
+    typeIntro' func = tsVariables %~ mappend (funcParamVars func)
       where
         funcParamVars func
-            = M.fromList
-            $ zip (func ^. funcParams)
-                  (func ^.. funcSig . funcParamTypes . traversed . _2)
+            = M.fromList (func ^. funcParams & map (_2 %~ snd))
 
 instance TypeIntro (Scope v f a) where
     typeIntro' scope = tsVariables %~ mappend (scope ^. scopeVars . to (peeks id))
