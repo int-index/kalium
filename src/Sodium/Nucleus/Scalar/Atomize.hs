@@ -26,7 +26,7 @@ instance Atomize Program where
     atomize = typeIntro $ programFuncs (traverse atomize)
 
 instance Atomize Func where
-    atomize = typeIntro $ funcBody atomize
+    atomize = funcScope atomize
 
 instance Atomize f => Atomize (Scope v f) where
     atomize = typeIntro $ scopeElem atomize

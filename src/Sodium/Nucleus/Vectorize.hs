@@ -37,17 +37,17 @@ references params = unzip $ do
 
 vectorizeFunc :: E m => M.Map Name FuncSig -> (Name, Func Atom) -> m Vec.Func
 vectorizeFunc funcSigs (name, func) = do
-    let params = func ^. funcParams & map fst
-    let (refnames, reftypes) = references (func ^. funcParams)
-    let r = vectorizeBody funcSigs (func ^. funcBody) (map Access refnames)
+    let params = func ^. funcScope . scopeVars
+    let (refnames, reftypes) = references (pos params)
+    let r = vectorizeBody funcSigs (func ^. funcScope . scopeElem) (map Access refnames)
     (_, vecBody)
             <- runReaderT r
-            $ M.fromList $ map (, Vec.Index 0) params
+            $ initIndices (Vec.Index 0) (peeks id params)
     let vecFuncSig = Vec.FuncSig name
           (func & funcSig & funcSigParamTypes & map snd)
           (func & funcSig & funcSigType)
           reftypes
-    return $ Vec.Func vecFuncSig params (Vec.BodyStatement vecBody)
+    return $ Vec.Func vecFuncSig (params & pos & map fst) (Vec.BodyStatement vecBody)
 
 patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
 expTuple = Vec.Tuple  . map (uncurry Vec.Access)

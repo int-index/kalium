@@ -23,10 +23,11 @@ data By
 
 type ByType = (By, Type)
 
+type Params = [(Name, ByType)]
+
 data Func a = Func
     { _funcType :: Type
-    , _funcParams :: [(Name, ByType)]
-    , _funcBody :: Scope Vars Body a
+    , _funcScope :: Scope Params (Scope Vars Body) a
     }
 
 data Body a = Body
@@ -87,4 +88,4 @@ data FuncSig = FuncSig
     } deriving (Eq)
 
 funcSig :: Func a -> FuncSig
-funcSig func = FuncSig (func ^. funcType) (func ^. funcParams & map snd)
+funcSig func = FuncSig (func ^. funcType) (func ^. funcScope . scopeVars & pos & map snd)

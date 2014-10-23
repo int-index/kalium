@@ -29,7 +29,7 @@ instance Conv S.Program (D.Program D.Expression) where
     conv (S.Program funcs vars body) = do
         clMain <- do
             clBody <- convScope vars $ D.Body <$> conv body <*> pure (D.atom ())
-            return $ D.Func D.TypeUnit [] clBody
+            return $ D.Func D.TypeUnit (D.Scope (D.store D.coerceParamsVars []) clBody)
         clFuncs <- mapM conv funcs
         return $ D.Program (M.fromList $ (D.NameMain, clMain):clFuncs)
 
@@ -38,6 +38,11 @@ convScope vardecls inner
        <$> (D.store id <$> (M.fromList <$> mapM conv varDecls))
        <*> local (M.union (M.fromList $ map varDeclToTup varDecls)) inner
    where varDecls = splitVarDecls vardecls
+
+convScope' paramdecls inner
+        = D.Scope
+       <$> (D.store D.coerceParamsVars <$> mapM conv paramdecls)
+       <*> local (M.union (M.fromList $ map paramDeclToTup paramdecls)) inner
 
 instance Conv S.Body (D.Statement D.Expression) where
     conv statements = D.Group <$> mapM conv statements
@@ -50,13 +55,11 @@ instance Conv S.Func (D.Name, D.Func D.Expression) where
                 let retName = nameV name
                 retType <- conv ty
                 return (D.atom retName, retType, [S.VarDecl [name] ty])
-        let paramDecls = splitParamDecls params
-        clParams <- mapM conv paramDecls
-        clBody <- local (M.union (M.fromList $ map paramDeclToTup paramDecls))
-                $ convScope (vars ++ retVars)
-                $ D.Body <$> conv body <*> pure retExpr
+        clScope <- convScope' (splitParamDecls params)
+                 $ convScope (vars ++ retVars)
+                 $ D.Body <$> conv body <*> pure retExpr
         let fname = nameF name
-        return $ (fname, D.Func retType clParams clBody)
+        return $ (fname, D.Func retType clScope)
 
 splitVarDecls vardecls
     = [VarDecl name t | S.VarDecl names t <- vardecls, name <- names]

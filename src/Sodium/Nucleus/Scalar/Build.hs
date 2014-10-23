@@ -5,6 +5,7 @@
 
 module Sodium.Nucleus.Scalar.Build where
 
+import qualified Data.Map as M
 import Data.Foldable
 import Sodium.Nucleus.Scalar.Program
 
@@ -43,3 +44,6 @@ statements ss = Group (map statement $ toList ss)
 
 assign :: Name -> a -> Statement a
 assign name a = statement $ Exec (Just name) (NameOp OpId) [a]
+
+coerceParamsVars :: Params -> Vars
+coerceParamsVars = M.map snd . M.fromList

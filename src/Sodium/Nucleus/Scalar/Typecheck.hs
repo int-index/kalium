@@ -80,11 +80,5 @@ instance TypeIntro (Program a) where
     typeIntro' program = tsFunctions
         %~ mappend (program ^. programFuncs & M.map funcSig)
 
-instance TypeIntro (Func a) where
-    typeIntro' func = tsVariables %~ mappend (funcParamVars func)
-      where
-        funcParamVars func
-            = M.fromList (func ^. funcParams & map (_2 %~ snd))
-
 instance TypeIntro (Scope v f a) where
     typeIntro' scope = tsVariables %~ mappend (scope ^. scopeVars . to (peeks id))
