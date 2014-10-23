@@ -8,7 +8,6 @@ import Control.Monad.Writer
 import Control.Monad.Reader
 import Control.Monad.Except
 import Control.Applicative
-import qualified Data.Map as M
 import Sodium.Nucleus.Scalar.Program
 import Sodium.Nucleus.Scalar.Build (statement)
 import Sodium.Nucleus.Scalar.Typecheck
@@ -28,7 +27,7 @@ instance Atomize Program where
 instance Atomize Func where
     atomize = funcScope atomize
 
-instance Atomize f => Atomize (Scope v f) where
+instance (Atomize f, Scoping v) => Atomize (Scope v f) where
     atomize = typeIntro $ scopeElem atomize
 
 instance Atomize Body where
@@ -53,7 +52,7 @@ instance Atomize Statement where
 atomizeStatement w = do
     (a, (vardecls, statements)) <- runWriterT w
     return $ ScopeStatement
-           $ Scope (store id (M.fromList vardecls)) (Group (statements `snoc` statement a))
+           $ Scope (scoping vardecls) (Group (statements `snoc` statement a))
 
 atomizeExpression :: (TypeEnv m, NameStack t m) => Expression
                   -> WriterT ([VarDecl], [Statement Atom]) m Atom

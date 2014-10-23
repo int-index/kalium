@@ -1,16 +1,30 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 module Sodium.Nucleus.Scalar.Program
     ( module Sodium.Nucleus.Scalar.Program
     , module Sodium.Nucleus.Program
-    , pos, peeks, store
     ) where
 
 import Control.Lens
-import Control.Comonad.Store
 import qualified Data.Map as M
 
 import Sodium.Nucleus.Program
+
+class Typing t where
+    typing :: t -> Type
+
+instance Typing Type   where typing = id
+instance Typing ByType where typing = snd
+
+class Scoping v where
+    scoping :: v -> M.Map Name Type
+
+instance Typing t => Scoping (M.Map Name t) where
+    scoping = M.map typing
+instance Typing t => Scoping [(Name, t)] where
+    scoping = scoping . M.fromList
 
 data Program a = Program
     { _programFuncs :: M.Map Name (Func a)
@@ -39,7 +53,7 @@ data Statement a
     = Execute (Exec a)
     | ForStatement (ForCycle a)
     | IfStatement (If a)
-    | forall v . ScopeStatement (Scope v Statement a)
+    | forall v . Scoping v => ScopeStatement (Scope v Statement a)
     | Group [Statement a]
 
 data Exec a = Exec
@@ -62,7 +76,7 @@ data If a = If
     }
 
 data Scope v f a = Scope
-    { _scopeVars :: Store v (M.Map Name Type)
+    { _scopeVars :: v
     , _scopeElem :: f a
     }
 
@@ -88,4 +102,4 @@ data FuncSig = FuncSig
     } deriving (Eq)
 
 funcSig :: Func a -> FuncSig
-funcSig func = FuncSig (func ^. funcType) (func ^. funcScope . scopeVars & pos & map snd)
+funcSig func = FuncSig (func ^. funcType) (func ^. funcScope . scopeVars & map snd)

@@ -48,7 +48,6 @@ library
                        unordered-containers,
                        array,
                        lens,
-                       comonad,
                        profunctors,
                        haskell-src-exts == 1.16.*,
                        parsec

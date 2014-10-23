@@ -38,21 +38,21 @@ references params = unzip $ do
 vectorizeFunc :: E m => M.Map Name FuncSig -> (Name, Func Atom) -> m Vec.Func
 vectorizeFunc funcSigs (name, func) = do
     let params = func ^. funcScope . scopeVars
-    let (refnames, reftypes) = references (pos params)
+    let (refnames, reftypes) = references params
     let r = vectorizeBody funcSigs (func ^. funcScope . scopeElem) (map Access refnames)
     (_, vecBody)
             <- runReaderT r
-            $ initIndices (Vec.Index 0) (peeks id params)
+            $ initIndices (Vec.Index 0) (scoping params)
     let vecFuncSig = Vec.FuncSig name
           (func & funcSig & funcSigParamTypes & map snd)
           (func & funcSig & funcSigType)
           reftypes
-    return $ Vec.Func vecFuncSig (params & pos & map fst) (Vec.BodyStatement vecBody)
+    return $ Vec.Func vecFuncSig (params & map fst) (Vec.BodyStatement vecBody)
 
 patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
 expTuple = Vec.Tuple  . map (uncurry Vec.Access)
 
-vectorizeBody :: V t m => M.Map Name FuncSig -> Scope v Body Atom -> [Atom] -> t m ([Name], Vec.Body)
+vectorizeBody :: (V t m, Scoping v) => M.Map Name FuncSig -> Scope v Body Atom -> [Atom] -> t m ([Name], Vec.Body)
 vectorizeBody funcSigs scope results = do
     let vars = scope ^. scopeVars
     let Body statement result = scope ^. scopeElem
@@ -61,9 +61,9 @@ vectorizeBody funcSigs scope results = do
     return (changed, vecBody)
 
 
-vectorizeScope :: V t m => M.Map Name FuncSig -> Scope v Statement Atom -> t m ([Name], [Atom] -> m Vec.Body)
+vectorizeScope :: (V t m, Scoping v) => M.Map Name FuncSig -> Scope v Statement Atom -> t m ([Name], [Atom] -> m Vec.Body)
 vectorizeScope funcSigs scope = do
-    let vars = scope ^. scopeVars . to (peeks id)
+    let vars = scope ^. scopeVars . to scoping
     local (initIndices Vec.Uninitialized vars `M.union`) $ do
         (boundIndices, vecBind) <- do
             (changed, vecStatement) <- vectorizeStatement funcSigs (scope ^. scopeElem)
@@ -141,8 +141,9 @@ vectorizeStatement funcSigs = \case
         return (changed, Vec.ForStatement vecForCycle)
     IfStatement ifb -> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
-        (changedThen, vecBodyThenGen) <- vectorizeScope funcSigs (Scope (store id M.empty) (ifb ^. ifThen))
-        (changedElse, vecBodyElseGen) <- vectorizeScope funcSigs (Scope (store id M.empty) (ifb ^. ifElse))
+        let noscope = Scope (M.empty :: M.Map Name Type)
+        (changedThen, vecBodyThenGen) <- vectorizeScope funcSigs (ifb ^. ifThen & noscope)
+        (changedElse, vecBodyElseGen) <- vectorizeScope funcSigs (ifb ^. ifElse & noscope)
         let changed = nub $ changedThen ++ changedElse
         let accessChanged = map Access changed
         vecBodyThen <- lift $ vecBodyThenGen accessChanged

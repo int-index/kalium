@@ -29,19 +29,20 @@ instance Conv S.Program (D.Program D.Expression) where
     conv (S.Program funcs vars body) = do
         clMain <- do
             clBody <- convScope vars $ D.Body <$> conv body <*> pure (D.atom ())
-            return $ D.Func D.TypeUnit (D.Scope (D.store D.coerceParamsVars []) clBody)
+            let noparams = D.Scope ([] :: D.Params)
+            return $ D.Func D.TypeUnit (noparams clBody)
         clFuncs <- mapM conv funcs
         return $ D.Program (M.fromList $ (D.NameMain, clMain):clFuncs)
 
 convScope vardecls inner
         = D.Scope
-       <$> (D.store id <$> (M.fromList <$> mapM conv varDecls))
+       <$> (D.scoping <$> mapM conv varDecls)
        <*> local (M.union (M.fromList $ map varDeclToTup varDecls)) inner
    where varDecls = splitVarDecls vardecls
 
 convScope' paramdecls inner
         = D.Scope
-       <$> (D.store D.coerceParamsVars <$> mapM conv paramdecls)
+       <$> mapM conv paramdecls
        <*> local (M.union (M.fromList $ map paramDeclToTup paramdecls)) inner
 
 instance Conv S.Body (D.Statement D.Expression) where
@@ -167,7 +168,7 @@ instance Conv S.Statement (D.Statement D.Expression) where
                         D.statement $ D.If cond ifThen ifElse)
                      leafElse leafs
             return $ D.statement $ D.Scope
-                        (D.store id $ M.singleton clName clType)
+                        (M.singleton clName clType)
                         (D.Group [D.assign clName clExpr, statement])
 
 parseInt :: String -> Integer

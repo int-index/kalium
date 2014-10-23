@@ -80,5 +80,5 @@ instance TypeIntro (Program a) where
     typeIntro' program = tsFunctions
         %~ mappend (program ^. programFuncs & M.map funcSig)
 
-instance TypeIntro (Scope v f a) where
-    typeIntro' scope = tsVariables %~ mappend (scope ^. scopeVars . to (peeks id))
+instance Scoping v => TypeIntro (Scope v f a) where
+    typeIntro' scope = tsVariables %~ mappend (scope ^. scopeVars . to scoping)
