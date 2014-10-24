@@ -28,29 +28,80 @@ every expression is atomic, whereas in the non-atomic one some are not.
 \item [Program] is a set of functions, every function is uniquely identified by
 its name.
 
-\item [Function] consists of a parameter list and a scoped body. The body
-consists of a statement and an atomic expression---the result that the function
-returns. Every parameter can be passed either by value or by reference, and it
-is reflected in the signature.
+\item [Function] is the main unit of abstraction. It represents an action
+parametrized by values. This action also has a result --- the return value of
+the function. Calling a function is providing it with some values, one for each
+parameter, performing the action, and receiving the return value.
 
-A function defines two scopes:
-\begin {enumerate}
-\item Parameters scope introduces the names of parameters
-\item Body scope introduces the names of local variables
-\end {enumerate}
+Thus, a function has a parameter list that declares what values can influence
+the action and a body that defines this action. A parameter is basically a
+variable declaration, annotated by a passing mechanism. The body consists of a
+statement and an atomic expression that defines the return value.
 
-They are nested, meaning that the body scope is considered to be inside the
-parameters scope. It has implications on the name shadowing.
+That is, a function consists of a parameter list, local variables, and a body.
+Their precise scoping relation is described in another section. A function is
+also annotated by the type of its return value.
 
-\item [Scope] contains a set of variable declarations and an arbitary structure,
-in which those variables can be accessed. Variable declarations can be stored in
-arbitary form, from which an associative array can be derived, where the keys
-are variable names, and values are types.
+\item [Variable declaration] is a simple pair. The first element is the name
+of a variable, and the second element is its type.
 
-For example, a function defines a scope, where variable declarations are stored
-as a parameter list, and the structure inside the scope is the body of that
+\item [Function signature] describes how a function can be called. It contains
+the types and passing mechanisms of parameters, and the type of the return
+value. Function signature can be unambigously derived from the definition of a
 function.
 
+\item [Statement] is the main unit of execution. It represents an action to be
+performed at runtime. A statement can contain expressions, variable declarations
+and other statements. Inside a statement, variables can be accessed and
+functions can be called. Different statements capture different execution
+semantics.
+
+\item [Statement \emph{exec}] calls a function with some specific values. It
+optionally binds the return value to a variable. Thus, it consists of a name of
+the function to be called, a list of arguments, and an optional variable name.
+An argument is an expression which is evaluated in order to provide a function
+with a value of its parameter. The arguments are evaluated left-to-right before
+the call.
+
+\item [Statement \emph{if}] performs one action or another, dependening on the
+value of a condition. Thus, it consists of a boolean expression and two
+statements. It evaluates the condition, and if its value is \texttt{true}, then
+it executes the first statement, otherwise the value is \texttt{false} and the
+second statement is executed.
+
+\item [Statement \emph{for}] traverses a list of values, performing an action
+for each. It consists of a variable name (an iterator), a list expression and a
+statement. The following steps are performed:
+\begin {enumerate}
+\item Consider the whole list to be the remaining list;
+\item If the remaining list is empty---stop, otherwise proceed;
+\item Copy the value of the list head to the iterator;
+\item Execute the statement;
+\item Consider the list tail to be the remaining list;
+\item Goto step 2.
+\end {enumerate}
+The value of the iterator is undefined after the statement \emph{for}.
+
+\item [Statement \emph{group}] sequentially executes multiple statements. It
+consists of a list of statements. There are basically three possible cases:
+\begin {enumerate}
+\item The list is empty. In this case, no action is performed.
+\item The list has one statement. The group is operationally indistinguishable
+from this statement.
+\item The list has multiple statements. They are executed one at a time.
+\end {enumerate}
+
+\item [Statement \emph{scope}] introduces new variables for another statement.
+The structure that contains those variables can be arbitrary.
+
 \end {description}
+
+\subsection { Scoping Rules }
+
+A scope captures the scoping relation between two structures. The first one
+introduces variables, and the second one can access them. Thus a set of variable
+declarations should be derivable from the first structure.
+
+\subsubsection { Scoping in a Function }
 
 \end {document}
