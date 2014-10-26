@@ -94,6 +94,13 @@ from this statement.
 \item [Statement \emph{scope}] introduces new variables for another statement.
 The structure that contains those variables can be arbitrary.
 
+\item [Expression] can be atomic or non-atomic. In the former case, it's either
+variable access or a literal. In the latter case, it can also be a function
+call, which is replaced by the return value during evaluation.
+
+\item [Literal] represents a value of a certain type. They are stored in a form
+that allows easy analysis and manipulation.
+
 \end {description}
 
 \subsection { Scoping Rules }
