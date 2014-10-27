@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -8,10 +10,22 @@ module Sodium.Nucleus.Scalar.Build where
 import Data.Foldable
 import Sodium.Nucleus.Scalar.Program
 
-class LiftLiteral a where
-    literal :: a -> Literal
+class LiftType t where
+    type LiftedType t :: Type
 
-instance LiftLiteral Literal  where literal = id
+instance LiftType (Literal t) where
+    type LiftedType (Literal t) = t
+instance LiftType Integer  where type LiftedType Integer  = TypeInteger
+instance LiftType Rational where type LiftedType Rational = TypeDouble
+instance LiftType Bool     where type LiftedType Bool     = TypeBoolean
+instance LiftType String   where type LiftedType String   = TypeString
+instance LiftType ()       where type LiftedType ()       = TypeUnit
+
+class LiftLiteral a where
+    literal :: a -> Literal (LiftedType a)
+
+instance LiftLiteral (Literal t) where
+    literal = id
 instance LiftLiteral Integer  where literal = LitInteger
 instance LiftLiteral Rational where literal = LitDouble
 instance LiftLiteral Bool     where literal = LitBoolean

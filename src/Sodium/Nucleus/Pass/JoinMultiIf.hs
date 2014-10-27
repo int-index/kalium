@@ -17,13 +17,13 @@ joinMultiIfExpression = tryApply joinMultiIf
 
           merge :: [(Expression, Expression)] -> Maybe Expression
           merge (leaf:leafs) = case leaf of
-            (cond, a) | cond == Primary (LitBoolean True) -> Just a
+            (cond, a) | cond == Primary (LitBoolean' True) -> Just a
             _ -> fmap (MultiIfExpression . MultiIf . match leaf) (merge leafs)
           merge [] = Nothing
 
           match leaf = \case
             MultiIfExpression (MultiIf leafs') -> (leaf:leafs')
-            expr -> [leaf, (Primary (LitBoolean True), expr)]
+            expr -> [leaf, (Primary (LitBoolean' True), expr)]
 
 joinMultiIfStatement :: Statement -> Statement
 joinMultiIfStatement = tryApply

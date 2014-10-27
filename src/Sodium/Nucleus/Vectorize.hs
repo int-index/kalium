@@ -150,13 +150,13 @@ vectorizeStatement funcSigs = \case
         vecBodyElse <- lift $ vecBodyElseGen accessChanged
         let vecMultiIf = Vec.MultiIf
                 [ (vecCond, Vec.BodyStatement vecBodyThen)
-                , (Vec.Primary (LitBoolean True), Vec.BodyStatement vecBodyElse)
+                , (Vec.Primary (LitBoolean' True), Vec.BodyStatement vecBodyElse)
                 ]
         return $ (changed, Vec.MultiIfStatement vecMultiIf)
 
 vectorizeAtom :: V t m => Atom -> t m Vec.Expression
 vectorizeAtom = \case
-    Primary a -> return (Vec.Primary a)
+    Primary a -> return (Vec.Primary (Literal' a))
     Access name -> Vec.Access name <$> lookupIndex name
 
 readerToState :: (Functor m, Monad m) => ReaderT x m a -> StateT x m a

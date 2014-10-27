@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 module Sodium.Nucleus.Pass.Compute (compute) where
 
 import Control.Lens hiding (Index, Fold)
@@ -11,23 +12,23 @@ match :: Expression -> Expression
 match = \case
     Call (NameOp OpId) [expr] -> expr
     Call (NameOp op) [x]
-        | Primary (LitInteger a) <- x
+        | Primary (LitInteger' a) <- x
         , Just f <- unaryIntegerOp op
-        -> Primary (LitInteger (f a))
+        -> Primary (LitInteger' (f a))
     Call (NameOp op) [x, y]
-        | Primary (LitInteger a) <- x
-        , Primary (LitInteger b) <- y
+        | Primary (LitInteger' a) <- x
+        , Primary (LitInteger' b) <- y
         , Just f <- binaryIntegerOp op
-        -> Primary (LitInteger (f a b))
+        -> Primary (LitInteger' (f a b))
     Tuple [expr] -> expr
-    Tuple [    ] -> Primary LitUnit
-    Fold (NameOp OpMultiply) (Primary (LitInteger 1)) range
+    Tuple [    ] -> Primary LitUnit'
+    Fold (NameOp OpMultiply) (Primary (LitInteger' 1)) range
         -> Call (NameOp OpProduct) [range]
-    Fold (NameOp OpAdd)      (Primary (LitInteger 0)) range
+    Fold (NameOp OpAdd)      (Primary (LitInteger' 0)) range
         -> Call (NameOp OpSum)     [range]
-    Fold (NameOp OpAnd) (Primary (LitBoolean True ))  range
+    Fold (NameOp OpAnd) (Primary (LitBoolean' True ))  range
         -> Call (NameOp OpAnd')    [range]
-    Fold (NameOp OpOr)  (Primary (LitBoolean False))  range
+    Fold (NameOp OpOr)  (Primary (LitBoolean' False))  range
         -> Call (NameOp OpOr')     [range]
     expr -> expr
 

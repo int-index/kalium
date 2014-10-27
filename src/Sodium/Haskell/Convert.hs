@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances, FlexibleContexts  #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 module Sodium.Haskell.Convert (convert, reserved) where
 
@@ -151,15 +152,15 @@ instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.Bind a) where
 
     type Norm (S.Bind a) = H.Stmt
     conv (S.Bind S.PWildCard statement) = D.doExecute <$> conv statement
-    conv (S.Bind pattern statement)
+    conv (S.Bind pat statement)
          =  D.doBind
-        <$> conv pattern
+        <$> conv pat
         <*> conv statement
 
     type Pure (S.Bind a) = H.Decl
-    pureconv (S.Bind pattern statement)
+    pureconv (S.Bind pat statement)
          =  D.valueDef
-        <$> pureconv pattern
+        <$> pureconv pat
         <*> pureconv statement
 
 instance Conv S.Statement where
@@ -243,11 +244,11 @@ instance Conv S.Expression where
 
 convexpr :: S.Expression -> Maybe H.Exp
 convexpr (S.Primary prim) = return $ case prim of
-    S.LitInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
-    S.LitDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
-    S.LitString cs -> H.Lit (H.String cs)
-    S.LitBoolean a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
-    S.LitUnit -> H.Con (H.Special H.UnitCon)
+    S.LitInteger' n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
+    S.LitDouble'  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
+    S.LitString' cs -> H.Lit (H.String cs)
+    S.LitBoolean' a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
+    S.LitUnit' -> H.Con (H.Special H.UnitCon)
 convexpr (S.Access name i) = D.access <$> pureconv (Name name i)
 convexpr (S.Call op exprs) = do
     hsExprs <- mapM convexpr exprs

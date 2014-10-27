@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ConstraintKinds #-}
 module Sodium.Nucleus.Scalar.Typecheck where
@@ -35,7 +36,7 @@ type TypeEnv m = (Applicative m, MonadReader TypeScope m, MonadError TypeError m
 class Typecheck a where
     typecheck :: TypeEnv m => a -> m Type
 
-typecheckLiteral :: Literal -> Type
+typecheckLiteral :: Literal t -> Type
 typecheckLiteral = \case
     LitInteger _ -> TypeInteger
     LitDouble  _ -> TypeDouble
@@ -43,7 +44,7 @@ typecheckLiteral = \case
     LitString  _ -> TypeString
     LitUnit      -> TypeUnit
 
-instance Typecheck Literal where
+instance Typecheck (Literal t) where
     typecheck = return . typecheckLiteral
 
 instance Typecheck Atom where
