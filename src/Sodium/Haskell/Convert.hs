@@ -248,7 +248,7 @@ convexpr (S.Primary prim) = return $ case prim of
     S.LitDouble'  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
     S.LitString' cs -> H.Lit (H.String cs)
     S.LitBoolean' a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
-    S.LitUnit' -> H.Con (H.Special H.UnitCon)
+    S.LitUnit' () -> H.Con (H.Special H.UnitCon)
 convexpr (S.Access name i) = D.access <$> pureconv (Name name i)
 convexpr (S.Call op exprs) = do
     hsExprs <- mapM convexpr exprs

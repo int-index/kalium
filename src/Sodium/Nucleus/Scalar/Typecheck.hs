@@ -42,10 +42,13 @@ typecheckLiteral = \case
     LitDouble  _ -> TypeDouble
     LitBoolean _ -> TypeBoolean
     LitString  _ -> TypeString
-    LitUnit      -> TypeUnit
+    LitUnit    _ -> TypeUnit
 
 instance Typecheck (Literal t) where
     typecheck = return . typecheckLiteral
+
+instance Typecheck Literal' where
+    typecheck (Literal' lit) = typecheck lit
 
 instance Typecheck Atom where
     typecheck (Primary lit) = typecheck lit

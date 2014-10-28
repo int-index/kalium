@@ -156,7 +156,7 @@ vectorizeStatement funcSigs = \case
 
 vectorizeAtom :: V t m => Atom -> t m Vec.Expression
 vectorizeAtom = \case
-    Primary a -> return (Vec.Primary (Literal' a))
+    Primary a -> return (Vec.Primary a)
     Access name -> Vec.Access name <$> lookupIndex name
 
 readerToState :: (Functor m, Monad m) => ReaderT x m a -> StateT x m a

@@ -21,7 +21,7 @@ match = \case
         , Just f <- binaryIntegerOp op
         -> Primary (LitInteger' (f a b))
     Tuple [expr] -> expr
-    Tuple [    ] -> Primary LitUnit'
+    Tuple [    ] -> Primary (LitUnit' ())
     Fold (NameOp OpMultiply) (Primary (LitInteger' 1)) range
         -> Call (NameOp OpProduct) [range]
     Fold (NameOp OpAdd)      (Primary (LitInteger' 0)) range

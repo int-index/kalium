@@ -86,7 +86,7 @@ data Expression
 
 data Atom
     = Access Name
-    | forall t . Primary (Literal t)
+    | Primary Literal'
 
 makeLenses ''Func
 makeLenses ''Body

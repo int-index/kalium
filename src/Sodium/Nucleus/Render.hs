@@ -77,7 +77,7 @@ instance Render (Literal t) where
         LitDouble  x -> show x
         LitBoolean x -> show x
         LitString  x -> show x
-        LitUnit -> "()"
+        LitUnit    x -> show x
 
 instance Render Type where
     render = \case

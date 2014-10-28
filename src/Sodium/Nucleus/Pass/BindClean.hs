@@ -40,7 +40,7 @@ patClean _ = []
 type Cleaner = Expression -> Maybe Expression
 
 wildCleaner :: Cleaner
-wildCleaner _ = Just (Primary LitUnit')
+wildCleaner _ = Just (Primary (LitUnit' ()))
 
 tupWildCleaner :: [Pattern] -> Int -> Cleaner
 tupWildCleaner pats n expr = getFirst (First direct <> First indirect)

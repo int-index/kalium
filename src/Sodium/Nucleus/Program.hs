@@ -1,12 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
 module Sodium.Nucleus.Program where
 
-import Control.Monad (msum)
 import qualified Data.Map as M
 
 data Name
@@ -46,12 +46,12 @@ data Operator
     deriving (Eq, Ord, Show)
 
 data Literal (t :: Type) where
-    LitInteger :: Integer   -> Literal TypeInteger
-    LitDouble  :: Rational  -> Literal TypeDouble
-    LitBoolean :: Bool      -> Literal TypeBoolean
-    LitString  :: String    -> Literal TypeString
-    LitUnit ::  Literal TypeUnit
-    LitList :: [Literal t] -> Literal (TypeList t)
+    LitInteger :: TypeRepr TypeInteger -> Literal TypeInteger
+    LitDouble  :: TypeRepr TypeDouble  -> Literal TypeDouble
+    LitBoolean :: TypeRepr TypeBoolean -> Literal TypeBoolean
+    LitString  :: TypeRepr TypeString  -> Literal TypeString
+    LitUnit    :: TypeRepr TypeUnit    -> Literal TypeUnit
+    LitSuper :: (r ~ TypeRepr t, Eq r, Show r) => r -> Literal t
 
 deriving instance Eq   (Literal t)
 deriving instance Show (Literal t)
@@ -60,35 +60,19 @@ data Literal' = forall t . Literal' (Literal t)
 
 deriving instance Show Literal'
 
-instance Eq Literal' where
-    Literal' l1 == Literal' l2 = maybe False id $ msum
-        [ do LitInteger x <- Just l1
-             LitInteger y <- Just l2
-             return (x == y)
-        , do LitDouble x <- Just l1
-             LitDouble y <- Just l2
-             return (x == y)
-        , do LitBoolean x <- Just l1
-             LitBoolean y <- Just l2
-             return (x == y)
-        , do LitString x <- Just l1
-             LitString y <- Just l2
-             return (x == y)
-        , do LitUnit <- Just l1
-             LitUnit <- Just l2
-             return True
-        , do LitList xs <- Just l1
-             LitList ys <- Just l2
-             let x' = map Literal' xs
-             let y' = map Literal' ys
-             return (x' == y')
-        ]
-
 pattern LitInteger' a = Literal' (LitInteger a)
 pattern LitDouble'  a = Literal' (LitDouble  a)
 pattern LitBoolean' a = Literal' (LitBoolean a)
 pattern LitString'  a = Literal' (LitString  a)
-pattern LitUnit'      = Literal' (LitUnit)
+pattern LitUnit'    a = Literal' (LitUnit a)
+
+instance Eq Literal' where
+    LitInteger' x == LitInteger' y = x == y
+    LitDouble'  x == LitDouble'  y = x == y
+    LitBoolean' x == LitBoolean' y = x == y
+    LitString'  x == LitString'  y = x == y
+    LitUnit'    x == LitUnit'    y = x == y
+    _ == _ = False
 
 data Type
     = TypeInteger
@@ -98,6 +82,14 @@ data Type
     | TypeUnit
     | TypeList Type
     deriving (Eq, Ord, Show)
+
+type family TypeRepr (t :: Type) where
+    TypeRepr TypeInteger = Integer
+    TypeRepr TypeDouble  = Rational
+    TypeRepr TypeBoolean = Bool
+    TypeRepr TypeString  = String
+    TypeRepr TypeUnit    = ()
+    TypeRepr (TypeList ts) = [TypeRepr ts]
 
 type Vars
     = M.Map Name Type

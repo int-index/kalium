@@ -30,14 +30,14 @@ instance LiftLiteral Integer  where literal = LitInteger
 instance LiftLiteral Rational where literal = LitDouble
 instance LiftLiteral Bool     where literal = LitBoolean
 instance LiftLiteral String   where literal = LitString
-instance LiftLiteral ()       where literal = const LitUnit
+instance LiftLiteral ()       where literal = LitUnit
 
 class LiftAtom a where
     atom :: a -> Atom
 
 instance LiftAtom Atom where atom = id
 instance LiftAtom Name where atom = Access
-instance LiftLiteral a => LiftAtom a where atom = Primary . literal
+instance LiftLiteral a => LiftAtom a where atom = Primary . Literal' . literal
 
 expression :: LiftAtom a => a -> Expression
 expression = Atom . atom
