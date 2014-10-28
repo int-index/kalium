@@ -11,15 +11,15 @@ import Data.Foldable
 import Sodium.Nucleus.Scalar.Program
 
 class LiftLiteral a where
-    literal :: a -> DLiteral
+    literal :: a -> Literal
 
-instance LiftLiteral DLiteral where
+instance LiftLiteral Literal where
     literal = id
-instance LiftLiteral Integer  where literal = DLit STypeInteger
-instance LiftLiteral Rational where literal = DLit STypeDouble
-instance LiftLiteral Bool     where literal = DLit STypeBoolean
-instance LiftLiteral String   where literal = DLit STypeString
-instance LiftLiteral ()       where literal = DLit STypeUnit
+instance LiftLiteral Integer  where literal = Lit STypeInteger
+instance LiftLiteral Rational where literal = Lit STypeDouble
+instance LiftLiteral Bool     where literal = Lit STypeBoolean
+instance LiftLiteral String   where literal = Lit STypeString
+instance LiftLiteral ()       where literal = Lit STypeUnit
 
 class LiftAtom a where
     atom :: a -> Atom

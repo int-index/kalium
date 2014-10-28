@@ -72,7 +72,7 @@ data Expression
     = Access Name Index
     | Fold Name Expression Expression
     | Call Name [Expression]
-    | Primary DLiteral
+    | Primary Literal
     | Tuple [Expression]
     | MultiIfExpression (MultiIf Expression)
     deriving (Eq, Show)

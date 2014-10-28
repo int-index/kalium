@@ -150,7 +150,7 @@ vectorizeStatement funcSigs = \case
         vecBodyElse <- lift $ vecBodyElseGen accessChanged
         let vecMultiIf = Vec.MultiIf
                 [ (vecCond, Vec.BodyStatement vecBodyThen)
-                , (Vec.Primary (DLit STypeBoolean True), Vec.BodyStatement vecBodyElse)
+                , (Vec.Primary (Lit STypeBoolean True), Vec.BodyStatement vecBodyElse)
                 ]
         return $ (changed, Vec.MultiIfStatement vecMultiIf)
 

@@ -68,8 +68,8 @@ instance Render FuncSig where
         , commas (map render (funcSig ^. funcRetRefs))
         ]
 
-instance Render DLiteral where
-    render (DLit _ r) = show r
+instance Render Literal where
+    render (Lit _ r) = show r
 
 instance Render Type where
     render = \case

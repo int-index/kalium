@@ -244,11 +244,11 @@ instance Conv S.Expression where
 
 convexpr :: S.Expression -> Maybe H.Exp
 convexpr (S.Primary prim) = return $ case prim of
-    S.DLit S.STypeInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
-    S.DLit S.STypeDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
-    S.DLit S.STypeString cs -> H.Lit (H.String cs)
-    S.DLit S.STypeBoolean a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
-    S.DLit S.STypeUnit   () -> H.Con (H.Special H.UnitCon)
+    S.Lit S.STypeInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
+    S.Lit S.STypeDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
+    S.Lit S.STypeString cs -> H.Lit (H.String cs)
+    S.Lit S.STypeBoolean a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
+    S.Lit S.STypeUnit   () -> H.Con (H.Special H.UnitCon)
 convexpr (S.Access name i) = D.access <$> pureconv (Name name i)
 convexpr (S.Call op exprs) = do
     hsExprs <- mapM convexpr exprs

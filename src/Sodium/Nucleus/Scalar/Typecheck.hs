@@ -36,8 +36,8 @@ type TypeEnv m = (Applicative m, MonadReader TypeScope m, MonadError TypeError m
 class Typecheck a where
     typecheck :: TypeEnv m => a -> m Type
 
-instance Typecheck DLiteral where
-    typecheck = return . typecheckDLiteral
+instance Typecheck Literal where
+    typecheck = return . typecheckLiteral
 
 instance Typecheck Atom where
     typecheck (Primary lit) = typecheck lit

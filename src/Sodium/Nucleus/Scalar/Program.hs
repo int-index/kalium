@@ -86,7 +86,7 @@ data Expression
 
 data Atom
     = Access Name
-    | Primary DLiteral
+    | Primary Literal
 
 makeLenses ''Func
 makeLenses ''Body

@@ -12,23 +12,23 @@ match :: Expression -> Expression
 match = \case
     Call (NameOp OpId) [expr] -> expr
     Call (NameOp op) [x]
-        | Primary (DLit STypeInteger a) <- x
+        | Primary (Lit STypeInteger a) <- x
         , Just f <- unaryIntegerOp op
-        -> Primary (DLit STypeInteger (f a))
+        -> Primary (Lit STypeInteger (f a))
     Call (NameOp op) [x, y]
-        | Primary (DLit STypeInteger a) <- x
-        , Primary (DLit STypeInteger b) <- y
+        | Primary (Lit STypeInteger a) <- x
+        , Primary (Lit STypeInteger b) <- y
         , Just f <- binaryIntegerOp op
-        -> Primary (DLit STypeInteger (f a b))
+        -> Primary (Lit STypeInteger (f a b))
     Tuple [expr] -> expr
-    Tuple [    ] -> Primary (DLit STypeUnit ())
-    Fold (NameOp OpMultiply) (Primary (DLit STypeInteger 1)) range
+    Tuple [    ] -> Primary (Lit STypeUnit ())
+    Fold (NameOp OpMultiply) (Primary (Lit STypeInteger 1)) range
         -> Call (NameOp OpProduct) [range]
-    Fold (NameOp OpAdd)      (Primary (DLit STypeInteger 0)) range
+    Fold (NameOp OpAdd)      (Primary (Lit STypeInteger 0)) range
         -> Call (NameOp OpSum)     [range]
-    Fold (NameOp OpAnd) (Primary (DLit STypeBoolean True ))  range
+    Fold (NameOp OpAnd) (Primary (Lit STypeBoolean True ))  range
         -> Call (NameOp OpAnd')    [range]
-    Fold (NameOp OpOr)  (Primary (DLit STypeBoolean False))  range
+    Fold (NameOp OpOr)  (Primary (Lit STypeBoolean False))  range
         -> Call (NameOp OpOr')     [range]
     expr -> expr
 
