@@ -20,6 +20,9 @@ flattenBodyBind body = (freeBinds, set bodyBinds closedBinds body)
 flattenBind :: Bind Statement -> [Bind Statement]
 flattenBind bind = maybe [bind] id $ do
     BodyStatement body <- return (bind ^. bindStatement)
-    let (binds, body') = flattenBodyBind body
-    let cx = [bindStatement .~ BodyStatement body' $ bind]
-    return (binds ++ cx)
+    case bind ^. bindPattern of
+        PWildCard -> return (body ^. bodyBinds)
+        _ -> do
+            let (binds, body') = flattenBodyBind body
+            let cx = [bindStatement .~ BodyStatement body' $ bind]
+            return (binds ++ cx)
