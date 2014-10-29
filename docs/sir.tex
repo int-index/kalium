@@ -98,7 +98,7 @@ The structure that contains those variables can be arbitrary.
 variable access or a literal. In the latter case, it can also be a function
 call, which is replaced by the return value during evaluation.
 
-\item [Literal] represents a value of a certain type. They are stored in a form
+\item [Literal] represents a value of a certain type. It is stored in a form
 that allows easy analysis and manipulation.
 
 \end {description}
@@ -110,5 +110,22 @@ introduces variables, and the second one can access them. Thus a set of variable
 declarations should be derivable from the first structure.
 
 \subsubsection { Scoping in a Function }
+
+Parameter list creates a scope where a variable per parameter is introduced.
+Inside there's another scope, created by local variables, that contains the
+body. Thus, parameters are shadowed by local variables, and the the body has
+access to both of them.
+
+\subsubsection { Scoping in a Statement }
+
+Statement \emph{scope} creates a scope. The variables it introduces do not exist
+outside the statement, and inside the statement they can shadow the existing
+ones. The value of an introduced variable is undefined.
+
+\subsubsection { Name Shadowing }
+
+When a scope introduces a variable with a name that was already introduced, it
+is called name shadowing. The new variable is used instead the old one inside
+the scope. They both exist independently, but the old variable is not visible.
 
 \end {document}
