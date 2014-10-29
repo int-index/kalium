@@ -179,8 +179,9 @@ instance Conv S.Statement where
             args -> (<$> mapM conv args) $ \case
                 [] -> H.App (D.access "putStrLn") (H.Lit (H.String ""))
                 hsExprs
-                    -> H.App (D.access "putStrLn")
-                     $ foldl1 (\x y -> betaL [D.access "++", x, y])
+                    -> D.matchExpression
+                     $ H.App (D.access "putStrLn")
+                     $ foldr1 (\x y -> betaL [D.access "++", x, y])
                      $ hsExprs
     conv (S.Execute op args) = error ("Execute " ++ show op ++ " " ++ show args)
     conv (S.ForStatement  forCycle) = conv forCycle
