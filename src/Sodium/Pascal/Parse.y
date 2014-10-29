@@ -220,6 +220,7 @@ match_type t = case t of
     "real"    -> PasReal
     "boolean" -> PasBoolean
     "string"  -> PasString
+    "char"    -> PasChar
     _         -> PasType t
 
 tokenize :: String -> Either P.ParseError [T.Token]

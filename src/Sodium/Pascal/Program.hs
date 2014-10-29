@@ -68,11 +68,12 @@ data UnaryOperator
     deriving (Show)
 
 data PasType
-	= PasInteger
-	| PasLongInt
-	| PasReal
-	| PasBoolean
-	| PasString
-	| PasArray PasType
-	| PasType Name
-	deriving (Eq, Show)
+    = PasInteger
+    | PasLongInt
+    | PasReal
+    | PasBoolean
+    | PasString
+    | PasArray PasType
+    | PasChar
+    | PasType Name
+    deriving (Eq, Show)

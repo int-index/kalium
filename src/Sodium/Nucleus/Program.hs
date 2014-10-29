@@ -71,9 +71,10 @@ deriving instance Show (Sing (t :: Type))
 deriving instance Show Literal
 
 instance Eq Literal where
-    Lit t1 r1 == Lit t2 r2 = case testEquality t1 t2 of
-        Just Refl -> r1 == r2
-        Nothing -> False
+    Lit t1 r1 == Lit t2 r2
+        | Just Refl <- testEquality t1 t2
+        = r1 == r2
+    _ == _ = False
 
 typecheckLiteral :: Literal -> Type
 typecheckLiteral (Lit t _) = fromSing t

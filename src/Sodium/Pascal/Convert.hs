@@ -89,6 +89,7 @@ instance Conv S.PasType D.Type where
         S.PasLongInt -> return D.TypeInteger
         S.PasReal    -> return D.TypeDouble
         S.PasBoolean -> return D.TypeBoolean
+        S.PasChar    -> return D.TypeChar
         S.PasString  -> return (D.TypeList D.TypeChar)
         S.PasArray t -> D.TypeList <$> conv t
         S.PasType _  -> error "Custom types are not implemented"
