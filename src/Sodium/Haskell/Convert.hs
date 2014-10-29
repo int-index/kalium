@@ -81,7 +81,7 @@ instance Conv S.Type where
         S.TypeInteger -> D.hsName "Int"
         S.TypeDouble  -> D.hsName "Double"
         S.TypeBoolean -> D.hsName "Bool"
-        S.TypeString  -> D.hsName "String"
+        S.TypeList S.TypeChar -> D.hsName "String"
         S.TypeUnit    -> H.Special H.UnitCon
 
 instance Conv S.Body where
@@ -167,7 +167,7 @@ instance Conv S.Statement where
 
     type Norm S.Statement = H.Exp
     conv (S.Execute (S.NameOp (S.OpReadLn t)) [])
-        | t == S.TypeString = return (D.access "getLine")
+        | t == S.TypeList S.TypeChar = return (D.access "getLine")
         | otherwise = do
                 hsType <- conv t
                 return $ H.ExpTypeSig H.noLoc
@@ -246,7 +246,7 @@ convexpr :: S.Expression -> Maybe H.Exp
 convexpr (S.Primary prim) = return $ case prim of
     S.Lit S.STypeInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
     S.Lit S.STypeDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
-    S.Lit S.STypeString cs -> H.Lit (H.String cs)
+    S.Lit (S.STypeList S.STypeChar) cs -> H.Lit (H.String cs)
     S.Lit S.STypeBoolean a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
     S.Lit S.STypeUnit   () -> H.Con (H.Special H.UnitCon)
 convexpr (S.Access name i) = D.access <$> pureconv (Name name i)

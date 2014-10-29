@@ -89,8 +89,8 @@ instance Conv S.PasType D.Type where
         S.PasLongInt -> return D.TypeInteger
         S.PasReal    -> return D.TypeDouble
         S.PasBoolean -> return D.TypeBoolean
-        S.PasString  -> return D.TypeString
-        S.PasArray _ -> error "Arrays are not implemented"
+        S.PasString  -> return (D.TypeList D.TypeChar)
+        S.PasArray t -> D.TypeList <$> conv t
         S.PasType _  -> error "Custom types are not implemented"
 
 binary op a b = D.Call op [a,b]

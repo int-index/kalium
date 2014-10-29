@@ -18,7 +18,7 @@ instance LiftLiteral Literal where
 instance LiftLiteral Integer  where literal = Lit STypeInteger
 instance LiftLiteral Rational where literal = Lit STypeDouble
 instance LiftLiteral Bool     where literal = Lit STypeBoolean
-instance LiftLiteral String   where literal = Lit STypeString
+instance LiftLiteral String   where literal = Lit (STypeList STypeChar)
 instance LiftLiteral ()       where literal = Lit STypeUnit
 
 class LiftAtom a where

@@ -18,7 +18,7 @@ singletons [d|
         = TypeInteger
         | TypeDouble
         | TypeBoolean
-        | TypeString
+        | TypeChar
         | TypeUnit
         | TypeList Type
         deriving (Eq)
@@ -82,7 +82,7 @@ type family TypeRepr (t :: Type) where
     TypeRepr TypeInteger = Integer
     TypeRepr TypeDouble  = Rational
     TypeRepr TypeBoolean = Bool
-    TypeRepr TypeString  = String
+    TypeRepr TypeChar    = Char
     TypeRepr TypeUnit    = ()
     TypeRepr (TypeList ts) = [TypeRepr ts]
 

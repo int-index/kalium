@@ -76,7 +76,8 @@ instance Render Type where
         TypeInteger -> "Integer"
         TypeDouble  -> "Double"
         TypeBoolean -> "Boolean"
-        TypeString  -> "String"
+        TypeChar    -> "Char"
+        TypeList t  -> "List " ++ parens (render t)
         TypeUnit    -> "()"
 
 instance Render Program where
