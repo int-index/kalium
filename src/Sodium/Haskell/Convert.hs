@@ -82,6 +82,7 @@ instance Conv S.Type where
         S.TypeDouble  -> D.hsName "Double"
         S.TypeBoolean -> D.hsName "Bool"
         S.TypeList S.TypeChar -> D.hsName "String"
+        S.TypeChar    -> D.hsName "Char"
         S.TypeUnit    -> H.Special H.UnitCon
 
 instance Conv S.Body where

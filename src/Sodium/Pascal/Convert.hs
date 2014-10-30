@@ -113,7 +113,7 @@ convWriteLn exprs = do
             S.Quote _ -> return True
             S.Access name -> do
                 ty <- lookupType name
-                return (ty == S.PasString)
+                return (ty == S.PasString || ty == S.PasChar)
             _ -> return False
           let wrap = if noShow then id else (\e -> D.Call (D.NameOp D.OpShow) [e])
           wrap <$> conv expr
