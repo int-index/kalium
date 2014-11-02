@@ -195,7 +195,7 @@ Atom : name  { Access $1 }
      | false { Primary (LitBool False) }
      | inumber { Primary (LitInt  $1) }
      | fnumber { Primary (LitReal $1) }
-     | quote   { Primary (LitStr  $1) }
+     | quote   { match_quote $1 }
 
 Call : name Arguments { Call (Right $1) $2 }
 
@@ -213,6 +213,9 @@ binary op x y = Call (Left op) [x, y]
 
 parse :: String -> Except P.ParseError Program
 parse = except . P.parse parser ""
+
+match_quote [c] = Primary (LitChar c)
+match_quote cs  = Primary (LitStr cs)
 
 match_type t = case t of
     "integer" -> TypeInteger

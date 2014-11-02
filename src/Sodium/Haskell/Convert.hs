@@ -245,12 +245,7 @@ instance Conv S.Expression where
     pureconv expr = D.matchExpression <$> convexpr expr
 
 convexpr :: S.Expression -> Maybe H.Exp
-convexpr (S.Primary prim) = return $ case prim of
-    S.Lit S.STypeInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
-    S.Lit S.STypeDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
-    S.Lit (S.STypeList S.STypeChar) cs -> H.Lit (H.String cs)
-    S.Lit S.STypeBoolean a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
-    S.Lit S.STypeUnit   () -> H.Con (H.Special H.UnitCon)
+convexpr (S.Primary lit) = return (convlit lit)
 convexpr (S.Access name i) = D.access <$> pureconv (Name name i)
 convexpr (S.Call op exprs) = do
     hsExprs <- mapM convexpr exprs
@@ -261,6 +256,15 @@ convexpr (S.Fold op expr range) = do
     hsRange <- convexpr range
     return $ betaL [D.access "foldl", D.access (transformName op), hsArgExpr, hsRange]
 convexpr (S.MultiIfExpression multiIf) = pureconv multiIf
+
+convlit :: S.Literal -> H.Exp
+convlit = \case
+    S.Lit S.STypeInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
+    S.Lit S.STypeDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
+    S.Lit (S.STypeChar)  c -> H.Lit (H.Char c)
+    S.Lit S.STypeBoolean a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
+    S.Lit S.STypeUnit   () -> H.Con (H.Special H.UnitCon)
+    S.Lit (S.STypeList S.STypeChar) cs -> H.Lit (H.String cs)
 
 convOp :: S.Operator -> D.Name
 convOp = \case

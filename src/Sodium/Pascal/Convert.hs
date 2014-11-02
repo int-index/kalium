@@ -99,7 +99,8 @@ convWriteLn exprs = do
           -- TODO: apply `show` only to non-String
           -- expressions as soon as typecheck is implemented
           noShow <- case expr of
-            S.Primary (S.LitStr _) -> return True
+            S.Primary (S.LitStr  _) -> return True
+            S.Primary (S.LitChar _) -> return True
             S.Access name -> do
                 ty <- lookupType name
                 return (ty == S.TypeString || ty == S.TypeChar)
@@ -173,6 +174,7 @@ instance Conv S.Literal D.Expression where
         S.LitInt  x -> return (D.expression x)
         S.LitReal x -> return (D.expression x)
         S.LitStr  x -> return (D.expression x)
+        S.LitChar x -> return (D.expression x)
         S.LitBool x -> return (D.expression x)
 
 instance Conv S.Operator D.Name where

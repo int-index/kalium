@@ -45,6 +45,7 @@ data Literal
     = LitBool Bool
     | LitInt  Integer
     | LitReal Rational
+    | LitChar Char
     | LitStr  String
     deriving (Eq, Show)
 
