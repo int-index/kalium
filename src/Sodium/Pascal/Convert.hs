@@ -7,8 +7,6 @@ import Prelude hiding (mapM)
 import Control.Applicative
 import Control.Monad.Reader hiding (mapM)
 import qualified Data.Map  as M
-import qualified Data.Char as C
-import Data.Ratio
 import Data.Traversable
 -- S for Src, D for Dest
 import qualified Sodium.Pascal.Program as S
@@ -23,7 +21,7 @@ nameV = D.NameSpace "v" . D.Name
 nameF = D.NameSpace "f" . D.Name
 
 class Conv s d | s -> d where
-    conv :: NameStack t m => s -> ReaderT (M.Map S.Name S.PasType) m d
+    conv :: NameStack t m => s -> ReaderT (M.Map S.Name S.Type) m d
 
 instance Conv S.Program (D.Program D.Expression) where
     conv (S.Program funcs vars body) = do
@@ -36,9 +34,8 @@ instance Conv S.Program (D.Program D.Expression) where
 
 convScope vardecls inner
         = D.Scope
-       <$> (D.scoping <$> mapM conv varDecls)
-       <*> local (M.union (M.fromList $ map varDeclToTup varDecls)) inner
-   where varDecls = splitVarDecls vardecls
+       <$> (D.scoping <$> mapM conv (M.toList vardecls))
+       <*> local (M.union vardecls) inner
 
 convScope' paramdecls inner
         = D.Scope
@@ -51,48 +48,40 @@ instance Conv S.Body (D.Statement D.Expression) where
 instance Conv S.Func (D.Name, D.Func D.Expression) where
     conv (S.Func name params pasType vars body) = do
         (retExpr, retType, retVars) <- case pasType of
-            Nothing -> return (D.atom (), D.TypeUnit, [])
+            Nothing -> return (D.atom (), D.TypeUnit, M.empty)
             Just ty -> do
                 let retName = nameV name
                 retType <- conv ty
-                return (D.atom retName, retType, [S.VarDecl [name] ty])
-        clScope <- convScope' (splitParamDecls params)
-                 $ convScope (vars ++ retVars)
+                return (D.atom retName, retType, M.singleton name ty)
+        clScope <- convScope' params
+                 $ convScope (M.union vars retVars)
                  $ D.Body <$> conv body <*> pure retExpr
         let fname = nameF name
         return $ (fname, D.Func retType clScope)
 
-splitVarDecls vardecls
-    = [VarDecl name t | S.VarDecl names t <- vardecls, name <- names]
+paramDeclToTup (S.ParamDecl name (_, ty)) = (name, ty)
 
-splitParamDecls paramdecls
-    = [ParamDecl name r t | S.ParamDecl names r t <- paramdecls, name <- names]
-
-varDeclToTup (VarDecl name ty) = (name, ty)
-paramDeclToTup (ParamDecl name _ ty) = (name, ty)
-
-data VarDecl   = VarDecl   S.Name      S.PasType
-data ParamDecl = ParamDecl S.Name Bool S.PasType
-
-instance Conv VarDecl (D.Name, D.Type) where
-    conv (VarDecl name pasType)
+instance Conv (S.Name, S.Type) (D.Name, D.Type) where
+    conv (name, pasType)
          = (,) <$> pure (nameV name) <*> conv pasType
 
-instance Conv ParamDecl (D.Name, D.ByType) where
-    conv (ParamDecl name r pasType)
-        = (,) <$> pure (nameV name) <*> (annotate <$> conv pasType)
-        where annotate = (,) (if r then D.ByReference else D.ByValue)
+instance Conv S.ParamDecl (D.Name, D.ByType) where
+    conv (S.ParamDecl name (r, pasType))
+        = (,) <$> pure (nameV name) <*> ((,) <$> conv r <*> conv pasType)
 
-instance Conv S.PasType D.Type where
+instance Conv S.By D.By where
+    conv S.ByValue     = pure D.ByValue
+    conv S.ByReference = pure D.ByReference
+
+instance Conv S.Type D.Type where
     conv = \case
-        S.PasInteger -> return D.TypeInteger
-        S.PasLongInt -> return D.TypeInteger
-        S.PasReal    -> return D.TypeDouble
-        S.PasBoolean -> return D.TypeBoolean
-        S.PasChar    -> return D.TypeChar
-        S.PasString  -> return (D.TypeList D.TypeChar)
-        S.PasArray t -> D.TypeList <$> conv t
-        S.PasType _  -> error "Custom types are not implemented"
+        S.TypeInteger -> return D.TypeInteger
+        S.TypeReal    -> return D.TypeDouble
+        S.TypeBoolean -> return D.TypeBoolean
+        S.TypeChar    -> return D.TypeChar
+        S.TypeString  -> return (D.TypeList D.TypeChar)
+        S.TypeArray t -> D.TypeList <$> conv t
+        S.TypeCustom _  -> error "Custom types are not implemented"
 
 binary op a b = D.Call op [a,b]
 
@@ -110,10 +99,10 @@ convWriteLn exprs = do
           -- TODO: apply `show` only to non-String
           -- expressions as soon as typecheck is implemented
           noShow <- case expr of
-            S.Quote _ -> return True
+            S.Primary (S.LitStr _) -> return True
             S.Access name -> do
                 ty <- lookupType name
-                return (ty == S.PasString || ty == S.PasChar)
+                return (ty == S.TypeString || ty == S.TypeChar)
             _ -> return False
           let wrap = if noShow then id else (\e -> D.Call (D.NameOp D.OpShow) [e])
           wrap <$> conv expr
@@ -172,33 +161,20 @@ instance Conv S.Statement (D.Statement D.Expression) where
                         (M.singleton clName clType)
                         (D.Group [D.assign clName clExpr, statement])
 
-parseInt :: String -> Integer
-parseInt = foldl (\acc c -> fromIntegral (C.digitToInt c) + acc * 10) 0
-
-parseFrac :: String -> String -> Rational
-parseFrac intSection fracSection = parseInt (intSection ++ fracSection)
-                                 % 10 ^ length fracSection
-
-parseExp :: String -> String -> Bool -> String -> Rational
-parseExp intSection fracSection eSign eSection
-    = (if eSign then (*) else (/))
-        (parseFrac intSection fracSection)
-        (10 ^ parseInt eSection)
-
 instance Conv S.Expression D.Expression where
     conv = \case
         S.Access name -> return $ D.expression (nameV name)
         S.Call name exprs -> D.Call <$> pure (nameF name) <*> mapM conv exprs
-        S.INumber intSection -> return $ D.expression (parseInt intSection)
-        S.FNumber intSection fracSection
-            -> return $ D.expression (parseFrac intSection fracSection)
-        S.ENumber intSection fracSection eSign eSection
-            -> return $ D.expression (parseExp intSection fracSection eSign eSection)
-        S.Quote cs -> return (D.expression cs)
-        S.BTrue    -> return (D.expression True)
-        S.BFalse   -> return (D.expression False)
+        S.Primary lit -> conv lit
         S.Binary op x y -> binary <$> conv op <*> conv x <*> conv y
         S.Unary  op x   -> D.Call <$> conv op <*> mapM conv [x]
+
+instance Conv S.Literal D.Expression where
+    conv = \case
+        S.LitInt  x -> return (D.expression x)
+        S.LitReal x -> return (D.expression x)
+        S.LitStr  x -> return (D.expression x)
+        S.LitBool x -> return (D.expression x)
 
 instance Conv S.Operator D.Name where
     conv = return . D.NameOp . \case

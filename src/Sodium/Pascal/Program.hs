@@ -1,48 +1,54 @@
 module Sodium.Pascal.Program where
 
+import qualified Data.Map as M
+
 type Name = String
 
 data Program
 	= Program [Func] Vars Body
 	deriving (Show)
 
-type Vars = [VarDecl]
+type Vars = M.Map Name Type
 type Params = [ParamDecl]
 
 type Body = [Statement]
 
 data Func
-    = Func Name Params (Maybe PasType) Vars Body
-    deriving (Show)
-
-data VarDecl
-    = VarDecl [Name] PasType
+    = Func Name Params (Maybe Type) Vars Body
     deriving (Show)
 
 data ParamDecl
-    = ParamDecl [Name] Bool PasType
+    = ParamDecl Name (By, Type)
     deriving (Show)
 
+data By
+    = ByReference
+    | ByValue
+    deriving (Eq, Show)
+
 data Statement
-	= Assign Name Expression
-	| Execute Name [Expression]
-	| ForCycle Name Expression Expression Statement
-	| IfBranch Expression Statement (Maybe Statement)
-	| CaseBranch Expression [([Expression], Statement)] (Maybe Statement)
-	| BodyStatement Body
-	deriving (Show)
+    = Assign Name Expression
+    | Execute Name [Expression]
+    | ForCycle Name Expression Expression Statement
+    | IfBranch Expression Statement (Maybe Statement)
+    | CaseBranch Expression [([Expression], Statement)] (Maybe Statement)
+    | BodyStatement Body
+    deriving (Show)
 
 data Expression
-	= Access Name
-	| Call Name [Expression]
-	| INumber String
-	| FNumber String String
-	| ENumber String String Bool String
-	| Quote String
-	| BTrue | BFalse
-	| Binary Operator Expression Expression
-	| Unary UnaryOperator Expression
-	deriving (Show)
+    = Access Name
+    | Call Name [Expression]
+    | Binary Operator Expression Expression
+    | Unary UnaryOperator Expression
+    | Primary Literal
+    deriving (Show)
+
+data Literal
+    = LitBool Bool
+    | LitInt  Integer
+    | LitReal Rational
+    | LitStr  String
+    deriving (Eq, Show)
 
 data Operator
     = OpAdd
@@ -67,13 +73,12 @@ data UnaryOperator
     | UOpNot
     deriving (Show)
 
-data PasType
-    = PasInteger
-    | PasLongInt
-    | PasReal
-    | PasBoolean
-    | PasString
-    | PasArray PasType
-    | PasChar
-    | PasType Name
+data Type
+    = TypeInteger
+    | TypeReal
+    | TypeBoolean
+    | TypeString
+    | TypeArray Type
+    | TypeChar
+    | TypeCustom Name
     deriving (Eq, Show)

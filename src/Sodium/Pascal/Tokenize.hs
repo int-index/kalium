@@ -3,7 +3,8 @@ module Sodium.Pascal.Tokenize (tokenCC, Token(..)) where
 import Data.Functor
 import Control.Monad
 
-import Data.Char (toLower)
+import Data.Ratio
+import Data.Char (toLower, digitToInt)
 import qualified Data.HashMap.Strict as M
 
 import Text.Parsec
@@ -46,9 +47,8 @@ data Token
     | Suck
     | Blow
     | Name String
-    | INumber String
-    | FNumber String String
-    | ENumber String String Bool String
+    | INumber Integer
+    | FNumber Rational
     | Quote String
     | LSqBrace
     | RSqBrace
@@ -114,21 +114,34 @@ pNumber :: P u Token
 pNumber = do
     intSection <- many1 digit
     try (pFloat intSection)
-        <|> return (INumber intSection)
+        <|> return (INumber $ parseInt intSection)
 
 pFloat :: String -> P u Token
 pFloat intSection = do
     char '.'
     fracSection <- many1 digit
     try (pExp intSection fracSection)
-        <|> return (FNumber intSection fracSection)
+        <|> return (FNumber $ parseFrac intSection fracSection)
 
 pExp :: String -> String -> P u Token
 pExp intSection fracSection = do
     char 'e' <|> char 'E'
     eSign <- pSign
     eSection <- many1 digit
-    return (ENumber intSection fracSection eSign eSection)
+    return (FNumber $ parseExp intSection fracSection eSign eSection)
+
+parseInt :: String -> Integer
+parseInt = foldl (\acc c -> fromIntegral (digitToInt c) + acc * 10) 0
+
+parseFrac :: String -> String -> Rational
+parseFrac intSection fracSection = parseInt (intSection ++ fracSection)
+                                 % 10 ^ length fracSection
+
+parseExp :: String -> String -> Bool -> String -> Rational
+parseExp intSection fracSection eSign eSection
+    = (if eSign then (*) else (/))
+        (parseFrac intSection fracSection)
+        (10 ^ parseInt eSection)
 
 pName :: P u Token
 pName = let gen p = char '_' <|> fmap toLower p

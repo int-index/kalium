@@ -1,6 +1,9 @@
 {
 module Sodium.Pascal.Parse (parse, tokenize) where
 
+import qualified Data.Map as M
+import Data.Ratio
+
 import Control.Monad
 import Control.Monad.Trans.Except
 
@@ -58,9 +61,8 @@ import qualified Text.Parsec as P
     '['      { T.LSqBrace  }
     ']'      { T.RSqBrace  }
     name     { T.Name $$   }
-    inumber  { T.INumber _    }
-    fnumber  { T.FNumber _ _  }
-    enumber  { T.ENumber _ _ _ _ }
+    inumber  { T.INumber $$ }
+    fnumber  { T.FNumber $$ }
     quote    { T.Quote $$  }
     unknown  { T.Unknown _ }
 
@@ -80,13 +82,13 @@ Decls :            {      [] }
 Decl : Func { $1 }
      | Proc { $1 }
 
-Vars  :              { [] }
-      | var VarDecls { $2 }
+Vars  :              { M.empty }
+      | var VarDecls { M.fromList $2 }
 
-VarDecls :                  {      [] }
-         | VarDecls VarDecl { $2 : $1 }
+VarDecls :                  {       [] }
+         | VarDecls VarDecl { $2 ++ $1 }
 
-VarDecl : VarNames ':' Type ';' { VarDecl $1 $3 }
+VarDecl : VarNames ':' Type ';' { map (\name -> (,) name $3) $1 }
 
 VarNames :              name { $1 : [] }
          | VarNames ',' name { $3 : $1 }
@@ -102,13 +104,14 @@ Params :                    { [] }
        | '('            ')' { [] }
        | '(' ParamDecls ')' { $2 }
 
-ParamDecls : ParamDecl                { $1 : [] }
-           | ParamDecl ';' ParamDecls { $1 : $3 }
+ParamDecls : ParamDecl                { $1 ++ [] }
+           | ParamDecl ';' ParamDecls { $1 ++ $3 }
 
-ParamDecl : ParamIsVar ParamNames ':' Type { ParamDecl (reverse $2) $1 $4 }
+ParamDecl : ParamIsVar ParamNames ':' Type
+          { map (\name -> ParamDecl name ($1, $4)) (reverse $2) }
 
-ParamIsVar :     { False }
-ParamIsVar : var { True  }
+ParamIsVar :     { ByValue     }
+ParamIsVar : var { ByReference }
 
 ParamNames :                name { $1 : [] }
            | ParamNames ',' name { $3 : $1 }
@@ -188,12 +191,11 @@ Expression_ : Expression '+' Expression { Binary OpAdd      $1 $3 }
             | Call { $1 }
 
 Atom : name  { Access $1 }
-     | true  { BTrue     }
-     | false { BFalse    }
-     | inumber { match_inumber $1 }
-     | fnumber { match_fnumber $1 }
-     | enumber { match_enumber $1 }
-     | quote   { Quote $1 }
+     | true  { Primary (LitBool True)  }
+     | false { Primary (LitBool False) }
+     | inumber { Primary (LitInt  $1) }
+     | fnumber { Primary (LitReal $1) }
+     | quote   { Primary (LitStr  $1) }
 
 Call : name Arguments { Call $1 $2 }
 
@@ -210,18 +212,14 @@ parseErr _ = mzero
 parse :: String -> Except P.ParseError Program
 parse = except . P.parse parser ""
 
-match_inumber (T.INumber i      ) = INumber i
-match_fnumber (T.FNumber i f    ) = FNumber i f
-match_enumber (T.ENumber i f s e) = ENumber i f s e
-
 match_type t = case t of
-    "integer" -> PasInteger
-    "longint" -> PasLongInt
-    "real"    -> PasReal
-    "boolean" -> PasBoolean
-    "string"  -> PasString
-    "char"    -> PasChar
-    _         -> PasType t
+    "integer" -> TypeInteger
+    "longint" -> TypeInteger
+    "real"    -> TypeReal
+    "boolean" -> TypeBoolean
+    "string"  -> TypeString
+    "char"    -> TypeChar
+    _         -> TypeCustom t
 
 tokenize :: String -> Either P.ParseError [T.Token]
 tokenize = P.parse tokenizer "" where
