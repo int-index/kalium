@@ -37,9 +37,7 @@ data Statement
 
 data Expression
     = Access Name
-    | Call Name [Expression]
-    | Binary Operator Expression Expression
-    | Unary UnaryOperator Expression
+    | Call (Either Operator Name) [Expression]
     | Primary Literal
     deriving (Show)
 
@@ -63,14 +61,10 @@ data Operator
     | OpAnd
     | OpOr
     | OpXor
-    | OpNot
     | OpRange
-    deriving (Show)
-
-data UnaryOperator
-    = UOpNegate
-    | UOpPlus
-    | UOpNot
+    | OpNegate
+    | OpPlus
+    | OpNot
     deriving (Show)
 
 data Type

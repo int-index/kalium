@@ -163,27 +163,27 @@ Ranges : Range            { $1 : [] }
        | Ranges ',' Range { $3 : $1 }
 
 Range :                  Expression_ { $1 }
-      | Expression_ '..' Expression_ { Binary OpRange $1 $3 }
+      | Expression_ '..' Expression_ { binary OpRange $1 $3 }
 
-Expression : Expression '<' Expression { Binary OpLess   $1 $3 }
-           | Expression '>' Expression { Binary OpMore   $1 $3 }
-           | Expression '=' Expression { Binary OpEquals $1 $3 }
+Expression : Expression '<' Expression { binary OpLess   $1 $3 }
+           | Expression '>' Expression { binary OpMore   $1 $3 }
+           | Expression '=' Expression { binary OpEquals $1 $3 }
            | Expression_ { $1 }
 
-Expression_ : Expression '+' Expression { Binary OpAdd      $1 $3 }
-            | Expression '-' Expression { Binary OpSubtract $1 $3 }
-            | Expression  or Expression { Binary OpOr       $1 $3 }
-            | Expression xor Expression { Binary OpXor      $1 $3 }
+Expression_ : Expression '+' Expression { binary OpAdd      $1 $3 }
+            | Expression '-' Expression { binary OpSubtract $1 $3 }
+            | Expression  or Expression { binary OpOr       $1 $3 }
+            | Expression xor Expression { binary OpXor      $1 $3 }
 
-            | Expression '*' Expression { Binary OpMultiply $1 $3 }
-            | Expression '/' Expression { Binary OpDivide   $1 $3 }
-            | Expression div Expression { Binary OpDiv      $1 $3 }
-            | Expression mod Expression { Binary OpMod      $1 $3 }
-            | Expression and Expression { Binary OpAnd      $1 $3 }
+            | Expression '*' Expression { binary OpMultiply $1 $3 }
+            | Expression '/' Expression { binary OpDivide   $1 $3 }
+            | Expression div Expression { binary OpDiv      $1 $3 }
+            | Expression mod Expression { binary OpMod      $1 $3 }
+            | Expression and Expression { binary OpAnd      $1 $3 }
 
-            | '-' Expression %prec NEG  { Unary UOpNegate $2 }
-            | '+' Expression %prec POS  { Unary UOpPlus   $2 }
-            | not Expression            { Unary UOpNot    $2 }
+            | '-' Expression %prec NEG  { Call (Left OpNegate) [$2] }
+            | '+' Expression %prec POS  { Call (Left OpPlus)   [$2] }
+            | not Expression            { Call (Left OpNot)    [$2] }
 
             | '(' Expression ')' { $2 }
             |     Atom           { $1 }
@@ -197,7 +197,7 @@ Atom : name  { Access $1 }
      | fnumber { Primary (LitReal $1) }
      | quote   { Primary (LitStr  $1) }
 
-Call : name Arguments { Call $1 $2 }
+Call : name Arguments { Call (Right $1) $2 }
 
 Type : name { match_type $1 }
 
@@ -208,6 +208,8 @@ Arguments_ :                           {      [] }
 
 {
 parseErr _ = mzero
+
+binary op x y = Call (Left op) [x, y]
 
 parse :: String -> Except P.ParseError Program
 parse = except . P.parse parser ""

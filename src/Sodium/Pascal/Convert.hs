@@ -143,7 +143,7 @@ instance Conv S.Statement (D.Statement D.Expression) where
             let clType = D.TypeUnit -- typeof(expr)
             let clCaseExpr = D.expression clName
             let instRange = \case
-                    S.Binary S.OpRange exprFrom exprTo
+                    S.Call (Left S.OpRange) [exprFrom, exprTo]
                          -> (binary (D.NameOp D.OpElem) clCaseExpr)
                         <$> (binary (D.NameOp D.OpRange) <$> conv exprFrom <*> conv exprTo)
                     expr -> binary (D.NameOp D.OpEquals) clCaseExpr <$> conv expr
@@ -164,10 +164,9 @@ instance Conv S.Statement (D.Statement D.Expression) where
 instance Conv S.Expression D.Expression where
     conv = \case
         S.Access name -> return $ D.expression (nameV name)
-        S.Call name exprs -> D.Call <$> pure (nameF name) <*> mapM conv exprs
+        S.Call (Left op)    exprs -> D.Call <$> conv op           <*> mapM conv exprs
+        S.Call (Right name) exprs -> D.Call <$> pure (nameF name) <*> mapM conv exprs
         S.Primary lit -> conv lit
-        S.Binary op x y -> binary <$> conv op <*> conv x <*> conv y
-        S.Unary  op x   -> D.Call <$> conv op <*> mapM conv [x]
 
 instance Conv S.Literal D.Expression where
     conv = \case
@@ -189,12 +188,8 @@ instance Conv S.Operator D.Name where
         S.OpEquals -> D.OpEquals
         S.OpAnd -> D.OpAnd
         S.OpOr  -> D.OpOr
-        S.OpNot -> D.OpNot
         S.OpXor -> D.OpXor
         S.OpRange -> D.OpRange
-
-instance Conv S.UnaryOperator D.Name where
-    conv = return . D.NameOp . \case
-        S.UOpPlus   -> D.OpId
-        S.UOpNegate -> D.OpNegate
-        S.UOpNot    -> D.OpNot
+        S.OpPlus   -> D.OpId
+        S.OpNegate -> D.OpNegate
+        S.OpNot    -> D.OpNot
