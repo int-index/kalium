@@ -94,11 +94,11 @@ VarNames :              name { $1 : [] }
          | VarNames ',' name { $3 : $1 }
 
 
-Func : function  name Params ':' Type ';' Vars Body ';'
-     { Func      $2   $3     (Just $5)    $7   $8 }
+Func : function  name         Params ':' Type ';' Vars Body ';'
+     { Func      $2  (FuncSig $3     (Just $5) )  $7   $8    }
 
-Proc : procedure name Params          ';' Vars Body ';'
-     { Func      $2   $3     Nothing      $5   $6 }
+Proc : procedure name         Params          ';' Vars Body ';'
+     { Func      $2  (FuncSig $3     Nothing   )  $5   $6    }
 
 Params :                    { [] }
        | '('            ')' { [] }

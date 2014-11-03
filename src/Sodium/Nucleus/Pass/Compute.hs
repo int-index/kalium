@@ -11,6 +11,7 @@ compute = over recmapped match
 match :: Expression -> Expression
 match = \case
     Call (NameOp OpId) [expr] -> expr
+    Call (NameOp OpSingleton) [Primary (Lit t a)] -> Primary (Lit (STypeList t) [a])
     Call (NameOp op) [x]
         | Primary (Lit STypeInteger a) <- x
         , Just f <- unaryIntegerOp op

@@ -14,9 +14,9 @@ import Sodium.Nucleus.Pass.BindClean   (bindClean)
 import Sodium.Nucleus.Pass.Clean       (clean)
 import Sodium.Nucleus.Pass.Compute     (compute)
 import Sodium.Nucleus.Pass.ArgClean    (argClean)
-import Sodium.Pascal.Parse   (parse)
 import Language.Haskell.Exts.Pretty (prettyPrint)
-import qualified  Sodium.Pascal.Convert as P (convert)
+import qualified Sodium.Pascal.Parse   as P (parse)
+import qualified Sodium.Pascal.Convert as P (convert)
 import qualified Sodium.Haskell.Convert as H (convert, reserved)
 import qualified Sodium.Error as E
 import qualified Sodium.Nucleus.Program.Vector as V
@@ -32,10 +32,12 @@ import Debug.Trace
 
 translate :: (Applicative m, MonadError E.Error m) => String -> m String
 translate src = do
-    pas <- liftErr E.parseError (parse src)
+    pas <- liftErr E.parseError (P.parse src)
     let namestack0 = map (V.NameSpace "g" . V.Name . ('g':) . show) [0..]
-    (scalar, namestack1) <- P.convert pas `runStateT` namestack0
-    (atomic, _) <- liftErr E.typeError (atomize' scalar `runStateT` namestack1)
+    (scalar,  namestack1) <- liftErr E.pasconvError
+        (P.convert pas `runStateT` namestack0)
+    (atomic, _namestack2) <- liftErr E.typeError
+        (atomize' scalar `runStateT` namestack1)
     vector <- liftErr E.vectorizeError (vectorize atomic)
     let noshadow = unshadow vector
     let optimal = let (a, log) = runWriter (closureM pass noshadow)

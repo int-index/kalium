@@ -5,21 +5,23 @@ import qualified Data.Map as M
 type Name = String
 
 data Program
-	= Program [Func] Vars Body
-	deriving (Show)
+    = Program [Func] Vars Body
+    deriving (Show)
 
 type Vars = M.Map Name Type
-type Params = [ParamDecl]
 
 type Body = [Statement]
 
+data FuncSig = FuncSig [ParamDecl] (Maybe Type)
+    deriving (Eq, Show)
+
 data Func
-    = Func Name Params (Maybe Type) Vars Body
+    = Func Name FuncSig Vars Body
     deriving (Show)
 
 data ParamDecl
     = ParamDecl Name (By, Type)
-    deriving (Show)
+    deriving (Eq, Show)
 
 data By
     = ByReference

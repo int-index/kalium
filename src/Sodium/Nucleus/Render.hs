@@ -59,6 +59,7 @@ instance Render Operator where
         OpId -> "id"
         OpFst -> "fst"
         OpSnd -> "snd"
+        OpSingleton -> "single"
 
 instance Render FuncSig where
     render funcSig = unwords

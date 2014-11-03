@@ -62,6 +62,7 @@ data Operator
     | OpId
     | OpFst
     | OpSnd
+    | OpSingleton
     deriving (Eq, Ord, Show)
 
 data Literal where

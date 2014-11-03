@@ -1,52 +1,78 @@
-{-# LANGUAGE FlexibleInstances, FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
  
-module Sodium.Pascal.Convert (convert) where
+module Sodium.Pascal.Convert (convert, TypeError(..)) where
 
-import Prelude hiding (mapM)
-import Control.Applicative
-import Control.Monad.Reader hiding (mapM)
-import qualified Data.Map  as M
+import qualified Data.Map as M
 import Data.Traversable
+
+import Control.Applicative
+import Control.Monad.Reader
+import Control.Monad.Except
+import Control.Lens
 -- S for Src, D for Dest
 import qualified Sodium.Pascal.Program as S
 import qualified Sodium.Nucleus.Scalar.Program as D
 import qualified Sodium.Nucleus.Scalar.Build   as D
 import Sodium.Nucleus.Name
 
-convert :: NameStack t m => S.Program -> m (D.Program D.Expression)
-convert program = runReaderT (conv program) M.empty
+declareLenses [d|
+
+    data TypeScope = TypeScope
+        { tsFunctions :: M.Map S.Name S.FuncSig
+        , tsVariables :: M.Map S.Name S.Type
+        } deriving (Eq)
+
+                |]
+
+data TypeError
+    = NoAccess
+    | NoFunction
+    | TypeVoid
+    deriving (Eq, Show)
+
+convert :: (NameStack t m, MonadError TypeError m) => S.Program -> m (D.Program D.Expression)
+convert program = runReaderT (conv program) (TypeScope M.empty M.empty)
 
 nameV = D.NameSpace "v" . D.Name
 nameF = D.NameSpace "f" . D.Name
 
 class Conv s d | s -> d where
-    conv :: NameStack t m => s -> ReaderT (M.Map S.Name S.Type) m d
+    conv :: (NameStack t m, MonadError TypeError m) => s -> ReaderT TypeScope m d
 
 instance Conv S.Program (D.Program D.Expression) where
-    conv (S.Program funcs vars body) = do
-        clMain <- do
-            clBody <- convScope vars $ D.Body <$> conv body <*> pure (D.atom ())
-            let noparams = D.Scope ([] :: D.Params)
-            return $ D.Func D.TypeUnit (noparams clBody)
-        clFuncs <- mapM conv funcs
-        return $ D.Program (M.fromList $ (D.NameMain, clMain):clFuncs)
+    conv (S.Program funcs vars body)
+        = local (tsFunctions %~ M.union funcSigs) $ do
+            clMain <- do
+                clBody <- convScope vars
+                    $ D.Body <$> conv body <*> pure (D.atom ())
+                let noparams = D.Scope ([] :: D.Params)
+                return $ D.Func D.TypeUnit (noparams clBody)
+            clFuncs <- traverse conv funcs
+            return $ D.Program (M.fromList $ (D.NameMain, clMain):clFuncs)
+        where funcSigs = M.unions (map funcSigOf funcs)
+              funcSigOf (S.Func name funcSig _ _) = M.singleton name funcSig
 
 convScope vardecls inner
         = D.Scope
-       <$> (D.scoping <$> mapM conv (M.toList vardecls))
-       <*> local (M.union vardecls) inner
+       <$> (D.scoping <$> traverse conv (M.toList vardecls))
+       <*> local (tsVariables %~ M.union vardecls) inner
 
 convScope' paramdecls inner
         = D.Scope
-       <$> mapM conv paramdecls
-       <*> local (M.union (M.fromList $ map paramDeclToTup paramdecls)) inner
+       <$> traverse conv paramdecls
+       <*> local (tsVariables %~ M.union vardecls) inner
+       where paramDeclToTup (S.ParamDecl name (_, ty)) = (name, ty)
+             vardecls = M.fromList $ map paramDeclToTup paramdecls
 
 instance Conv S.Body (D.Statement D.Expression) where
-    conv statements = D.Group <$> mapM conv statements
+    conv statements = D.Group <$> traverse conv statements
 
 instance Conv S.Func (D.Name, D.Func D.Expression) where
-    conv (S.Func name params pasType vars body) = do
+    conv (S.Func name (S.FuncSig params pasType) vars body) = do
         (retExpr, retType, retVars) <- case pasType of
             Nothing -> return (D.atom (), D.TypeUnit, M.empty)
             Just ty -> do
@@ -58,8 +84,6 @@ instance Conv S.Func (D.Name, D.Func D.Expression) where
                  $ D.Body <$> conv body <*> pure retExpr
         let fname = nameF name
         return $ (fname, D.Func retType clScope)
-
-paramDeclToTup (S.ParamDecl name (_, ty)) = (name, ty)
 
 instance Conv (S.Name, S.Type) (D.Name, D.Type) where
     conv (name, pasType)
@@ -85,8 +109,8 @@ instance Conv S.Type D.Type where
 
 binary op a b = D.Call op [a,b]
 
-convReadLn [S.Access name] = do
-    ty <- lookupType name
+convReadLn [e@(S.Access name)] = do
+    ty <- typecheck e
     clType <- conv ty
     return $ D.Exec
         (Just $ nameV name)
@@ -96,23 +120,34 @@ convReadLn _ = error "IOMagic supports only single-value read operations"
 
 convWriteLn exprs = do
     let convArg expr = do
-          -- TODO: apply `show` only to non-String
-          -- expressions as soon as typecheck is implemented
-          noShow <- case expr of
-            S.Primary (S.LitStr  _) -> return True
-            S.Primary (S.LitChar _) -> return True
-            S.Access name -> do
-                ty <- lookupType name
-                return (ty == S.TypeString || ty == S.TypeChar)
-            _ -> return False
-          let wrap = if noShow then id else (\e -> D.Call (D.NameOp D.OpShow) [e])
+          ty <- typecheck expr
+          let wrap = case ty of
+                S.TypeString -> id
+                S.TypeChar -> \e -> D.Call (D.NameOp D.OpSingleton) [e]
+                _ -> \e -> D.Call (D.NameOp D.OpShow) [e]
           wrap <$> conv expr
-    D.Exec Nothing (D.NameOp D.OpPrintLn) <$> mapM convArg exprs
+    D.Exec Nothing (D.NameOp D.OpPrintLn) <$> traverse convArg exprs
 
-
-lookupType name = do
-    mtype <- asks (M.lookup name)
-    maybe (error "IOMagic lookup error") return mtype
+typecheck :: (MonadReader TypeScope m, MonadError TypeError m)
+          => S.Expression -> m S.Type
+typecheck = \case
+    S.Primary lit -> return $ case lit of
+        S.LitBool _ -> S.TypeBoolean
+        S.LitInt  _ -> S.TypeInteger
+        S.LitReal _ -> S.TypeReal
+        S.LitChar _ -> S.TypeChar
+        S.LitStr  _ -> S.TypeString
+    S.Access name -> do
+        mtype <- asks (M.lookup name . view tsVariables)
+        maybe (throwError NoAccess) return mtype
+    S.Call (Right name) _ -> do
+        mfuncsig <- asks (M.lookup name . view tsFunctions)
+        case mfuncsig of
+            Nothing -> throwError NoFunction
+            Just (S.FuncSig _ mtype) -> case mtype of
+                Nothing -> throwError TypeVoid
+                Just t -> return t
+    S.Call (Left _op) _ -> return (S.TypeCustom "not-implemented")
 
 instance Conv S.Statement (D.Statement D.Expression) where
     conv = \case
@@ -123,7 +158,7 @@ instance Conv S.Statement (D.Statement D.Expression) where
         S.Execute name exprs
              -> fmap D.statement
              $  D.Exec Nothing (nameF name)
-            <$> mapM conv exprs
+            <$> traverse conv exprs
         S.ForCycle name fromExpr toExpr statement -> do
             let clName = nameV name
             clFromExpr <- conv fromExpr
@@ -137,11 +172,11 @@ instance Conv S.Statement (D.Statement D.Expression) where
              $  D.If
             <$> conv expr
             <*> conv bodyThen
-            <*> (D.statements <$> mapM conv mBodyElse)
+            <*> (D.statements <$> traverse conv mBodyElse)
         S.CaseBranch expr leafs mBodyElse -> do
+            clType <- typecheck expr >>= conv
             clExpr <- conv expr
             clName <- namepop
-            let clType = D.TypeUnit -- typeof(expr)
             let clCaseExpr = D.expression clName
             let instRange = \case
                     S.Call (Left S.OpRange) [exprFrom, exprTo]
@@ -150,10 +185,10 @@ instance Conv S.Statement (D.Statement D.Expression) where
                     expr -> binary (D.NameOp D.OpEquals) clCaseExpr <$> conv expr
             let instLeaf (exprs, body)
                      =  (,)
-                    <$> (foldl1 (binary (D.NameOp D.OpOr)) <$> mapM instRange exprs)
+                    <$> (foldl1 (binary (D.NameOp D.OpOr)) <$> traverse instRange exprs)
                     <*> conv body
-            leafs <- mapM instLeaf leafs
-            leafElse <- D.statements <$> mapM conv mBodyElse
+            leafs <- traverse instLeaf leafs
+            leafElse <- D.statements <$> traverse conv mBodyElse
             let statement = foldr
                     (\(cond, ifThen) ifElse ->
                         D.statement $ D.If cond ifThen ifElse)
@@ -165,8 +200,8 @@ instance Conv S.Statement (D.Statement D.Expression) where
 instance Conv S.Expression D.Expression where
     conv = \case
         S.Access name -> return $ D.expression (nameV name)
-        S.Call (Left op)    exprs -> D.Call <$> conv op           <*> mapM conv exprs
-        S.Call (Right name) exprs -> D.Call <$> pure (nameF name) <*> mapM conv exprs
+        S.Call (Left op)    exprs -> D.Call <$> conv op           <*> traverse conv exprs
+        S.Call (Right name) exprs -> D.Call <$> pure (nameF name) <*> traverse conv exprs
         S.Primary lit -> conv lit
 
 instance Conv S.Literal D.Expression where

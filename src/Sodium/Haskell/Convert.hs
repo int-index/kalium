@@ -294,3 +294,4 @@ convOp = \case
     S.OpSnd      -> "snd"
     S.OpPrintLn  -> "print"
     S.OpReadLn _ -> "readLn"
+    S.OpSingleton -> "return"
