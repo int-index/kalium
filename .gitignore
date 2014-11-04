@@ -1,4 +1,6 @@
 dist
+.idea
+sodium.iml
 docs/*.aux
 docs/*.log
 docs/*.pdf
