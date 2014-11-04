@@ -55,6 +55,7 @@ instance Render Operator where
         OpAnd' -> "and'"
         OpOr' -> "or'"
         OpPrintLn -> "println"
+        OpGetLn -> "getln"
         OpReadLn ty -> "readln-" ++ render ty
         OpId -> "id"
         OpFst -> "fst"

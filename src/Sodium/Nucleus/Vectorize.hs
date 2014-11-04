@@ -93,7 +93,7 @@ diff m1 m2 = M.keys $ M.filter id $ M.intersectionWith (/=) m1 m2
 
 vectorizeStatement :: V t m => M.Map Name FuncSig -> Statement Atom -> t m ([Name], Vec.Statement)
 vectorizeStatement funcSigs = \case
-    Group statements -> do
+    Group statements ->
         degroup funcSigs statements
             $ \indices vecBinds -> do
                 changed <- asks (diff indices)
@@ -123,6 +123,7 @@ vectorizeStatement funcSigs = \case
         -- TODO: purity flag in function signature
         let impure = case name of
               NameOp (OpReadLn _) -> True
+              NameOp OpGetLn      -> True
               NameOp OpPrintLn    -> True
               _ -> False
         let vecExecute

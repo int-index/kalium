@@ -167,13 +167,12 @@ instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.Bind a) where
 instance Conv S.Statement where
 
     type Norm S.Statement = H.Exp
-    conv (S.Execute (S.NameOp (S.OpReadLn t)) [])
-        | t == S.TypeList S.TypeChar = return (D.access "getLine")
-        | otherwise = do
-                hsType <- conv t
-                return $ H.ExpTypeSig H.noLoc
-                    (D.access "readLn")
-                    (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
+    conv (S.Execute (S.NameOp S.OpGetLn) []) = return (D.access "getLine")
+    conv (S.Execute (S.NameOp (S.OpReadLn t)) []) = do
+        hsType <- conv t
+        return $ H.ExpTypeSig H.noLoc
+            (D.access "readLn")
+            (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
     conv (S.Execute (S.NameOp S.OpPrintLn) args)
         = case args of
             [S.Call (S.NameOp S.OpShow) [arg]] -> H.App (D.access "print") <$> conv arg
@@ -293,5 +292,6 @@ convOp = \case
     S.OpFst      -> "fst"
     S.OpSnd      -> "snd"
     S.OpPrintLn  -> "print"
+    S.OpGetLn    -> "getLine"
     S.OpReadLn _ -> "readLn"
     S.OpSingleton -> "return"

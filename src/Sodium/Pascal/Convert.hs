@@ -109,13 +109,13 @@ instance Conv S.Type D.Type where
 
 binary op a b = D.Call op [a,b]
 
-convReadLn [e@(S.Access name)] = do
-    ty <- typecheck e
-    clType <- conv ty
-    return $ D.Exec
-        (Just $ nameV name)
-        (D.NameOp $ D.OpReadLn clType)
-        []
+convReadLn [e@(S.Access name')] = do
+    let name = nameV name'
+    typecheck e >>= \case
+        S.TypeString -> return $ D.Exec (Just name) (D.NameOp D.OpGetLn) []
+        ty -> do
+            clType <- conv ty
+            return $ D.Exec (Just name) (D.NameOp $ D.OpReadLn clType) []
 convReadLn _ = error "IOMagic supports only single-value read operations"
 
 convWriteLn exprs = do

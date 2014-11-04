@@ -58,6 +58,7 @@ data Operator
     | OpAnd'
     | OpOr'
     | OpPrintLn
+    | OpGetLn
     | OpReadLn Type
     | OpId
     | OpFst
