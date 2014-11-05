@@ -16,7 +16,7 @@ tick :: Char
 tick = '`'
 
 indent :: String -> String
-indent = concat . intersperse "\n" . map ("  "++) . lines
+indent = intercalate "\n" . map ("  "++) . lines
 
 parens :: String -> String
 parens s = "(" ++ s ++ ")"

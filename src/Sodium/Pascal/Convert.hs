@@ -29,9 +29,11 @@ declareLenses [d|
                 |]
 
 data TypeError
-    = NoAccess
+    = TypeError
+    | NoAccess
     | NoFunction
     | TypeVoid
+    | TypeNoCast
     deriving (Eq, Show)
 
 convert :: (NameStack t m, MonadError TypeError m) => S.Program -> m (D.Program D.Expression)
@@ -128,7 +130,7 @@ convWriteLn exprs = do
           wrap <$> conv expr
     D.Exec Nothing (D.NameOp D.OpPrintLn) <$> traverse convArg exprs
 
-typecheck :: (MonadReader TypeScope m, MonadError TypeError m)
+typecheck :: (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
           => S.Expression -> m S.Type
 typecheck = \case
     S.Primary lit -> return $ case lit of
@@ -147,12 +149,44 @@ typecheck = \case
             Just (S.FuncSig _ mtype) -> case mtype of
                 Nothing -> throwError TypeVoid
                 Just t -> return t
-    S.Call (Left _op) _ -> return (S.TypeCustom "not-implemented")
+    S.Call (Left op) args -> do
+        tys <- traverse typecheck args
+        let isNumeric = liftA2 (||) (== S.TypeInteger) (== S.TypeReal)
+        case (op, tys) of
+            (S.OpAdd     , [t1, t2]) | t1 == t2, isNumeric t1 || t1 == S.TypeString -> return t1
+            (S.OpSubtract, [t1, t2]) | t1 == t2, isNumeric t1 -> return t1
+            (S.OpMultiply, [t1, t2]) | t1 == t2, isNumeric t1 -> return t1
+            (S.OpDivide  , [S.TypeReal   , S.TypeReal   ]) -> return S.TypeReal
+            (S.OpDiv     , [S.TypeInteger, S.TypeInteger]) -> return S.TypeInteger
+            (S.OpMod     , [S.TypeInteger, S.TypeInteger]) -> return S.TypeInteger
+            (S.OpLess    , [t1, t2]) | t1 == t2 -> return S.TypeBoolean
+            (S.OpMore    , [t1, t2]) | t1 == t2 -> return S.TypeBoolean
+            (S.OpEquals  , [t1, t2]) | t1 == t2 -> return S.TypeBoolean
+            (S.OpAnd     , [S.TypeBoolean, S.TypeBoolean]) -> return S.TypeBoolean
+            (S.OpOr      , [S.TypeBoolean, S.TypeBoolean]) -> return S.TypeBoolean
+            (S.OpXor     , [S.TypeBoolean, S.TypeBoolean]) -> return S.TypeBoolean
+            -- TODO: not a Pascal operator
+            (S.OpRange   , [t1, t2]) | t1 == t2 -> return (S.TypeArray t1)
+            (S.OpNegate  , [t1]) | isNumeric t1 -> return t1
+            (S.OpPlus    , [t1]) | isNumeric t1 -> return t1
+            (S.OpNot     , [S.TypeBoolean]) -> return S.TypeBoolean
+            _ -> throwError TypeError
+
+typecast :: MonadError TypeError m => S.Type -> S.Type -> m (D.Expression -> D.Expression)
+typecast t1 t2 | t1 == t2 = return id
+typecast S.TypeChar S.TypeString = return (\e -> D.Call (D.NameOp D.OpSingleton) [e])
+typecast _ _ = throwError TypeNoCast
 
 instance Conv S.Statement (D.Statement D.Expression) where
     conv = \case
         S.BodyStatement body -> D.statement <$> conv body
-        S.Assign name expr -> D.assign (nameV name) <$> conv expr
+        S.Assign name' expr' -> do
+            let name = nameV name'
+            expr <- conv expr'
+            tyW <- typecheck (S.Access name')
+            ty  <- typecheck expr'
+            tc <- typecast ty tyW
+            return $ D.assign name (tc expr)
         S.Execute "readln"  exprs -> D.statement <$> convReadLn  exprs
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn exprs
         S.Execute name exprs
