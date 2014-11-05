@@ -162,8 +162,8 @@ CaseClause : Ranges ':' Statement_ ';' { (reverse $1, $3) }
 Ranges : Range            { $1 : [] }
        | Ranges ',' Range { $3 : $1 }
 
-Range :                  Expression_ { $1 }
-      | Expression_ '..' Expression_ { binary OpRange $1 $3 }
+Range :                  Expression_ { Left $1 }
+      | Expression_ '..' Expression_ { Right ($1, $3) }
 
 Expression : Expression '<' Expression { binary OpLess   $1 $3 }
            | Expression '>' Expression { binary OpMore   $1 $3 }

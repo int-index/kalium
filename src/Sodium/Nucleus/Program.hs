@@ -64,6 +64,7 @@ data Operator
     | OpFst
     | OpSnd
     | OpSingleton
+    | OpIntToDouble
     deriving (Eq, Ord, Show)
 
 data Literal where

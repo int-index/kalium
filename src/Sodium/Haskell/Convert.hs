@@ -260,10 +260,10 @@ convlit :: S.Literal -> H.Exp
 convlit = \case
     S.Lit S.STypeInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
     S.Lit S.STypeDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
-    S.Lit (S.STypeChar)  c -> H.Lit (H.Char c)
+    S.Lit S.STypeChar    c -> H.Lit $ H.Char c
     S.Lit S.STypeBoolean a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
-    S.Lit S.STypeUnit   () -> H.Con (H.Special H.UnitCon)
-    S.Lit (S.STypeList S.STypeChar) cs -> H.Lit (H.String cs)
+    S.Lit S.STypeUnit   () -> H.Con $ H.Special H.UnitCon
+    S.Lit (S.STypeList S.STypeChar) cs -> H.Lit $ H.String cs
 
 convOp :: S.Operator -> D.Name
 convOp = \case
@@ -295,3 +295,4 @@ convOp = \case
     S.OpGetLn    -> "getLine"
     S.OpReadLn _ -> "readLn"
     S.OpSingleton -> "return"
+    S.OpIntToDouble -> "fromIntegral"

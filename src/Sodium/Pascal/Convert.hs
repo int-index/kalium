@@ -142,7 +142,7 @@ typecheck = \case
     S.Access name -> do
         mtype <- asks (M.lookup name . view tsVariables)
         maybe (throwError NoAccess) return mtype
-    S.Call (Right name) _ -> do
+    S.Call (Right name) _ -> do -- TODO: check argument types
         mfuncsig <- asks (M.lookup name . view tsFunctions)
         case mfuncsig of
             Nothing -> throwError NoFunction
@@ -165,28 +165,37 @@ typecheck = \case
             (S.OpAnd     , [S.TypeBoolean, S.TypeBoolean]) -> return S.TypeBoolean
             (S.OpOr      , [S.TypeBoolean, S.TypeBoolean]) -> return S.TypeBoolean
             (S.OpXor     , [S.TypeBoolean, S.TypeBoolean]) -> return S.TypeBoolean
-            -- TODO: not a Pascal operator
-            (S.OpRange   , [t1, t2]) | t1 == t2 -> return (S.TypeArray t1)
             (S.OpNegate  , [t1]) | isNumeric t1 -> return t1
             (S.OpPlus    , [t1]) | isNumeric t1 -> return t1
             (S.OpNot     , [S.TypeBoolean]) -> return S.TypeBoolean
+            (S.OpCharToString, [S.TypeChar   ]) -> return S.TypeString
+            (S.OpIntToReal   , [S.TypeInteger]) -> return S.TypeReal
             _ -> throwError TypeError
 
-typecast :: MonadError TypeError m => S.Type -> S.Type -> m (D.Expression -> D.Expression)
-typecast t1 t2 | t1 == t2 = return id
-typecast S.TypeChar S.TypeString = return (\e -> D.Call (D.NameOp D.OpSingleton) [e])
-typecast _ _ = throwError TypeNoCast
+op1App :: S.Operator -> S.Expression -> S.Expression
+op1App op e = S.Call (Left op) [e]
+
+typecasts :: (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
+          => S.Expression -> m [S.Expression]
+typecasts expr = do
+    ty <- typecheck expr
+    return $ expr : case ty of
+        S.TypeChar -> [op1App S.OpCharToString expr]
+        S.TypeInteger -> [op1App S.OpIntToReal expr]
+        _ -> []
 
 instance Conv S.Statement (D.Statement D.Expression) where
     conv = \case
         S.BodyStatement body -> D.statement <$> conv body
         S.Assign name' expr' -> do
             let name = nameV name'
-            expr <- conv expr'
+            tcs <- typecasts expr'
             tyW <- typecheck (S.Access name')
-            ty  <- typecheck expr'
-            tc <- typecast ty tyW
-            return $ D.assign name (tc expr)
+            tc <- filterM (\tc -> (==) tyW <$> typecheck tc) tcs >>= \case
+                [] -> throwError TypeNoCast
+                tc:_ -> return tc
+            expr <- conv tc
+            return $ D.assign name expr
         S.Execute "readln"  exprs -> D.statement <$> convReadLn  exprs
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn exprs
         S.Execute name exprs
@@ -213,10 +222,10 @@ instance Conv S.Statement (D.Statement D.Expression) where
             clName <- namepop
             let clCaseExpr = D.expression clName
             let instRange = \case
-                    S.Call (Left S.OpRange) [exprFrom, exprTo]
-                         -> (binary (D.NameOp D.OpElem) clCaseExpr)
+                    Right (exprFrom, exprTo)
+                         ->  binary (D.NameOp D.OpElem) clCaseExpr
                         <$> (binary (D.NameOp D.OpRange) <$> conv exprFrom <*> conv exprTo)
-                    expr -> binary (D.NameOp D.OpEquals) clCaseExpr <$> conv expr
+                    Left expr -> binary (D.NameOp D.OpEquals) clCaseExpr <$> conv expr
             let instLeaf (exprs, body)
                      =  (,)
                     <$> (foldl1 (binary (D.NameOp D.OpOr)) <$> traverse instRange exprs)
@@ -234,8 +243,11 @@ instance Conv S.Statement (D.Statement D.Expression) where
 instance Conv S.Expression D.Expression where
     conv = \case
         S.Access name -> return $ D.expression (nameV name)
-        S.Call (Left op)    exprs -> D.Call <$> conv op           <*> traverse conv exprs
-        S.Call (Right name) exprs -> D.Call <$> pure (nameF name) <*> traverse conv exprs
+        S.Call name' exprs -> do
+            name <- case name' of
+                Left op -> conv op
+                Right name -> pure (nameF name)
+            D.Call name <$> traverse conv exprs -- TODO: try all typecasts
         S.Primary lit -> conv lit
 
 instance Conv S.Literal D.Expression where
@@ -260,7 +272,8 @@ instance Conv S.Operator D.Name where
         S.OpAnd -> D.OpAnd
         S.OpOr  -> D.OpOr
         S.OpXor -> D.OpXor
-        S.OpRange -> D.OpRange
         S.OpPlus   -> D.OpId
         S.OpNegate -> D.OpNegate
         S.OpNot    -> D.OpNot
+        S.OpCharToString -> D.OpSingleton
+        S.OpIntToReal    -> D.OpIntToDouble

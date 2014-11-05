@@ -28,12 +28,14 @@ data By
     | ByValue
     deriving (Eq, Show)
 
+type Leaf = ([Either Expression (Expression, Expression)], Statement)
+
 data Statement
     = Assign Name Expression
     | Execute Name [Expression]
     | ForCycle Name Expression Expression Statement
     | IfBranch Expression Statement (Maybe Statement)
-    | CaseBranch Expression [([Expression], Statement)] (Maybe Statement)
+    | CaseBranch Expression [Leaf] (Maybe Statement)
     | BodyStatement Body
     deriving (Show)
 
@@ -64,10 +66,11 @@ data Operator
     | OpAnd
     | OpOr
     | OpXor
-    | OpRange
     | OpNegate
     | OpPlus
     | OpNot
+    | OpCharToString
+    | OpIntToReal
     deriving (Show)
 
 data Type
