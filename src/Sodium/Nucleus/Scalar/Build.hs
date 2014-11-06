@@ -46,4 +46,4 @@ statements :: (Foldable c, LiftStatement f) => c (f a) -> Statement a
 statements ss = Group (map statement $ toList ss)
 
 assign :: Name -> a -> Statement a
-assign name a = statement $ Exec (Just name) (NameOp OpId) [a]
+assign name a = statement $ Exec (PAccess name) (NameOp OpId) [a]

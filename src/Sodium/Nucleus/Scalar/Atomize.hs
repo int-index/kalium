@@ -63,5 +63,5 @@ atomizeExpression = \case
         name  <- namepop
         ty <- typecheck e
         let vardecl = (name, ty)
-        tell ([vardecl], [Execute $ Exec (Just name) op eArgs])
+        tell ([vardecl], [Execute $ Exec (PAccess name) op eArgs])
         return (Access name)

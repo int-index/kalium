@@ -115,7 +115,9 @@ vectorizeStatement funcSigs = \case
                           & sequence
                      of Nothing -> throwError NoReference
                         Just ns -> return (concat ns)
-        let resnames = maybe empty pure mres
+        let resnames = case mres of
+                PUnit -> empty
+                PAccess name -> pure name
         -- BUG: if a function is called without a return value (mres = Nothing)
         -- then its value isn't bound anywhere, resulting in a pattern tuple
         -- with incorrect amount of variables

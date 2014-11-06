@@ -114,10 +114,10 @@ binary op a b = D.Call op [a,b]
 convReadLn [e@(S.Access name')] = do
     let name = nameV name'
     typecheck e >>= \case
-        S.TypeString -> return $ D.Exec (Just name) (D.NameOp D.OpGetLn) []
+        S.TypeString -> return $ D.Exec (D.PAccess name) (D.NameOp D.OpGetLn) []
         ty -> do
             clType <- conv ty
-            return $ D.Exec (Just name) (D.NameOp $ D.OpReadLn clType) []
+            return $ D.Exec (D.PAccess name) (D.NameOp $ D.OpReadLn clType) []
 convReadLn _ = error "IOMagic supports only single-value read operations"
 
 convWriteLn exprs = do
@@ -128,7 +128,7 @@ convWriteLn exprs = do
                 S.TypeChar -> \e -> D.Call (D.NameOp D.OpSingleton) [e]
                 _ -> \e -> D.Call (D.NameOp D.OpShow) [e]
           wrap <$> conv expr
-    D.Exec Nothing (D.NameOp D.OpPrintLn) <$> traverse convArg exprs
+    D.Exec D.PUnit (D.NameOp D.OpPrintLn) <$> traverse convArg exprs
 
 typecheck :: (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
           => S.Expression -> m S.Type
@@ -200,7 +200,7 @@ instance Conv S.Statement (D.Statement D.Expression) where
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn exprs
         S.Execute name exprs
              -> fmap D.statement
-             $  D.Exec Nothing (nameF name)
+             $  D.Exec D.PUnit (nameF name)
             <$> traverse conv exprs
         S.ForCycle name fromExpr toExpr statement -> do
             let clName = nameV name

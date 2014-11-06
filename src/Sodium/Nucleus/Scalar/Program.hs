@@ -56,8 +56,12 @@ data Statement a
     | forall v . Scoping v => ScopeStatement (Scope v Statement a)
     | Group [Statement a]
 
+data Pattern
+    = PUnit
+    | PAccess Name
+
 data Exec a = Exec
-    { _execRet :: Maybe Name
+    { _execRet :: Pattern
     , _execOp :: Name
     , _execArgs :: [a]
     }
