@@ -33,7 +33,7 @@ expression :: LiftAtom a => a -> Expression
 expression = Atom . atom
 
 class LiftStatement f where
-    statement :: f a -> Statement a
+    statement :: f a p -> Statement a p
 
 instance LiftStatement Statement where statement = id
 instance LiftStatement Exec      where statement = Execute
@@ -42,8 +42,8 @@ instance LiftStatement If        where statement = IfStatement
 instance Scoping v => LiftStatement (Scope v Statement)
     where statement = ScopeStatement
 
-statements :: (Foldable c, LiftStatement f) => c (f a) -> Statement a
+statements :: (Foldable c, LiftStatement f) => c (f a p) -> Statement a p
 statements ss = Group (map statement $ toList ss)
 
-assign :: Name -> a -> Statement a
+assign :: Name -> a -> Statement a Pattern
 assign name a = statement $ Exec (PAccess name) (NameOp OpId) [a]

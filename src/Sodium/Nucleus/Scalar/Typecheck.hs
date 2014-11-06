@@ -69,9 +69,9 @@ class TypeIntro a where
 typeIntro :: (TypeIntro a, TypeEnv m) => (a -> m b) -> (a -> m b)
 typeIntro k x = local (typeIntro' x) (k x)
 
-instance TypeIntro (Program a) where
+instance TypeIntro (Program a p) where
     typeIntro' program = tsFunctions
         %~ mappend (program ^. programFuncs & M.map funcSig)
 
-instance Scoping v => TypeIntro (Scope v f a) where
+instance Scoping v => TypeIntro (Scope v f a p) where
     typeIntro' scope = tsVariables %~ mappend (scope ^. scopeVars . to scoping)

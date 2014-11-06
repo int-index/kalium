@@ -15,11 +15,11 @@ import Sodium.Nucleus.Name
 
 type VarDecl = (Name, Type)
 
-atomize' :: (MonadError TypeError m, NameStack t m) => Program Expression -> m (Program Atom)
+atomize' :: (MonadError TypeError m, NameStack t m) => Program Expression Pattern -> m (Program Atom Pattern)
 atomize' program = runReaderT (atomize program) mempty
 
 class Atomize a where
-    atomize :: (TypeEnv m, NameStack t m) => a Expression -> m (a Atom)
+    atomize :: (TypeEnv m, NameStack t m) => a Expression Pattern -> m (a Atom Pattern)
 
 instance Atomize Program where
     atomize = typeIntro $ programFuncs (traverse atomize)
@@ -55,7 +55,7 @@ atomizeStatement w = do
            $ Scope (scoping vardecls) (Group (statements `snoc` statement a))
 
 atomizeExpression :: (TypeEnv m, NameStack t m) => Expression
-                  -> WriterT ([VarDecl], [Statement Atom]) m Atom
+                  -> WriterT ([VarDecl], [Statement Atom Pattern]) m Atom
 atomizeExpression = \case
     Atom atom -> return atom
     e@(Call op args) -> do

@@ -26,8 +26,8 @@ instance Typing t => Scoping (M.Map Name t) where
 instance Typing t => Scoping [(Name, t)] where
     scoping = scoping . M.fromList
 
-data Program a = Program
-    { _programFuncs :: M.Map Name (Func a)
+data Program a p = Program
+    { _programFuncs :: M.Map Name (Func a p)
     }
 
 data By
@@ -39,49 +39,49 @@ type ByType = (By, Type)
 
 type Params = [(Name, ByType)]
 
-data Func a = Func
+data Func a p = Func
     { _funcType :: Type
-    , _funcScope :: Scope Params (Scope Vars Body) a
+    , _funcScope :: Scope Params (Scope Vars Body) a p
     }
 
-data Body a = Body
-    { _bodyStatement :: Statement a
+data Body a p = Body
+    { _bodyStatement :: Statement a p
     , _bodyResult :: Atom
     }
 
-data Statement a
-    = Execute (Exec a)
-    | ForStatement (ForCycle a)
-    | IfStatement (If a)
-    | forall v . Scoping v => ScopeStatement (Scope v Statement a)
-    | Group [Statement a]
+data Statement a p
+    = Execute (Exec a p)
+    | ForStatement (ForCycle a p)
+    | IfStatement (If a p)
+    | forall v . Scoping v => ScopeStatement (Scope v Statement a p)
+    | Group [Statement a p]
 
 data Pattern
     = PUnit
     | PAccess Name
 
-data Exec a = Exec
-    { _execRet :: Pattern
+data Exec a p = Exec
+    { _execRet :: p
     , _execOp :: Name
     , _execArgs :: [a]
     }
 
-data ForCycle a
+data ForCycle a p
     = ForCycle
     { _forName :: Name
     , _forRange :: a
-    , _forStatement :: Statement a
+    , _forStatement :: Statement a p
     }
 
-data If a = If
+data If a p = If
     { _ifCond :: a
-    , _ifThen :: Statement a
-    , _ifElse :: Statement a
+    , _ifThen :: Statement a p
+    , _ifElse :: Statement a p
     }
 
-data Scope v f a = Scope
+data Scope v f a p = Scope
     { _scopeVars :: v
-    , _scopeElem :: f a
+    , _scopeElem :: f a p
     }
 
 data Expression
@@ -105,5 +105,5 @@ data FuncSig = FuncSig
     , funcSigParamTypes :: [ByType]
     } deriving (Eq)
 
-funcSig :: Func a -> FuncSig
+funcSig :: Func a p -> FuncSig
 funcSig func = FuncSig (func ^. funcType) (func ^. funcScope . scopeVars & map snd)
