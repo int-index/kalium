@@ -77,13 +77,16 @@ instance Conv S.Type where
     conv = pureconv
 
     type Pure S.Type = H.Type
-    pureconv = return . H.TyCon . \case
-        S.TypeInteger -> D.hsName "Int"
-        S.TypeDouble  -> D.hsName "Double"
-        S.TypeBoolean -> D.hsName "Bool"
-        S.TypeList S.TypeChar -> D.hsName "String"
-        S.TypeChar    -> D.hsName "Char"
-        S.TypeUnit    -> H.Special H.UnitCon
+    pureconv = \case
+        S.TypeInteger -> return $ H.TyCon (D.hsName "Int")
+        S.TypeDouble  -> return $ H.TyCon (D.hsName "Double")
+        S.TypeBoolean -> return $ H.TyCon (D.hsName "Bool")
+        S.TypeChar    -> return $ H.TyCon (D.hsName "Char")
+        S.TypeUnit    -> return $ H.TyCon (H.Special H.UnitCon)
+        S.TypePair t1 t2  -> (\t1 t2 -> H.TyTuple H.Boxed [t1, t2])
+                         <$> pureconv t1 <*> pureconv t2
+        S.TypeList S.TypeChar -> return $ H.TyCon (D.hsName "String")
+        S.TypeList ts -> H.TyList <$> pureconv ts
 
 instance Conv S.Body where
 
@@ -183,7 +186,7 @@ instance Conv S.Statement where
                      $ H.App (D.access "putStrLn")
                      $ foldr1 (\x y -> betaL [D.access "++", x, y])
                      $ hsExprs
-    conv (S.Execute op args) = error ("Execute " ++ show op ++ " " ++ show args)
+    conv (S.Execute _ _) = error "Execute..."
     conv (S.ForStatement  forCycle) = conv forCycle
     conv (S.MultiIfStatement multiIf) = conv multiIf
     conv (S.BodyStatement body) = conv body
@@ -264,6 +267,9 @@ convlit = \case
     S.Lit S.STypeBoolean a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
     S.Lit S.STypeUnit   () -> H.Con $ H.Special H.UnitCon
     S.Lit (S.STypeList S.STypeChar) cs -> H.Lit $ H.String cs
+    S.Lit (S.STypeList t) xs -> H.List $ map (\x -> convlit (S.Lit t x)) xs
+    S.Lit (S.STypePair t1 t2) (x1, x2)
+         -> H.Tuple H.Boxed [convlit (S.Lit t1 x1), convlit (S.Lit t2 x2)]
 
 convOp :: S.Operator -> D.Name
 convOp = \case

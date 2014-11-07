@@ -12,7 +12,7 @@ import Sodium.Nucleus.Program
 data Program
     = Program
     { _programFuncs :: [Func]
-    } deriving (Eq, Show)
+    } deriving (Eq)
 
 data FuncSig
     = FuncSig
@@ -20,27 +20,27 @@ data FuncSig
     , _funcParamTypes :: [Type]
     , _funcRetType :: Type
     , _funcRetRefs :: [Type]
-    } deriving (Eq, Show)
+    } deriving (Eq)
 
 data Func
     = Func
     { _funcSig :: FuncSig
     , _funcParams :: [Name]
     , _funcStatement :: Statement
-    } deriving (Eq, Show)
+    } deriving (Eq)
 
 data Body
     = Body
     { _bodyVars  :: Vars
     , _bodyBinds :: [Bind Statement]
     , _bodyResult :: Expression
-    } deriving (Eq, Show)
+    } deriving (Eq)
 
 data Bind a
     = Bind
     { _bindPattern :: Pattern
     , _bindStatement :: a
-    } deriving (Eq, Show)
+    } deriving (Eq)
 
 data Statement
     = Assign Expression
@@ -48,25 +48,25 @@ data Statement
     | ForStatement (ForCycle Statement)
     | MultiIfStatement (MultiIf Statement)
     | BodyStatement Body
-    deriving (Eq, Show)
+    deriving (Eq)
 
 data ForCycle a
     = ForCycle
     { _forLambda  :: Lambda a
     , _forArgExpr :: Expression
     , _forRange   :: Expression
-    } deriving (Eq, Show)
+    } deriving (Eq)
 
 data Lambda a
     = Lambda
     { _lamPatterns :: [Pattern]
     , _lamAction :: a
-    } deriving (Eq, Show)
+    } deriving (Eq)
 
 data MultiIf a
     = MultiIf
     { _multiIfLeafs :: [(Expression, a)]
-    } deriving (Eq, Show)
+    } deriving (Eq)
 
 data Expression
     = Access Name Index
@@ -75,7 +75,7 @@ data Expression
     | Primary Literal
     | Tuple [Expression]
     | MultiIfExpression (MultiIf Expression)
-    deriving (Eq, Show)
+    deriving (Eq)
 
 data Index
     = Index Integer
@@ -90,7 +90,7 @@ data Pattern
     = PTuple [Pattern]
     | PAccess Name Index
     | PWildCard
-    deriving (Eq, Show)
+    deriving (Eq)
 
 makeLenses ''FuncSig
 makeLenses ''Func

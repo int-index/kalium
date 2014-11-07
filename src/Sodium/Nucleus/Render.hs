@@ -72,7 +72,7 @@ instance Render FuncSig where
         ]
 
 instance Render Literal where
-    render (Lit _ r) = show r
+    render (Lit _ _) = "1"
 
 instance Render Type where
     render = \case
@@ -81,7 +81,8 @@ instance Render Type where
         TypeBoolean -> "Boolean"
         TypeChar    -> "Char"
         TypeList t  -> "List " ++ parens (render t)
-        TypeUnit    -> "()"
+        TypeUnit    -> parens ""
+        TypePair t1 t2 -> parens (commas [render t1, render t2])
 
 instance Render Program where
     render = unlines
@@ -138,7 +139,7 @@ instance Render Expression where
         Primary lit -> render lit
         Call op args -> render op ++ commas (map render args)
         MultiIfExpression multiIf -> render multiIf
-        expr -> show expr
+        _ -> "EXPR"
 
 instance Render (MultiIf Statement) where
     render multiIf =

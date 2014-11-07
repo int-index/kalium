@@ -8,6 +8,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Sodium.Nucleus.Program where
 
+import Data.Singletons.Prelude
 import Data.Singletons.TH
 import Data.Type.Equality
 import qualified Data.Map as M
@@ -21,6 +22,7 @@ singletons [d|
         | TypeChar
         | TypeUnit
         | TypeList Type
+        | TypePair Type Type
         deriving (Eq)
 
              |]
@@ -68,16 +70,22 @@ data Operator
     deriving (Eq, Ord, Show)
 
 data Literal where
-    Lit :: (r ~ TypeRepr t, Eq r, Show r) => SType t -> r -> Literal
-
-deriving instance Show (Sing (t :: Type))
-deriving instance Show Literal
+    Lit :: SType t -> TypeRepr t -> Literal
 
 instance Eq Literal where
-    Lit t1 r1 == Lit t2 r2
-        | Just Refl <- testEquality t1 t2
-        = r1 == r2
-    _ == _ = False
+    Lit STypeInteger r1 == Lit STypeInteger r2 = r1 == r2
+    Lit STypeDouble  r1 == Lit STypeDouble  r2 = r1 == r2
+    Lit STypeBoolean r1 == Lit STypeBoolean r2 = r1 == r2
+    Lit STypeChar    r1 == Lit STypeChar    r2 = r1 == r2
+    Lit STypeUnit    r1 == Lit STypeUnit    r2 = r1 == r2
+    Lit (STypeList ts1) rs1 == Lit (STypeList ts2) rs2
+        | Just Refl <- testEquality ts1 ts2
+        = map (Lit ts1) rs1 == map (Lit ts2) rs2
+    Lit (STypePair t11 t21) (r11, r21) == Lit (STypePair t12 t22) (r12, r22)
+        | Just Refl <- testEquality t11 t21
+        , Just Refl <- testEquality t12 t22
+        = (Lit t11 r11, Lit t21 r21) == (Lit t12 r12, Lit t22 r22)
+    Lit _ _ == Lit _ _ = False
 
 typecheckLiteral :: Literal -> Type
 typecheckLiteral (Lit t _) = fromSing t
@@ -88,7 +96,8 @@ type family TypeRepr (t :: Type) where
     TypeRepr TypeBoolean = Bool
     TypeRepr TypeChar    = Char
     TypeRepr TypeUnit    = ()
-    TypeRepr (TypeList ts) = [TypeRepr ts]
+    TypeRepr (TypeList    ts) = [TypeRepr ts]
+    TypeRepr (TypePair t1 t2) = (TypeRepr t1, TypeRepr t2)
 
 type Vars
     = M.Map Name Type
