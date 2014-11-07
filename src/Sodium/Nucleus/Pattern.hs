@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 module Sodium.Nucleus.Pattern where
 
 import Data.Traversable
@@ -12,6 +13,7 @@ patBound _ = []
 -- the pattern needs
 patMatch :: Pattern -> Expression -> Bool
 patMatch PWildCard _ = True
+patMatch PUnit (Primary (Lit STypeUnit ())) = True
 patMatch (PTuple xs) (Tuple ys)
     =  length xs == length ys
     && and (zipWith patMatch xs ys)
@@ -23,6 +25,7 @@ patMatch _ _ = False
 -- the expression needs
 expMatch :: Pattern -> Expression -> Bool
 expMatch PWildCard _ = False
+expMatch PUnit (Primary (Lit STypeUnit ())) = True
 expMatch (PTuple xs) (Tuple ys)
     =  length xs == length ys
     && and (zipWith expMatch xs ys)

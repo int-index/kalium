@@ -49,8 +49,14 @@ vectorizeFunc funcSigs (name, func) = do
           reftypes
     return $ Vec.Func vecFuncSig (params & map fst) (Vec.BodyStatement vecBody)
 
-patTuple = Vec.PTuple . map (uncurry Vec.PAccess)
-expTuple = Vec.Tuple  . map (uncurry Vec.Access)
+mkPatTuple [  ] = Vec.PUnit
+mkPatTuple pats = foldr1 (\x y -> Vec.PTuple [x,y]) pats
+
+mkExpTuple [  ] = Vec.Primary (Lit STypeUnit ())
+mkExpTuple pats = foldr1 (\x y -> Vec.Tuple [x,y]) pats
+
+patTuple = mkPatTuple . map (uncurry Vec.PAccess)
+expTuple = mkExpTuple . map (uncurry Vec.Access)
 
 vectorizeBody :: (V t m, Scoping v) => M.Map Name FuncSig -> Scope v Body Atom Pattern -> [Atom] -> t m ([Name], Vec.Body)
 vectorizeBody funcSigs scope results = do
@@ -73,7 +79,7 @@ vectorizeScope funcSigs scope = do
         indices' <- asks (M.fromList boundIndices `M.union`)
         let vecBodyGen results
                 = Vec.Body vars [vecBind]
-                <$> runReaderT (Vec.Tuple <$> mapM vectorizeAtom results) indices'
+                <$> runReaderT (mkExpTuple <$> mapM vectorizeAtom results) indices'
         return (changed, vecBodyGen)
 
 degroup funcSigs statements act = do
@@ -97,7 +103,7 @@ vectorizeStatement funcSigs = \case
         degroup funcSigs statements
             $ \indices vecBinds -> do
                 changed <- asks (diff indices)
-                results <- Vec.Tuple <$> mapM vectorizeAtom (map Access changed)
+                results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
                 let vecBody = Vec.Body M.empty vecBinds results
                 return (changed, Vec.BodyStatement vecBody)
     ScopeStatement scope -> do

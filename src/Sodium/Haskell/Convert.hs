@@ -233,6 +233,7 @@ instance Conv S.Pattern where
     conv = pureconv
 
     type Pure S.Pattern = H.Pat
+    pureconv S.PUnit = return (H.PTuple H.Boxed [])
     pureconv S.PWildCard = return H.PWildCard
     pureconv (S.PAccess name i) = H.PVar . H.Ident <$> pureconv (Name name i)
     pureconv (S.PTuple pats) = H.PTuple H.Boxed <$> mapM pureconv pats

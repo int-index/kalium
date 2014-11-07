@@ -90,6 +90,7 @@ data Pattern
     = PTuple [Pattern]
     | PAccess Name Index
     | PWildCard
+    | PUnit
     deriving (Eq)
 
 makeLenses ''FuncSig

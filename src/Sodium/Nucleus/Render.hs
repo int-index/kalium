@@ -122,6 +122,7 @@ instance Render Statement where
 
 instance Render Pattern where
     render = \case
+        PUnit -> "()"
         PTuple pats -> commas (map render pats)
         PAccess name index -> render name ++ render index
         PWildCard -> "_"

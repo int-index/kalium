@@ -28,9 +28,9 @@ cleanBody body = body & bodyBinds .~ binds where
     binds = tails (body ^. bodyBinds) >>= cleanBind
 
 cleanUsage :: Mask scope => scope -> Pattern -> Pattern
+cleanUsage _ PUnit = PWildCard
 cleanUsage scope (PTuple ps)
   = case cleanUsage scope `map` ps of
-      []  -> PWildCard
       [p] -> p
       ps' -> PTuple ps'
 cleanUsage scope (PAccess name _)
