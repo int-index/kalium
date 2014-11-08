@@ -252,7 +252,9 @@ convexpr (S.Primary lit) = return (convlit lit)
 convexpr (S.Access name i) = D.access <$> pureconv (Name name i)
 convexpr (S.Call op exprs) = do
     hsExprs <- mapM convexpr exprs
-    return $ betaL (D.access (transformName op) : hsExprs)
+    return $ case op of
+        S.NameOp S.OpSingleton -> H.List hsExprs
+        _ -> betaL (D.access (transformName op) : hsExprs)
 convexpr (S.Tuple exprs) = D.expTuple <$> mapM convexpr exprs
 convexpr (S.Fold op expr range) = do
     hsArgExpr <- convexpr expr
