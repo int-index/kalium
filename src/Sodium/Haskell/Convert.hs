@@ -236,7 +236,7 @@ instance Conv S.Pattern where
     pureconv S.PUnit = return (H.PTuple H.Boxed [])
     pureconv S.PWildCard = return H.PWildCard
     pureconv (S.PAccess name i) = H.PVar . H.Ident <$> pureconv (Name name i)
-    pureconv (S.PTuple pats) = H.PTuple H.Boxed <$> mapM pureconv pats
+    pureconv (S.PTuple pat1 pat2) = H.PTuple H.Boxed <$> mapM pureconv [pat1, pat2]
 
 
 instance Conv S.Expression where
@@ -255,7 +255,7 @@ convexpr (S.Call op exprs) = do
     return $ case op of
         S.NameOp S.OpSingleton -> H.List hsExprs
         _ -> betaL (D.access (transformName op) : hsExprs)
-convexpr (S.Tuple exprs) = D.expTuple <$> mapM convexpr exprs
+convexpr (S.Tuple expr1 expr2) = D.expTuple <$> mapM convexpr [expr1, expr2]
 convexpr (S.Fold op expr range) = do
     hsArgExpr <- convexpr expr
     hsRange <- convexpr range

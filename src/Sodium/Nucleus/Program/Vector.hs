@@ -73,7 +73,7 @@ data Expression
     | Fold Name Expression Expression
     | Call Name [Expression]
     | Primary Literal
-    | Tuple [Expression]
+    | Tuple Expression Expression
     | MultiIfExpression (MultiIf Expression)
     deriving (Eq)
 
@@ -87,7 +87,7 @@ type Indices
     = M.Map Name Index
 
 data Pattern
-    = PTuple [Pattern]
+    = PTuple Pattern Pattern
     | PAccess Name Index
     | PWildCard
     | PUnit

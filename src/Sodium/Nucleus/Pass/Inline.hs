@@ -37,13 +37,12 @@ inlineBody = evalState unconsBind where
         when (expr ^? _Access == Nothing) $ guard (count <= 1)
         return body
     merge :: Pattern -> State Body Pattern
-    merge p@(PTuple pats)
-        | topsm <- pats ^.. traversed . to (preview _PAccess)
-        , Just tops <- sequence topsm
-        , not (null tops)
+    merge p@(PTuple pat1 pat2)
+        | topsm <- [pat1, pat2] ^.. traversed . to (preview _PAccess)
+        , Just [top1, top2] <- sequence topsm
         -- TODO: generate a name!
         , top <- (NameSpace "merge" (Name "a"), Immutable)
-        = do let model =  Tuple (map (review _Access) tops)
+        = do let model =  Tuple (review _Access top1) (review _Access top2)
              let pat   = _PAccess # top
              let expr  =  _Access # top
              gets (over recmapped (model `subst` expr))

@@ -79,7 +79,7 @@ recExpr f = \case
     e@(Access _ _) -> f e
     e@(Primary  _) -> f e
     Call op exprs  -> (Call op <$> traverse rf exprs) >>= f
-    Tuple   exprs  -> (Tuple <$> traverse rf exprs) >>= f
+    Tuple expr1 expr2  -> Tuple <$> rf expr1 <*> rf expr2 >>= f
     Fold op expr range -> (Fold op <$> rf expr <*> rf range) >>= f
     MultiIfExpression multiIf ->
         (MultiIfExpression <$> (multiIfLeafs . traversed . both) rf multiIf)

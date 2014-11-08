@@ -123,7 +123,7 @@ instance Render Statement where
 instance Render Pattern where
     render = \case
         PUnit -> "()"
-        PTuple pats -> commas (map render pats)
+        PTuple pat1 pat2 -> commas (map render [pat1, pat2])
         PAccess name index -> render name ++ render index
         PWildCard -> "_"
 
@@ -135,7 +135,7 @@ instance Render Index where
 
 instance Render Expression where
     render = \case
-        Tuple exprs -> commas (map render exprs)
+        Tuple expr1 expr2 -> commas (map render [expr1, expr2])
         Access name index -> render name ++ render index
         Primary lit -> render lit
         Call op args -> render op ++ commas (map render args)

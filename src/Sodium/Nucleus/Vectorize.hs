@@ -50,10 +50,10 @@ vectorizeFunc funcSigs (name, func) = do
     return $ Vec.Func vecFuncSig (params & map fst) (Vec.BodyStatement vecBody)
 
 mkPatTuple [  ] = Vec.PUnit
-mkPatTuple pats = foldr1 (\x y -> Vec.PTuple [x,y]) pats
+mkPatTuple pats = foldr1 Vec.PTuple pats
 
 mkExpTuple [  ] = Vec.Primary (Lit STypeUnit ())
-mkExpTuple pats = foldr1 (\x y -> Vec.Tuple [x,y]) pats
+mkExpTuple pats = foldr1 Vec.Tuple pats
 
 patTuple = mkPatTuple . map (uncurry Vec.PAccess)
 expTuple = mkExpTuple . map (uncurry Vec.Access)

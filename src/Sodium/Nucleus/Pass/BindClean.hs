@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Sodium.Nucleus.Pass.BindClean (bindClean) where
 
+import Control.Applicative
 import Control.Monad
 import Control.Lens
 import Data.Monoid
@@ -29,12 +30,16 @@ subst bind (pat, cleaner)
 
 patClean :: Pattern -> [(Pattern, Cleaner)]
 patClean p@PWildCard = [(p, wildCleaner)]
-patClean (PTuple pats) = concat (unfoldr go 0) where
-    go n = do
-        (pre, cur:post) <- Just (splitAt n pats)
-        let wrap (PWildCard, _) = [(PTuple (pre++post), tupWildCleaner pats n)]
-            wrap (cur', cln') = [(PTuple (pre++cur':post), tupNestedCleaner cln' n)]
-        return (patClean cur >>= wrap, succ n)
+patClean (PTuple pat1 pat2) = go OpFst ++ go OpSnd where
+    go OpFst = do
+        let wrap (PWildCard, _) = [(pat1, \expr -> return $ Call (NameOp OpFst) [expr])]
+            wrap (cur', cln') = [(PTuple pat1 cur', tupNestedCleaner cln' False)]
+        patClean pat2 >>= wrap
+    go OpSnd = do
+        let wrap (PWildCard, _) = [(pat2, \expr -> return $ Call (NameOp OpSnd) [expr])]
+            wrap (cur', cln') = [(PTuple cur' pat2, tupNestedCleaner cln' True)]
+        patClean pat1 >>= wrap
+    go _ = []
 patClean _ = []
 
 type Cleaner = Expression -> Maybe Expression
@@ -42,26 +47,11 @@ type Cleaner = Expression -> Maybe Expression
 wildCleaner :: Cleaner
 wildCleaner _ = Just (Primary (Lit STypeUnit ()))
 
-tupWildCleaner :: [Pattern] -> Int -> Cleaner
-tupWildCleaner pats n expr = getFirst (First direct <> First indirect)
- where direct = do
-         Tuple  exprs  <- Just expr
-         (pre, _:post) <- Just (splitAt n exprs)
-         return $ Tuple (pre ++ post)
-       indirect = do
-         guard $ length pats == 2
-         op <- case n of
-            0 -> Just OpSnd
-            1 -> Just OpFst
-            _ -> Nothing
-         return $ Call (NameOp op) [expr]
-
-tupNestedCleaner :: Cleaner -> Int -> Cleaner
-tupNestedCleaner cln n expr = do
-    Tuple exprs <- Just expr
-    (pre, cur:post) <- Just (splitAt n exprs)
-    cur' <- cln cur
-    return $ Tuple (pre ++ cur':post)
+tupNestedCleaner :: Cleaner -> Bool -> Cleaner
+tupNestedCleaner cln op expr = do
+    Tuple expr1 expr2 <- Just expr
+    if op then Tuple <$> cln expr1 <*> pure expr2
+          else Tuple <$> pure expr1 <*> cln expr2
 
 class CleanRet a where
     cleanRet :: Cleaner -> a -> Maybe a
