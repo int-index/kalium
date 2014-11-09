@@ -1,14 +1,15 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
 module Sodium.Nucleus.Pass.BindClean (bindClean) where
 
 import Control.Applicative
 import Control.Monad
 import Control.Lens
-import Data.Monoid
-import Data.List
+import Data.Tuple
 
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
+import Sodium.Util (Pairs)
 
 bindClean :: Program -> Program
 bindClean = over recmapped bindCleanBody
@@ -19,7 +20,7 @@ bindCleanBody = bodyBinds . traversed %~ bindCleanBind
 bindCleanBind :: Bind Statement -> Bind Statement
 bindCleanBind bind
     = maybe bind id
-    $ getFirst . mconcat . map First
+    $ msum
     $ map (subst bind)
     $ patClean (bind ^. bindPattern)
 
@@ -28,30 +29,30 @@ subst bind (pat, cleaner)
     = bind & bindPattern .~ pat
            & bindStatement (cleanRet cleaner)
 
-patClean :: Pattern -> [(Pattern, Cleaner)]
-patClean p@PWildCard = [(p, wildCleaner)]
-patClean (PTuple pat1 pat2) = go OpFst ++ go OpSnd where
-    go OpFst = do
-        let wrap (PWildCard, _) = [(pat1, \expr -> return $ Call (NameOp OpFst) [expr])]
-            wrap (cur', cln') = [(PTuple pat1 cur', tupNestedCleaner cln' False)]
-        patClean pat2 >>= wrap
-    go OpSnd = do
-        let wrap (PWildCard, _) = [(pat2, \expr -> return $ Call (NameOp OpSnd) [expr])]
-            wrap (cur', cln') = [(PTuple cur' pat2, tupNestedCleaner cln' True)]
-        patClean pat1 >>= wrap
-    go _ = []
+type Con = forall a . (a,a) -> (a,a)
+
+patClean :: Pattern -> Pairs Pattern Cleaner
+patClean p@PWildCard = return (p, wildCleaner)
+patClean (PTuple pat1 pat2) = go id OpFst `mplus` go swap OpSnd where
+    go :: Con -> Operator -> Pairs Pattern Cleaner
+    go con op = do
+        let (p1, p2) = con (pat1, pat2)
+        let wrap (PWildCard, _) = do
+                let cln expr = return $ Call (NameOp op) [expr]
+                return (p1, cln)
+            wrap (p0, cln') = do
+                let cln (Tuple expr1 expr2) = do
+                      let (act1, act2) = con (pure, cln')
+                      Tuple <$> act1 expr1 <*> act2 expr2
+                    cln _ = Nothing
+                return (PTuple `uncurry` con (p1, p0), cln)
+        patClean p2 >>= wrap
 patClean _ = []
 
 type Cleaner = Expression -> Maybe Expression
 
 wildCleaner :: Cleaner
 wildCleaner _ = Just (Primary (Lit STypeUnit ()))
-
-tupNestedCleaner :: Cleaner -> Bool -> Cleaner
-tupNestedCleaner cln op expr = do
-    Tuple expr1 expr2 <- Just expr
-    if op then Tuple <$> cln expr1 <*> pure expr2
-          else Tuple <$> pure expr1 <*> cln expr2
 
 class CleanRet a where
     cleanRet :: Cleaner -> a -> Maybe a
