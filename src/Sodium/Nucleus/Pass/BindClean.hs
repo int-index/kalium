@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 module Sodium.Nucleus.Pass.BindClean (bindClean) where
@@ -41,9 +42,9 @@ patClean (PTuple pat1 pat2) = go id OpFst `mplus` go swap OpSnd where
                 let cln expr = return $ Call (NameOp op) [expr]
                 return (p1, cln)
             wrap (p0, cln') = do
-                let cln (Tuple expr1 expr2) = do
+                let cln (CallOp2 OpPair expr1 expr2) = do
                       let (act1, act2) = con (pure, cln')
-                      Tuple <$> act1 expr1 <*> act2 expr2
+                      CallOp2 OpPair <$> act1 expr1 <*> act2 expr2
                     cln _ = Nothing
                 return (PTuple `uncurry` con (p1, p0), cln)
         patClean p2 >>= wrap

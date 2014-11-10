@@ -55,7 +55,6 @@ instance Mask Pattern where
 
 instance Mask Expression where
     mask  =  (_Access . _1) mask
-         >=> _Tuple mask
          >=> _Fold  mask
          >=> _Call  mask
          >=> _MultiIfExpression mask

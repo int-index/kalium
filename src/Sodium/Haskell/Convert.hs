@@ -254,8 +254,8 @@ convexpr (S.Call op exprs) = do
     hsExprs <- mapM convexpr exprs
     return $ case op of
         S.NameOp S.OpSingleton -> H.List hsExprs
+        S.NameOp S.OpPair -> D.expTuple hsExprs
         _ -> betaL (D.access (transformName op) : hsExprs)
-convexpr (S.Tuple expr1 expr2) = D.expTuple <$> mapM convexpr [expr1, expr2]
 convexpr (S.Fold op expr range) = do
     hsArgExpr <- convexpr expr
     hsRange <- convexpr range
@@ -298,6 +298,7 @@ convOp = \case
     S.OpElem     -> "elem"
     S.OpRange    -> "enumFromTo"
     S.OpId       -> "id"
+    S.OpPair     -> ","
     S.OpFst      -> "fst"
     S.OpSnd      -> "snd"
     S.OpPrintLn  -> "print"

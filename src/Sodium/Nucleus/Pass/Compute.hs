@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE GADTs #-}
 module Sodium.Nucleus.Pass.Compute (compute) where
 
@@ -21,8 +22,8 @@ match = \case
         , Primary (Lit STypeInteger b) <- y
         , Just f <- binaryIntegerOp op
         -> Primary (Lit STypeInteger (f a b))
-    Call (NameOp OpFst) [Tuple expr1 _] -> expr1
-    Call (NameOp OpSnd) [Tuple _ expr2] -> expr2
+    Call (NameOp OpFst) [CallOp2 OpPair expr1 _] -> expr1
+    Call (NameOp OpSnd) [CallOp2 OpPair _ expr2] -> expr2
     Fold (NameOp OpMultiply) (Primary (Lit STypeInteger 1)) range
         -> Call (NameOp OpProduct) [range]
     Fold (NameOp OpAdd)      (Primary (Lit STypeInteger 0)) range

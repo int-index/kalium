@@ -53,7 +53,7 @@ mkPatTuple [  ] = Vec.PUnit
 mkPatTuple pats = foldr1 Vec.PTuple pats
 
 mkExpTuple [  ] = Vec.Primary (Lit STypeUnit ())
-mkExpTuple pats = foldr1 Vec.Tuple pats
+mkExpTuple pats = foldr1 (Vec.CallOp2 OpPair) pats
 
 patTuple = mkPatTuple . map (uncurry Vec.PAccess)
 expTuple = mkExpTuple . map (uncurry Vec.Access)

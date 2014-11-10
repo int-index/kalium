@@ -58,6 +58,7 @@ instance Render Operator where
         OpGetLn -> "getln"
         OpReadLn ty -> "readln-" ++ render ty
         OpId -> "id"
+        OpPair -> "pair"
         OpFst -> "fst"
         OpSnd -> "snd"
         OpSingleton -> "single"
@@ -135,7 +136,6 @@ instance Render Index where
 
 instance Render Expression where
     render = \case
-        Tuple expr1 expr2 -> commas (map render [expr1, expr2])
         Access name index -> render name ++ render index
         Primary lit -> render lit
         Call op args -> render op ++ commas (map render args)

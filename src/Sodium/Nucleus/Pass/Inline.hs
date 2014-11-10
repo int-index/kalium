@@ -42,7 +42,7 @@ inlineBody = evalState unconsBind where
         , Just [top1, top2] <- sequence topsm
         -- TODO: generate a name!
         , top <- (NameSpace "merge" (Name "a"), Immutable)
-        = do let model =  Tuple (review _Access top1) (review _Access top2)
+        = do let model =  CallOp2 OpPair (review _Access top1) (review _Access top2)
              let pat   = _PAccess # top
              let expr  =  _Access # top
              gets (over recmapped (model `subst` expr))

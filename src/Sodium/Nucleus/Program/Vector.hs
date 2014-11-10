@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE PatternSynonyms #-}
 module Sodium.Nucleus.Program.Vector
     ( module Sodium.Nucleus.Program.Vector
     , module Sodium.Nucleus.Program
@@ -73,9 +74,10 @@ data Expression
     | Fold Name Expression Expression
     | Call Name [Expression]
     | Primary Literal
-    | Tuple Expression Expression
     | MultiIfExpression (MultiIf Expression)
     deriving (Eq)
+
+pattern CallOp2 op x y = Call (NameOp op) [x, y]
 
 data Index
     = Index Integer

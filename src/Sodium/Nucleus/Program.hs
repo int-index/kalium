@@ -63,6 +63,7 @@ data Operator
     | OpGetLn
     | OpReadLn Type
     | OpId
+    | OpPair
     | OpFst
     | OpSnd
     | OpSingleton

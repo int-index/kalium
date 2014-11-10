@@ -11,6 +11,7 @@ import Control.Lens
 import qualified Data.Map as M
 
 import Sodium.Nucleus.Program
+import Sodium.Util
 
 class Typing t where
     typing :: t -> Type
@@ -23,7 +24,7 @@ class Scoping v where
 
 instance Typing t => Scoping (M.Map Name t) where
     scoping = M.map typing
-instance Typing t => Scoping [(Name, t)] where
+instance Typing t => Scoping (Pairs Name t) where
     scoping = scoping . M.fromList
 
 data Program a p = Program
