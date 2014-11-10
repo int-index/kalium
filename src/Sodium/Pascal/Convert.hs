@@ -18,6 +18,7 @@ import qualified Sodium.Pascal.Program as S
 import qualified Sodium.Nucleus.Scalar.Program as D
 import qualified Sodium.Nucleus.Scalar.Build   as D
 import Sodium.Nucleus.Name
+import Sodium.Util
 
 declareLenses [d|
 
@@ -36,7 +37,7 @@ data TypeError
     | TypeNoCast
     deriving (Eq, Show)
 
-convert :: (NameStack t m, MonadError TypeError m) => S.Program -> m (D.Program D.Expression D.Pattern)
+convert :: (NameStack t m, MonadError TypeError m) => S.Program -> m (D.Program D.ByType D.Expression D.Pattern)
 convert program = runReaderT (conv program) (TypeScope M.empty M.empty)
 
 nameV = D.NameSpace "v" . D.Name
@@ -45,13 +46,13 @@ nameF = D.NameSpace "f" . D.Name
 class Conv s d | s -> d where
     conv :: (NameStack t m, MonadError TypeError m) => s -> ReaderT TypeScope m d
 
-instance Conv S.Program (D.Program D.Expression D.Pattern) where
+instance Conv S.Program (D.Program D.ByType D.Expression D.Pattern) where
     conv (S.Program funcs vars body)
         = local (tsFunctions %~ M.union funcSigs) $ do
             clMain <- do
                 clBody <- convScope vars
                     $ D.Body <$> conv body <*> pure (D.atom ())
-                let noparams = D.Scope ([] :: D.Params)
+                let noparams = D.Scope ([] :: Pairs D.Name D.ByType)
                 return $ D.Func D.TypeUnit (noparams clBody)
             clFuncs <- traverse conv funcs
             return $ D.Program (M.fromList $ (D.NameMain, clMain):clFuncs)
@@ -73,7 +74,7 @@ convScope' paramdecls inner
 instance Conv S.Body (D.Statement D.Expression D.Pattern) where
     conv statements = D.Group <$> traverse conv statements
 
-instance Conv S.Func (D.Name, D.Func D.Expression D.Pattern) where
+instance Conv S.Func (D.Name, D.Func D.ByType D.Expression D.Pattern) where
     conv (S.Func name (S.FuncSig params pasType) vars body) = do
         (retExpr, retType, retVars) <- case pasType of
             Nothing -> return (D.atom (), D.TypeUnit, M.empty)

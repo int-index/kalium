@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
 module Sodium.Nucleus.Scalar.Typecheck where
 
@@ -19,59 +20,59 @@ data TypeError
 
 declareLenses [d|
 
-    data TypeScope = TypeScope
-        { tsFunctions :: M.Map Name FuncSig
+    data TypeScope param = TypeScope
+        { tsFunctions :: M.Map Name (FuncSig param)
         , tsVariables :: Vars
         } deriving (Eq)
 
                 |]
 
-instance Monoid TypeScope where
+instance Monoid (TypeScope param) where
     mempty = TypeScope mempty mempty
     mappend (TypeScope funs1 vars1) (TypeScope funs2 vars2)
         = TypeScope (mappend funs1 funs2) (mappend vars1 vars2)
 
-type TypeEnv m = (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
+type TypeEnv param m = (Applicative m, MonadReader (TypeScope param) m, MonadError TypeError m)
 
-class Typecheck a where
-    typecheck :: TypeEnv m => a -> m Type
+class Typecheck param a where
+    typecheck :: TypeEnv param m => a -> m Type
 
-instance Typecheck Literal where
+instance Typecheck param Literal where
     typecheck = return . typecheckLiteral
 
-instance Typecheck Atom where
+instance Typecheck param Atom where
     typecheck (Primary lit) = typecheck lit
     typecheck (Access name) = do
         vars <- asks (view tsVariables)
         M.lookup name vars
             & maybe (throwError $ NoAccess name vars) return
 
-lookupFuncSig :: TypeEnv m => Name -> m FuncSig
+lookupFuncSig :: TypeEnv param m => Name -> m (FuncSig param)
 lookupFuncSig name = do
     funcSigs <- asks (view tsFunctions)
     M.lookup name funcSigs
         & maybe (throwError (NoFunction name)) return
 
-instance Typecheck Expression where
+instance Typecheck param Expression where
     typecheck (Atom atom) = typecheck atom
     typecheck (Call name args)
         | NameOp op <- name = do
             mapM typecheck args >>= builtinOpType op
         | otherwise = funcSigType <$> lookupFuncSig name
 
-builtinOpType :: TypeEnv m => Operator -> [Type] -> m Type
+builtinOpType :: TypeEnv param m => Operator -> [Type] -> m Type
 builtinOpType _ _ = return TypeUnit
 
 
-class TypeIntro a where
-    typeIntro' :: a -> TypeScope -> TypeScope
+class TypeIntro param a where
+    typeIntro' :: a -> TypeScope param -> TypeScope param
 
-typeIntro :: (TypeIntro a, TypeEnv m) => (a -> m b) -> (a -> m b)
+typeIntro :: (TypeIntro param a, TypeEnv param m) => (a -> m b) -> (a -> m b)
 typeIntro k x = local (typeIntro' x) (k x)
 
-instance TypeIntro (Program a p) where
+instance TypeIntro param (Program param expr pat) where
     typeIntro' program = tsFunctions
         %~ mappend (program ^. programFuncs & M.map funcSig)
 
-instance Scoping v => TypeIntro (Scope v f a p) where
+instance Scoping vars => TypeIntro param (Scope vars obj expr pat) where
     typeIntro' scope = tsVariables %~ mappend (scope ^. scopeVars . to scoping)

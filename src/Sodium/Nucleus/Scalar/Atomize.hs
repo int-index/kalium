@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
 module Sodium.Nucleus.Scalar.Atomize (atomize, atomize') where
 
@@ -15,19 +16,20 @@ import Sodium.Nucleus.Name
 
 type VarDecl = (Name, Type)
 
-atomize' :: (MonadError TypeError m, NameStack t m) => Program Expression Pattern -> m (Program Atom Pattern)
+atomize' :: (MonadError TypeError m, NameStack t m) => Program ByType Expression Pattern -> m (Program ByType Atom Pattern)
 atomize' program = runReaderT (atomize program) mempty
 
 class Atomize a where
-    atomize :: (TypeEnv m, NameStack t m) => a Expression Pattern -> m (a Atom Pattern)
+    atomize :: (TypeEnv ByType m, NameStack t m)
+            => a Expression Pattern -> m (a Atom Pattern)
 
-instance Atomize Program where
+instance Atomize (Program ByType) where
     atomize = typeIntro $ programFuncs (traverse atomize)
 
-instance Atomize Func where
+instance Atomize (Func ByType) where
     atomize = funcScope atomize
 
-instance (Atomize f, Scoping v) => Atomize (Scope v f) where
+instance (Atomize obj, Scoping vars) => Atomize (Scope vars obj) where
     atomize = typeIntro $ scopeElem atomize
 
 instance Atomize Body where
@@ -54,7 +56,7 @@ atomizeStatement w = do
     return $ ScopeStatement
            $ Scope (scoping vardecls) (Group (statements `snoc` statement a))
 
-atomizeExpression :: (TypeEnv m, NameStack t m) => Expression
+atomizeExpression :: (TypeEnv ByType m, NameStack t m) => Expression
                   -> WriterT ([VarDecl], [Statement Atom Pattern]) m Atom
 atomizeExpression = \case
     Atom atom -> return atom

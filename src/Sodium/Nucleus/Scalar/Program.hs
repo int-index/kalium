@@ -19,16 +19,16 @@ class Typing t where
 instance Typing Type   where typing = id
 instance Typing ByType where typing = snd
 
-class Scoping v where
-    scoping :: v -> M.Map Name Type
+class Scoping vars where
+    scoping :: vars -> M.Map Name Type
 
 instance Typing t => Scoping (M.Map Name t) where
     scoping = M.map typing
 instance Typing t => Scoping (Pairs Name t) where
     scoping = scoping . M.fromList
 
-data Program a p = Program
-    { _programFuncs :: M.Map Name (Func a p)
+data Program param expr pat = Program
+    { _programFuncs :: M.Map Name (Func param expr pat)
     }
 
 data By
@@ -38,51 +38,49 @@ data By
 
 type ByType = (By, Type)
 
-type Params = [(Name, ByType)]
-
-data Func a p = Func
+data Func param expr pat = Func
     { _funcType :: Type
-    , _funcScope :: Scope Params (Scope Vars Body) a p
+    , _funcScope :: Scope (Pairs Name param) (Scope Vars Body) expr pat
     }
 
-data Body a p = Body
-    { _bodyStatement :: Statement a p
+data Body expr pat = Body
+    { _bodyStatement :: Statement expr pat
     , _bodyResult :: Atom
     }
 
-data Statement a p
-    = Execute (Exec a p)
-    | ForStatement (ForCycle a p)
-    | IfStatement (If a p)
-    | forall v . Scoping v => ScopeStatement (Scope v Statement a p)
-    | Group [Statement a p]
+data Statement expr pat
+    = Execute (Exec expr pat)
+    | ForStatement (ForCycle expr pat)
+    | IfStatement (If expr pat)
+    | forall vars . Scoping vars => ScopeStatement (Scope vars Statement expr pat)
+    | Group [Statement expr pat]
 
 data Pattern
     = PUnit
     | PAccess Name
 
-data Exec a p = Exec
-    { _execRet :: p
+data Exec expr pat = Exec
+    { _execRet :: pat
     , _execOp :: Name
-    , _execArgs :: [a]
+    , _execArgs :: [expr]
     }
 
-data ForCycle a p
+data ForCycle expr pat
     = ForCycle
     { _forName :: Name
-    , _forRange :: a
-    , _forStatement :: Statement a p
+    , _forRange :: expr
+    , _forStatement :: Statement expr pat
     }
 
-data If a p = If
-    { _ifCond :: a
-    , _ifThen :: Statement a p
-    , _ifElse :: Statement a p
+data If expr pat = If
+    { _ifCond :: expr
+    , _ifThen :: Statement expr pat
+    , _ifElse :: Statement expr pat
     }
 
-data Scope v f a p = Scope
-    { _scopeVars :: v
-    , _scopeElem :: f a p
+data Scope vars obj expr pat = Scope
+    { _scopeVars :: vars
+    , _scopeElem :: obj expr pat
     }
 
 data Expression
@@ -101,10 +99,10 @@ makeLenses ''If
 makeLenses ''Program
 makeLenses ''Exec
 
-data FuncSig = FuncSig
+data FuncSig param = FuncSig
     { funcSigType :: Type
-    , funcSigParamTypes :: [ByType]
+    , funcSigParamTypes :: [param]
     } deriving (Eq)
 
-funcSig :: Func a p -> FuncSig
+funcSig :: Func param a p -> FuncSig param
 funcSig func = FuncSig (func ^. funcType) (func ^. funcScope . scopeVars & map snd)
