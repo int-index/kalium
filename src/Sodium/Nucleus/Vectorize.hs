@@ -23,7 +23,7 @@ data Error
 type E m = (Applicative m, MonadError Error m)
 type V t m = (MonadTrans t, MonadReader Vec.Indices (t m), E m, E (t m))
 
-vectorize :: E m => Program ByType Atom Pattern -> m Vec.Program
+vectorize :: E m => Program ByType Pattern Atom -> m Vec.Program
 vectorize program = do
     let funcSigs = program ^. programFuncs & M.map funcSig
     vecFuncs <- mapM (vectorizeFunc funcSigs) (program ^. programFuncs & M.toList)
@@ -35,7 +35,7 @@ references params = unzip $ do
     guard (by == ByReference)
     return (name, ty)
 
-vectorizeFunc :: E m => M.Map Name (FuncSig ByType) -> (Name, Func ByType Atom Pattern) -> m Vec.Func
+vectorizeFunc :: E m => M.Map Name (FuncSig ByType) -> (Name, Func ByType Pattern Atom) -> m Vec.Func
 vectorizeFunc funcSigs (name, func) = do
     let params = func ^. funcScope . scopeVars
     let (refnames, reftypes) = references params
@@ -58,7 +58,7 @@ mkExpTuple pats = foldr1 (Vec.CallOp2 OpPair) pats
 patTuple = mkPatTuple . map (uncurry Vec.PAccess)
 expTuple = mkExpTuple . map (uncurry Vec.Access)
 
-vectorizeBody :: (V t m, Scoping v) => M.Map Name (FuncSig ByType) -> Scope v Body Atom Pattern -> [Atom] -> t m ([Name], Vec.Body)
+vectorizeBody :: (V t m, Scoping v) => M.Map Name (FuncSig ByType) -> Scope v Body Pattern Atom -> [Atom] -> t m ([Name], Vec.Body)
 vectorizeBody funcSigs scope results = do
     let vars = scope ^. scopeVars
     let Body statement result = scope ^. scopeElem
@@ -67,7 +67,7 @@ vectorizeBody funcSigs scope results = do
     return (changed, vecBody)
 
 
-vectorizeScope :: (V t m, Scoping v) => M.Map Name (FuncSig ByType) -> Scope v Statement Atom Pattern -> t m ([Name], [Atom] -> m Vec.Body)
+vectorizeScope :: (V t m, Scoping v) => M.Map Name (FuncSig ByType) -> Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Body)
 vectorizeScope funcSigs scope = do
     let vars = scope ^. scopeVars . to scoping
     local (initIndices Vec.Uninitialized vars `M.union`) $ do
@@ -97,7 +97,7 @@ degroup funcSigs statements act = do
 diff :: (Ord k, Eq v) => M.Map k v -> M.Map k v -> [k]
 diff m1 m2 = M.keys $ M.filter id $ M.intersectionWith (/=) m1 m2
 
-vectorizeStatement :: V t m => M.Map Name (FuncSig ByType) -> Statement Atom Pattern -> t m ([Name], Vec.Statement)
+vectorizeStatement :: V t m => M.Map Name (FuncSig ByType) -> Statement Pattern Atom -> t m ([Name], Vec.Statement)
 vectorizeStatement funcSigs = \case
     Group statements ->
         degroup funcSigs statements

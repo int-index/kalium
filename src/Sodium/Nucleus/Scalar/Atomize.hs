@@ -16,26 +16,25 @@ import Sodium.Nucleus.Name
 
 type VarDecl = (Name, Type)
 
-atomize' :: (MonadError TypeError m, NameStack t m) => Program ByType Expression Pattern -> m (Program ByType Atom Pattern)
+atomize' :: (MonadError TypeError m, NameStack t m) => Program ByType Pattern Expression -> m (Program ByType Pattern Atom)
 atomize' program = runReaderT (atomize program) mempty
 
 class Atomize a where
-    atomize :: (TypeEnv ByType m, NameStack t m)
-            => a Expression Pattern -> m (a Atom Pattern)
+    atomize :: (TypeEnv ByType m, NameStack t m) => a Expression -> m (a Atom)
 
-instance Atomize (Program ByType) where
+instance Atomize (Program ByType Pattern) where
     atomize = typeIntro $ programFuncs (traverse atomize)
 
-instance Atomize (Func ByType) where
+instance Atomize (Func ByType Pattern) where
     atomize = funcScope atomize
 
-instance (Atomize obj, Scoping vars) => Atomize (Scope vars obj) where
+instance (Atomize (obj pat), Scoping vars) => Atomize (Scope vars obj pat) where
     atomize = typeIntro $ scopeElem atomize
 
-instance Atomize Body where
+instance Atomize (Body Pattern) where
     atomize = bodyStatement atomize
 
-instance Atomize Statement where
+instance Atomize (Statement Pattern) where
 
     atomize (Execute (Exec mname op exprs)) = atomizeStatement
         $ Exec mname op <$> mapM atomizeExpression exprs
@@ -56,8 +55,8 @@ atomizeStatement w = do
     return $ ScopeStatement
            $ Scope (scoping vardecls) (Group (statements `snoc` statement a))
 
-atomizeExpression :: (TypeEnv ByType m, NameStack t m) => Expression
-                  -> WriterT ([VarDecl], [Statement Atom Pattern]) m Atom
+atomizeExpression :: (TypeEnv param m, NameStack t m) => Expression
+                  -> WriterT ([VarDecl], [Statement Pattern Atom]) m Atom
 atomizeExpression = \case
     Atom atom -> return atom
     e@(Call op args) -> do

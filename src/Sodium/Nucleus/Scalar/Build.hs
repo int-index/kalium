@@ -45,5 +45,5 @@ instance Scoping v => LiftStatement (Scope v Statement)
 statements :: (Foldable c, LiftStatement f) => c (f a p) -> Statement a p
 statements ss = Group (map statement $ toList ss)
 
-assign :: Name -> a -> Statement a Pattern
+assign :: Name -> a -> Statement Pattern a
 assign name a = statement $ Exec (PAccess name) (NameOp OpId) [a]

@@ -37,7 +37,7 @@ data TypeError
     | TypeNoCast
     deriving (Eq, Show)
 
-convert :: (NameStack t m, MonadError TypeError m) => S.Program -> m (D.Program D.ByType D.Expression D.Pattern)
+convert :: (NameStack t m, MonadError TypeError m) => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
 convert program = runReaderT (conv program) (TypeScope M.empty M.empty)
 
 nameV = D.NameSpace "v" . D.Name
@@ -46,7 +46,7 @@ nameF = D.NameSpace "f" . D.Name
 class Conv s d | s -> d where
     conv :: (NameStack t m, MonadError TypeError m) => s -> ReaderT TypeScope m d
 
-instance Conv S.Program (D.Program D.ByType D.Expression D.Pattern) where
+instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
     conv (S.Program funcs vars body)
         = local (tsFunctions %~ M.union funcSigs) $ do
             clMain <- do
@@ -71,10 +71,10 @@ convScope' paramdecls inner
        where paramDeclToTup (S.ParamDecl name (_, ty)) = (name, ty)
              vardecls = M.fromList $ map paramDeclToTup paramdecls
 
-instance Conv S.Body (D.Statement D.Expression D.Pattern) where
+instance Conv S.Body (D.Statement D.Pattern D.Expression) where
     conv statements = D.Group <$> traverse conv statements
 
-instance Conv S.Func (D.Name, D.Func D.ByType D.Expression D.Pattern) where
+instance Conv S.Func (D.Name, D.Func D.ByType D.Pattern D.Expression) where
     conv (S.Func name (S.FuncSig params pasType) vars body) = do
         (retExpr, retType, retVars) <- case pasType of
             Nothing -> return (D.atom (), D.TypeUnit, M.empty)
@@ -185,7 +185,7 @@ typecasts expr = do
         S.TypeInteger -> [op1App S.OpIntToReal expr]
         _ -> []
 
-instance Conv S.Statement (D.Statement D.Expression D.Pattern) where
+instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
     conv = \case
         S.BodyStatement body -> D.statement <$> conv body
         S.Assign name' expr' -> do

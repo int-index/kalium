@@ -27,8 +27,8 @@ instance Typing t => Scoping (M.Map Name t) where
 instance Typing t => Scoping (Pairs Name t) where
     scoping = scoping . M.fromList
 
-data Program param expr pat = Program
-    { _programFuncs :: M.Map Name (Func param expr pat)
+data Program param pat expr = Program
+    { _programFuncs :: M.Map Name (Func param pat expr)
     }
 
 data By
@@ -38,49 +38,49 @@ data By
 
 type ByType = (By, Type)
 
-data Func param expr pat = Func
+data Func param pat expr = Func
     { _funcType :: Type
-    , _funcScope :: Scope (Pairs Name param) (Scope Vars Body) expr pat
+    , _funcScope :: Scope (Pairs Name param) (Scope Vars Body) pat expr
     }
 
-data Body expr pat = Body
-    { _bodyStatement :: Statement expr pat
+data Body pat expr = Body
+    { _bodyStatement :: Statement pat expr
     , _bodyResult :: Atom
     }
 
-data Statement expr pat
-    = Execute (Exec expr pat)
-    | ForStatement (ForCycle expr pat)
-    | IfStatement (If expr pat)
-    | forall vars . Scoping vars => ScopeStatement (Scope vars Statement expr pat)
-    | Group [Statement expr pat]
+data Statement pat expr
+    = Execute (Exec pat expr)
+    | ForStatement (ForCycle pat expr)
+    | IfStatement (If pat expr)
+    | forall vars . Scoping vars => ScopeStatement (Scope vars Statement pat expr)
+    | Group [Statement pat expr]
 
 data Pattern
     = PUnit
     | PAccess Name
 
-data Exec expr pat = Exec
+data Exec pat expr = Exec
     { _execRet :: pat
     , _execOp :: Name
     , _execArgs :: [expr]
     }
 
-data ForCycle expr pat
+data ForCycle pat expr
     = ForCycle
     { _forName :: Name
     , _forRange :: expr
-    , _forStatement :: Statement expr pat
+    , _forStatement :: Statement pat expr
     }
 
-data If expr pat = If
+data If pat expr = If
     { _ifCond :: expr
-    , _ifThen :: Statement expr pat
-    , _ifElse :: Statement expr pat
+    , _ifThen :: Statement pat expr
+    , _ifElse :: Statement pat expr
     }
 
-data Scope vars obj expr pat = Scope
+data Scope vars obj pat expr = Scope
     { _scopeVars :: vars
-    , _scopeElem :: obj expr pat
+    , _scopeElem :: obj pat expr
     }
 
 data Expression
