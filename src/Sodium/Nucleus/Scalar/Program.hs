@@ -58,6 +58,7 @@ data Statement pat expr
 data Pattern
     = PUnit
     | PAccess Name
+    | PTuple Pattern Pattern
 
 data Exec pat expr = Exec
     { _execRet :: pat

@@ -4,6 +4,7 @@ module Sodium (translate) where
 import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.Shadow      (unshadow)
 import Sodium.Nucleus.Scalar.Atomize (atomize')
+import Sodium.Nucleus.Scalar.Valueficate (valueficate)
 import Sodium.Nucleus.Strip (strip)
 import Sodium.Nucleus.Pass.Flatten     (flatten)
 import Sodium.Nucleus.Pass.JoinMultiIf (joinMultiIf)
@@ -36,9 +37,10 @@ translate src = do
     let namestack0 = map (V.NameSpace "g" . V.Name . ('g':) . show) [0..]
     (scalar,  namestack1) <- liftErr E.pasconvError
         (P.convert pas `runStateT` namestack0)
-    (atomic, _namestack2) <- liftErr E.typeError
+    (atomic,  namestack2) <- liftErr E.typeError
         (atomize' scalar `runStateT` namestack1)
-    vector <- liftErr E.vectorizeError (vectorize atomic)
+    (valued, _namestack3) <- valueficate atomic `runStateT` namestack2
+    vector <- liftErr E.vectorizeError (valued `seq` vectorize atomic)
     let noshadow = unshadow vector
     let optimal = let (a, log) = runWriter (closureM pass noshadow)
                   in trace (concat $ map R.render log) a

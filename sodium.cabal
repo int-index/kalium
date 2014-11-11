@@ -23,6 +23,7 @@ library
                        Sodium.Nucleus.Scalar.Build
                        Sodium.Nucleus.Scalar.Typecheck
                        Sodium.Nucleus.Scalar.Atomize
+                       Sodium.Nucleus.Scalar.Valueficate
                        Sodium.Nucleus.Vectorize
                        Sodium.Nucleus.Shadow
                        Sodium.Nucleus.Pass.Flatten
