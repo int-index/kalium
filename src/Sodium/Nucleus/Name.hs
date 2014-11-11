@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, ConstraintKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Sodium.Nucleus.Name where
 
 import Control.Lens

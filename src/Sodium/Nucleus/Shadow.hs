@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, ConstraintKinds, NoMonomorphismRestriction #-}
+{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction #-}
 module Sodium.Nucleus.Shadow (unshadow) where
 
 import qualified Data.Set as S

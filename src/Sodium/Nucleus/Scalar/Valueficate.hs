@@ -1,4 +1,3 @@
-{-# LANGUAGE ConstraintKinds #-}
 module Sodium.Nucleus.Scalar.Valueficate where
 
 import Control.Lens

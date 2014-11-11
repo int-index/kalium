@@ -59,6 +59,8 @@ library
   default-extensions:  LambdaCase,
                        TupleSections,
                        ScopedTypeVariables,
+                       ConstraintKinds,
+                       RankNTypes,
                        MultiParamTypeClasses
 
 executable sodium-tool

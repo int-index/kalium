@@ -1,6 +1,5 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RankNTypes #-}
 module Sodium.Nucleus.Pass.BindClean (bindClean) where
 
 import Control.Applicative

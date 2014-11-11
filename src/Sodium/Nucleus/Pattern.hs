@@ -2,7 +2,6 @@
 {-# LANGUAGE GADTs #-}
 module Sodium.Nucleus.Pattern where
 
-import Data.Traversable
 import Sodium.Nucleus.Program.Vector
 
 patBound :: Pattern -> [Name]

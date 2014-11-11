@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, RankNTypes, ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Sodium.Nucleus.Recmap.Vector
     ( Recmapper
@@ -9,8 +9,6 @@ module Sodium.Nucleus.Recmap.Vector
     , recmapped
     , recExpr
     ) where
-
-import qualified Data.Map as M
 
 import Control.Applicative
 import Control.Monad

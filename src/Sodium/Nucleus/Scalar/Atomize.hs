@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ConstraintKinds #-}
 module Sodium.Nucleus.Scalar.Atomize (atomize, atomize') where
 
 import Data.Monoid

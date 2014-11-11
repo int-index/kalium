@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ViewPatterns #-}
 module Sodium.Nucleus.Vectorize (vectorize, Error(..), degroup) where
 

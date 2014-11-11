@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, ConstraintKinds, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 module Sodium.Nucleus.Recmap where
 
 import Control.Applicative
