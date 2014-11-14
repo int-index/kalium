@@ -22,6 +22,7 @@ import qualified Sodium.Haskell.Convert as H (convert, reserved)
 import qualified Sodium.Error as E
 import qualified Sodium.Nucleus.Program.Vector as V
 import qualified Sodium.Nucleus.Render as R
+import qualified Sodium.Nucleus.Name as N
 
 import Data.Bool
 import Control.Applicative
@@ -35,27 +36,32 @@ translate :: (Applicative m, MonadError E.Error m) => String -> m String
 translate src = do
     pas <- liftErr E.parseError (P.parse src)
     let namestack0 = map (V.NameSpace "g" . V.Name . ('g':) . show) [0..]
-    (scalar,  namestack1) <- liftErr E.pasconvError
+    (scalar, namestack1) <- liftErr E.pasconvError
         (P.convert pas `runStateT` namestack0)
-    (atomic,  namestack2) <- liftErr E.typeError
+    (atomic, namestack2) <- liftErr E.typeError
         (atomize' scalar `runStateT` namestack1)
-    (valued, _namestack3) <- valueficate atomic `runStateT` namestack2
+    (valued, namestack3) <- valueficate atomic `runStateT` namestack2
     vector <- liftErr E.vectorizeError (valued `seq` vectorize atomic)
     let noshadow = unshadow vector
-    let optimal = let (a, log) = runWriter (closureM pass noshadow)
+    let optimal = let (a, log) = runWriterT (closureM pass noshadow)
+                               `evalState` namestack3
                   in trace (concat $ map R.render log) a
     return $ prettyPrint (H.convert (strip H.reserved optimal))
 
 liftErr :: MonadError e' m => (e -> e') -> Except e a -> m a
 liftErr h m = either (throwError . h) return (runExcept m)
 
-pass :: MonadWriter [V.Program] m => V.Program -> m V.Program
+pass :: (MonadWriter [V.Program] m, N.NameStack t m) => V.Program -> m V.Program
 pass program = tell [program] >> f program
-    where f = return
-            . argClean
-            . compute   . flatten     . inline
-            . foldMatch . joinMultiIf . extractBody
-            . bindClean . clean
+    where f  =  return . argClean
+            <=< return . compute
+            <=< return . flatten
+            <=< inline
+            <=< return . foldMatch
+            <=< return . joinMultiIf
+            <=< return . extractBody
+            <=< return . bindClean
+            <=< return . clean
 
 closureM :: (Eq a, Monad m) => (a -> m a) -> (a -> m a)
 closureM f = go where

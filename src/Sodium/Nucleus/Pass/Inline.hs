@@ -9,15 +9,14 @@ import qualified Data.Set as S
 import Control.Lens hiding (Index, Fold)
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Name
 
-import Debug.Trace
+inline :: NameStack t m => Program -> m Program
+inline = recmapped inlineBody
 
-inline :: Program -> Program
-inline = over recmapped inlineBody
-
-inlineBody :: Body -> Body
-inlineBody = evalState unconsBind where
-    unconsBind :: State Body Body
+inlineBody :: NameStack t m => Body -> m Body
+inlineBody = evalStateT unconsBind where
+    unconsBind :: NameStack t m => StateT Body m Body
     unconsBind = uses bodyBinds uncons >>= maybe get go
     go (bind', binds) = do
         bodyBinds .= binds
@@ -36,19 +35,18 @@ inlineBody = evalState unconsBind where
               $ recmapped inl body'
         when (expr ^? _Access == Nothing) $ guard (count <= 1)
         return body
-    merge :: Pattern -> State Body Pattern
+    merge :: NameStack t m => Pattern -> StateT Body m Pattern
     merge p@(PTuple pat1 pat2)
-        | topsm <- [pat1, pat2] ^.. traversed . to (preview _PAccess)
-        , Just [top1, top2] <- sequence topsm
-        -- TODO: generate a name!
-        , top <- (NameSpace "merge" (Name "a"), Immutable)
-        = do let model =  CallOp2 OpPair (review _Access top1) (review _Access top2)
+        | Just top1 <- pat1 ^? _PAccess
+        , Just top2 <- pat2 ^? _PAccess
+        = do top <- lift $ namepop <&> \name -> (name, Immutable)
+             let model =  CallOp2 OpPair (review _Access top1) (review _Access top2)
              let pat   = _PAccess # top
              let expr  =  _Access # top
              gets (over recmapped (model `subst` expr))
                 >>= \case body | eb1 <- execWriter (body  & recmapped exprBound)
                                , eb2 <- execWriter (model & recExpr   exprBound)
-                               , S.null (join traceShow $ eb1 `S.intersection` eb2)
+                               , S.null (eb1 `S.intersection` eb2)
                             -> put body >> return pat
                           _ -> return p
     merge pat = return pat
