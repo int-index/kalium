@@ -9,7 +9,7 @@ import Control.Monad.Reader
 import Control.Monad.Except
 import Control.Applicative
 import Sodium.Nucleus.Scalar.Program
-import Sodium.Nucleus.Scalar.Build (statement)
+import Sodium.Nucleus.Scalar.Build (statement, group)
 import Sodium.Nucleus.Scalar.Typecheck
 import Sodium.Nucleus.Name
 
@@ -47,12 +47,13 @@ instance Atomize (Statement Pattern) where
              <*> atomize elseb
 
     atomize (ScopeStatement scope) = ScopeStatement <$> atomize scope
-    atomize (Group as) = Group <$> traverse atomize as
+    atomize (Follow st1 st2) = Follow <$> atomize st1 <*> atomize st2
+    atomize Pass = pure Pass
 
 atomizeStatement w = do
     (a, (vardecls, statements)) <- runWriterT w
     return $ ScopeStatement
-           $ Scope (scoping vardecls) (Group (statements `snoc` statement a))
+           $ Scope (scoping vardecls) (group (statements `snoc` statement a))
 
 atomizeExpression :: (TypeEnv param m, NameStack t m) => Expression
                   -> WriterT ([VarDecl], [Statement Pattern Atom]) m Atom

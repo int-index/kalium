@@ -71,7 +71,7 @@ convScope' paramdecls inner
              vardecls = M.fromList $ map paramDeclToTup paramdecls
 
 instance Conv S.Body (D.Statement D.Pattern D.Expression) where
-    conv statements = D.Group <$> traverse conv statements
+    conv statements = D.group <$> traverse conv statements
 
 instance Conv S.Func (D.Name, D.Func D.ByType D.Pattern D.Expression) where
     conv (S.Func name (S.FuncSig params pasType) vars body) = do
@@ -209,7 +209,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
             let clRange = binary (D.NameOp D.OpRange) clFromExpr clToExpr
             clAction <- conv statement
             let clForCycle = D.statement (D.ForCycle clName clRange clAction)
-            return $ D.Group [clForCycle, D.assign clName clToExpr]
+            return $ D.group [clForCycle, D.assign clName clToExpr]
         S.IfBranch expr bodyThen mBodyElse
              -> fmap D.statement
              $  D.If
@@ -238,7 +238,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
                      leafElse leafs
             return $ D.statement $ D.Scope
                         (M.singleton clName clType)
-                        (D.Group [D.assign clName clExpr, statement])
+                        (D.group [D.assign clName clExpr, statement])
 
 instance Conv S.Expression D.Expression where
     conv = \case

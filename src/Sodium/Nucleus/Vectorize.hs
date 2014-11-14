@@ -98,8 +98,16 @@ diff m1 m2 = M.keys $ M.filter id $ M.intersectionWith (/=) m1 m2
 
 vectorizeStatement :: V t m => M.Map Name (FuncSig ByType) -> Statement Pattern Atom -> t m ([Name], Vec.Statement)
 vectorizeStatement funcSigs = \case
-    Group statements ->
-        degroup funcSigs statements
+    -- TODO: simplify Pass and Follow
+    Pass ->
+        degroup funcSigs []
+            $ \indices vecBinds -> do
+                changed <- asks (diff indices)
+                results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
+                let vecBody = Vec.Body M.empty vecBinds results
+                return (changed, Vec.BodyStatement vecBody)
+    Follow st1 st2 ->
+        degroup funcSigs [st1, st2]
             $ \indices vecBinds -> do
                 changed <- asks (diff indices)
                 results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)

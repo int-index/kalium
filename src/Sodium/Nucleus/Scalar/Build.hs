@@ -7,6 +7,7 @@
 
 module Sodium.Nucleus.Scalar.Build where
 
+import qualified Data.List as L
 import Data.Foldable
 import Sodium.Nucleus.Scalar.Program
 
@@ -43,7 +44,10 @@ instance Scoping v => LiftStatement (Scope v Statement)
     where statement = ScopeStatement
 
 statements :: (Foldable c, LiftStatement f) => c (f a p) -> Statement a p
-statements ss = Group (map statement $ toList ss)
+statements ss = group (map statement $ toList ss)
+
+group :: [Statement a p] -> Statement a p
+group = L.foldr Follow Pass
 
 assign :: Name -> a -> Statement Pattern a
 assign name a = statement $ Exec (PAccess name) (NameOp OpId) [a]

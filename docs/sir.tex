@@ -82,14 +82,10 @@ statement. The following steps are performed:
 \end {enumerate}
 The value of the iterator is undefined after the statement \emph{for}.
 
-\item [Statement \emph{group}] sequentially executes multiple statements. It
-consists of a list of statements. There are basically three possible cases:
-\begin {enumerate}
-\item The list is empty. In this case, no action is performed.
-\item The list has one statement. The group is operationally indistinguishable
-from this statement.
-\item The list has multiple statements. They are executed one at a time.
-\end {enumerate}
+\item [Statement \emph{follow}] performs one action after another. It consists
+of two statements which are executed sequentially, one at a time.
+
+\item [Statement \emph{pass}] performs no action.
 
 \item [Statement \emph{scope}] introduces new variables for another statement.
 The structure that contains those variables can be arbitrary.

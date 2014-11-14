@@ -53,7 +53,8 @@ data Statement pat expr
     | ForStatement (ForCycle pat expr)
     | IfStatement (If pat expr)
     | forall vars . Scoping vars => ScopeStatement (Scope vars Statement pat expr)
-    | Group [Statement pat expr]
+    | Follow (Statement pat expr) (Statement pat expr)
+    | Pass
 
 data Pattern
     = PUnit
