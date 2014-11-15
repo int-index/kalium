@@ -10,6 +10,7 @@ import Control.Lens hiding (Index)
 import qualified Data.Map as M
 import Sodium.Nucleus.Scalar.Program
 import qualified Sodium.Nucleus.Program.Vector as Vec
+import Sodium.Util
 
 data Error
     = NoAccess Name Vec.Indices
@@ -64,39 +65,36 @@ vectorizeBody funcSigs scope results = do
     vecBody <- lift $ vecBodyGen (result:results)
     return (changed, vecBody)
 
+namingIndexUpdates :: V t m => [Name] -> t m (Pairs Name Vec.Index)
+namingIndexUpdates = mapM (naming indexUpdate)
 
 vectorizeScope :: (V t m, Scoping v) => M.Map Name (FuncSig ByType) -> Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Body)
 vectorizeScope funcSigs scope = do
     let vars = scope ^. scopeVars . to scoping
     local (initIndices Vec.Uninitialized vars `M.union`) $ do
-        (boundIndices, vecBind) <- do
-            (changed, vecStatement) <- vectorizeStatement funcSigs (scope ^. scopeElem)
-            changed' <- mapM (naming indexUpdate) changed
-            return (changed', Vec.Bind (patTuple changed') vecStatement)
-        let changed = filter (`M.notMember` vars) (map fst boundIndices)
-        indices' <- asks (M.fromList boundIndices `M.union`)
-        let vecBodyGen results
-                = Vec.Body vars [vecBind]
-                <$> runReaderT (mkExpTuple <$> mapM vectorizeAtom results) indices'
-        return (changed, vecBodyGen)
+        (changed, vecStatement) <- vectorizeStatement funcSigs (scope ^. scopeElem)
+        boundIndices <- namingIndexUpdates changed
+        local (M.fromList boundIndices `M.union`) $ do
+            indices <- ask
+            let vecBodyGen results
+                    = Vec.Body vars [Vec.Bind (patTuple boundIndices) vecStatement]
+                    <$> runReaderT (mkExpTuple <$> mapM vectorizeAtom results) indices
+            let changedNonlocal = filter (`M.notMember` vars) changed
+            return (changedNonlocal, vecBodyGen)
 
 degroup funcSigs st1 st2 = do
     indices <- ask
-    (vecBind1, indices') <- do
-        (changed, vecStatement) <- vectorizeStatement funcSigs st1
-        changed' <- forM changed $ naming indexUpdate
-        newIndices <- asks $ M.union (M.fromList changed')
-        return (Vec.Bind (patTuple changed') vecStatement, newIndices)
-    local (const indices') $ do
-        (vecBind2, indices'') <- do
-            (changed, vecStatement) <- vectorizeStatement funcSigs st2
-            changed' <- forM changed $ naming indexUpdate
-            newIndices <- asks $ M.union (M.fromList changed')
-            return (Vec.Bind (patTuple changed') vecStatement, newIndices)
-        local (const indices'') $ do
+    (changed1, vecStatement1) <- vectorizeStatement funcSigs st1
+    boundIndices1 <- namingIndexUpdates changed1
+    local (M.fromList boundIndices1 `M.union`) $ do
+        (changed2, vecStatement2) <- vectorizeStatement funcSigs st2
+        boundIndices2 <- namingIndexUpdates changed2
+        local (M.fromList boundIndices2 `M.union`) $ do
             changed <- asks (diff indices)
             results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
-            let vecBody = Vec.Body M.empty [vecBind1, vecBind2] results
+            let vecBind1 = Vec.Bind (patTuple boundIndices1) vecStatement1
+                vecBind2 = Vec.Bind (patTuple boundIndices2) vecStatement2
+                vecBody  = Vec.Body M.empty [vecBind1, vecBind2] results
             return (changed, Vec.BodyStatement vecBody)
 
 diff :: (Ord k, Eq v) => M.Map k v -> M.Map k v -> [k]
