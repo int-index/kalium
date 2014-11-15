@@ -82,28 +82,22 @@ vectorizeScope funcSigs scope = do
             let changedNonlocal = filter (`M.notMember` vars) changed
             return (changedNonlocal, vecBodyGen)
 
-degroup funcSigs st1 st2 = do
-    indices <- ask
-    (changed1, vecStatement1) <- vectorizeStatement funcSigs st1
-    boundIndices1 <- namingIndexUpdates changed1
-    local (M.fromList boundIndices1 `M.union`) $ do
-        (changed2, vecStatement2) <- vectorizeStatement funcSigs st2
-        boundIndices2 <- namingIndexUpdates changed2
-        local (M.fromList boundIndices2 `M.union`) $ do
-            changed <- asks (diff indices)
-            results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
-            let vecBind1 = Vec.Bind (patTuple boundIndices1) vecStatement1
-                vecBind2 = Vec.Bind (patTuple boundIndices2) vecStatement2
-                vecBody  = Vec.Body M.empty [vecBind1, vecBind2] results
-            return (changed, Vec.BodyStatement vecBody)
-
-diff :: (Ord k, Eq v) => M.Map k v -> M.Map k v -> [k]
-diff m1 m2 = M.keys $ M.filter id $ M.intersectionWith (/=) m1 m2
-
 vectorizeStatement :: V t m => M.Map Name (FuncSig ByType) -> Statement Pattern Atom -> t m ([Name], Vec.Statement)
 vectorizeStatement funcSigs = \case
     Pass -> return ([], Vec.Assign $ Vec.Primary (Lit STypeUnit ()))
-    Follow st1 st2 -> degroup funcSigs st1 st2
+    Follow st1 st2 -> do
+        (changed1, vecStatement1) <- vectorizeStatement funcSigs st1
+        boundIndices1 <- namingIndexUpdates changed1
+        local (M.fromList boundIndices1 `M.union`) $ do
+            (changed2, vecStatement2) <- vectorizeStatement funcSigs st2
+            boundIndices2 <- namingIndexUpdates changed2
+            local (M.fromList boundIndices2 `M.union`) $ do
+                let changed = nub $ changed1 ++ changed2
+                results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
+                let vecBind1 = Vec.Bind (patTuple boundIndices1) vecStatement1
+                    vecBind2 = Vec.Bind (patTuple boundIndices2) vecStatement2
+                    vecBody  = Vec.Body M.empty [vecBind1, vecBind2] results
+                return (changed, Vec.BodyStatement vecBody)
     ScopeStatement scope -> do
         (changed, vecBodyGen) <- vectorizeScope funcSigs scope
         vecBody <- lift $ vecBodyGen (map Access changed)
