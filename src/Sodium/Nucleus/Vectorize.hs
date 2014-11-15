@@ -1,11 +1,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
-module Sodium.Nucleus.Vectorize (vectorize, Error(..), degroup) where
+module Sodium.Nucleus.Vectorize (vectorize, Error(..)) where
 
 import Data.List
 import Control.Applicative
 import Control.Monad.Reader
-import Control.Monad.State.Lazy
 import Control.Monad.Except
 import Control.Lens hiding (Index)
 import qualified Data.Map as M
@@ -81,38 +80,32 @@ vectorizeScope funcSigs scope = do
                 <$> runReaderT (mkExpTuple <$> mapM vectorizeAtom results) indices'
         return (changed, vecBodyGen)
 
-degroup funcSigs statements act = do
+degroup funcSigs st1 st2 = do
     indices <- ask
-    flip evalStateT indices $ do
-       vecBinds <- forM statements $ \statement -> do
-          (changed, vecStatement) <- readerToState (vectorizeStatement funcSigs statement)
-          changed' <- forM changed $ naming $ \name -> do
-                index <- readerToState (indexUpdate name)
-                modify $ M.insert name index
-                return index
-          return $ Vec.Bind (patTuple changed') vecStatement
-       readerToState (act indices vecBinds)
+    (vecBind1, indices') <- do
+        (changed, vecStatement) <- vectorizeStatement funcSigs st1
+        changed' <- forM changed $ naming indexUpdate
+        newIndices <- asks $ M.union (M.fromList changed')
+        return (Vec.Bind (patTuple changed') vecStatement, newIndices)
+    local (const indices') $ do
+        (vecBind2, indices'') <- do
+            (changed, vecStatement) <- vectorizeStatement funcSigs st2
+            changed' <- forM changed $ naming indexUpdate
+            newIndices <- asks $ M.union (M.fromList changed')
+            return (Vec.Bind (patTuple changed') vecStatement, newIndices)
+        local (const indices'') $ do
+            changed <- asks (diff indices)
+            results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
+            let vecBody = Vec.Body M.empty [vecBind1, vecBind2] results
+            return (changed, Vec.BodyStatement vecBody)
 
 diff :: (Ord k, Eq v) => M.Map k v -> M.Map k v -> [k]
 diff m1 m2 = M.keys $ M.filter id $ M.intersectionWith (/=) m1 m2
 
 vectorizeStatement :: V t m => M.Map Name (FuncSig ByType) -> Statement Pattern Atom -> t m ([Name], Vec.Statement)
 vectorizeStatement funcSigs = \case
-    -- TODO: simplify Pass and Follow
-    Pass ->
-        degroup funcSigs []
-            $ \indices vecBinds -> do
-                changed <- asks (diff indices)
-                results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
-                let vecBody = Vec.Body M.empty vecBinds results
-                return (changed, Vec.BodyStatement vecBody)
-    Follow st1 st2 ->
-        degroup funcSigs [st1, st2]
-            $ \indices vecBinds -> do
-                changed <- asks (diff indices)
-                results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
-                let vecBody = Vec.Body M.empty vecBinds results
-                return (changed, Vec.BodyStatement vecBody)
+    Pass -> return ([], Vec.Assign $ Vec.Primary (Lit STypeUnit ()))
+    Follow st1 st2 -> degroup funcSigs st1 st2
     ScopeStatement scope -> do
         (changed, vecBodyGen) <- vectorizeScope funcSigs scope
         vecBody <- lift $ vecBodyGen (map Access changed)
@@ -174,9 +167,6 @@ vectorizeAtom :: V t m => Atom -> t m Vec.Expression
 vectorizeAtom = \case
     Primary a -> return (Vec.Primary a)
     Access name -> Vec.Access name <$> lookupIndex name
-
-readerToState :: (Functor m, Monad m) => ReaderT x m a -> StateT x m a
-readerToState reader = StateT $ \x -> (,x) <$> runReaderT reader x
 
 lookupIndex :: V t m => Name -> t m Vec.Index
 lookupIndex name = do
