@@ -45,7 +45,7 @@ data Func param pat expr = Func
 
 data Body pat expr = Body
     { _bodyStatement :: Statement pat expr
-    , _bodyResult :: Atom
+    , _bodyResult :: expr
     }
 
 data Statement pat expr

@@ -50,7 +50,7 @@ instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
         = local (tsFunctions %~ M.union funcSigs) $ do
             clMain <- do
                 clBody <- convScope vars
-                    $ D.Body <$> conv body <*> pure (D.atom ())
+                    $ D.Body <$> conv body <*> pure (D.expression ())
                 let noparams = D.Scope ([] :: Pairs D.Name D.ByType)
                 return $ D.Func D.TypeUnit (noparams clBody)
             clFuncs <- traverse conv funcs
@@ -76,11 +76,11 @@ instance Conv S.Body (D.Statement D.Pattern D.Expression) where
 instance Conv S.Func (D.Name, D.Func D.ByType D.Pattern D.Expression) where
     conv (S.Func name (S.FuncSig params pasType) vars body) = do
         (retExpr, retType, retVars) <- case pasType of
-            Nothing -> return (D.atom (), D.TypeUnit, M.empty)
+            Nothing -> return (D.expression (), D.TypeUnit, M.empty)
             Just ty -> do
                 let retName = nameV name
                 retType <- conv ty
-                return (D.atom retName, retType, M.singleton name ty)
+                return (D.expression retName, retType, M.singleton name ty)
         clScope <- convScope' params
                  $ convScope (M.union vars retVars)
                  $ D.Body <$> conv body <*> pure retExpr
