@@ -40,11 +40,11 @@ translate src = do
         (P.convert pas `runStateT` namestack0)
     (atomic, namestack2) <- liftErr E.typeError
         (atomize' scalar `runStateT` namestack1)
-    (valued, namestack3) <- valueficate atomic `runStateT` namestack2
+    let valued = valueficate atomic
     vector <- liftErr E.vectorizeError (valued `seq` vectorize atomic)
     let noshadow = unshadow vector
     let optimal = let (a, log) = runWriterT (closureM pass noshadow)
-                               `evalState` namestack3
+                               `evalState` namestack2
                   in trace (concat $ map R.render log) a
     return $ prettyPrint (H.convert (strip H.reserved optimal))
 
