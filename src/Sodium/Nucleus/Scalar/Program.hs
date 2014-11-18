@@ -101,10 +101,12 @@ makeLenses ''If
 makeLenses ''Program
 makeLenses ''Exec
 
-data FuncSig param = FuncSig
+data FuncSig = FuncSig
     { funcSigType :: Type
-    , funcSigParamTypes :: [param]
+    , funcSigParamTypes :: [Type]
     } deriving (Eq)
 
-funcSig :: Func param a p -> FuncSig param
-funcSig func = FuncSig (func ^. funcType) (func ^. funcScope . scopeVars & map snd)
+funcSig :: Typing param => Func param a p -> FuncSig
+funcSig func = FuncSig
+    (func ^. funcType)
+    (func ^. funcScope . scopeVars & map (\(_name, ty) -> typing ty))

@@ -22,30 +22,22 @@ data Error
 type E m = (Applicative m, MonadError Error m)
 type V t m = (MonadTrans t, MonadReader Vec.Indices (t m), E m, E (t m))
 
-vectorize :: E m => Program ByType Pattern Atom -> m Vec.Program
+vectorize :: E m => Program Type Pattern Atom -> m Vec.Program
 vectorize program = do
-    let funcSigs = program ^. programFuncs & M.map funcSig
-    vecFuncs <- mapM (vectorizeFunc funcSigs) (program ^. programFuncs & M.toList)
+    vecFuncs <- mapM vectorizeFunc (program ^. programFuncs & M.toList)
     return $ Vec.Program vecFuncs
 
-references :: [(Name, ByType)] -> ([Name], [Type])
-references params = unzip $ do
-    (name, (by, ty)) <- params
-    guard (by == ByReference)
-    return (name, ty)
-
-vectorizeFunc :: E m => M.Map Name (FuncSig ByType) -> (Name, Func ByType Pattern Atom) -> m Vec.Func
-vectorizeFunc funcSigs (name, func) = do
+vectorizeFunc :: E m => (Name, Func Type Pattern Atom) -> m Vec.Func
+vectorizeFunc (name, func) = do
     let params = func ^. funcScope . scopeVars
-    let (refnames, reftypes) = references params
-    let r = vectorizeBody funcSigs (func ^. funcScope . scopeElem) (map Access refnames)
+    let r = vectorizeBody (func ^. funcScope . scopeElem)
     (_, vecBody)
             <- runReaderT r
             $ initIndices (Vec.Index 0) (scoping params)
     let vecFuncSig = Vec.FuncSig name
-          (func & funcSig & funcSigParamTypes & map snd)
+          (func & funcSig & funcSigParamTypes)
           (func & funcSig & funcSigType)
-          reftypes
+          []
     return $ Vec.Func vecFuncSig (params & map fst) (Vec.BodyStatement vecBody)
 
 mkPatTuple [  ] = Vec.PUnit
@@ -57,22 +49,22 @@ mkExpTuple pats = foldr1 (Vec.CallOp2 OpPair) pats
 patTuple = mkPatTuple . map (uncurry Vec.PAccess)
 expTuple = mkExpTuple . map (uncurry Vec.Access)
 
-vectorizeBody :: (V t m, Scoping v) => M.Map Name (FuncSig ByType) -> Scope v Body Pattern Atom -> [Atom] -> t m ([Name], Vec.Body)
-vectorizeBody funcSigs scope results = do
+vectorizeBody :: (V t m, Scoping v) => Scope v Body Pattern Atom -> t m ([Name], Vec.Body)
+vectorizeBody scope = do
     let vars = scope ^. scopeVars
     let Body statement result = scope ^. scopeElem
-    (changed, vecBodyGen) <- vectorizeScope funcSigs (Scope vars statement)
-    vecBody <- lift $ vecBodyGen (result:results)
+    (changed, vecBodyGen) <- vectorizeScope (Scope vars statement)
+    vecBody <- lift $ vecBodyGen [result]
     return (changed, vecBody)
 
 namingIndexUpdates :: V t m => [Name] -> t m (Pairs Name Vec.Index)
 namingIndexUpdates = mapM (naming indexUpdate)
 
-vectorizeScope :: (V t m, Scoping v) => M.Map Name (FuncSig ByType) -> Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Body)
-vectorizeScope funcSigs scope = do
+vectorizeScope :: (V t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Body)
+vectorizeScope scope = do
     let vars = scope ^. scopeVars . to scoping
     local (initIndices Vec.Uninitialized vars `M.union`) $ do
-        (changed, vecStatement) <- vectorizeStatement funcSigs (scope ^. scopeElem)
+        (changed, vecStatement) <- vectorizeStatement (scope ^. scopeElem)
         boundIndices <- namingIndexUpdates changed
         local (M.fromList boundIndices `M.union`) $ do
             indices <- ask
@@ -82,14 +74,14 @@ vectorizeScope funcSigs scope = do
             let changedNonlocal = filter (`M.notMember` vars) changed
             return (changedNonlocal, vecBodyGen)
 
-vectorizeStatement :: V t m => M.Map Name (FuncSig ByType) -> Statement Pattern Atom -> t m ([Name], Vec.Statement)
-vectorizeStatement funcSigs = \case
+vectorizeStatement :: V t m => Statement Pattern Atom -> t m ([Name], Vec.Statement)
+vectorizeStatement = \case
     Pass -> return ([], Vec.Assign $ Vec.Primary (Lit STypeUnit ()))
     Follow st1 st2 -> do
-        (changed1, vecStatement1) <- vectorizeStatement funcSigs st1
+        (changed1, vecStatement1) <- vectorizeStatement st1
         boundIndices1 <- namingIndexUpdates changed1
         local (M.fromList boundIndices1 `M.union`) $ do
-            (changed2, vecStatement2) <- vectorizeStatement funcSigs st2
+            (changed2, vecStatement2) <- vectorizeStatement st2
             boundIndices2 <- namingIndexUpdates changed2
             local (M.fromList boundIndices2 `M.union`) $ do
                 let changed = nub $ changed1 ++ changed2
@@ -99,23 +91,16 @@ vectorizeStatement funcSigs = \case
                     vecBody  = Vec.Body M.empty [vecBind1, vecBind2] results
                 return (changed, Vec.BodyStatement vecBody)
     ScopeStatement scope -> do
-        (changed, vecBodyGen) <- vectorizeScope funcSigs scope
+        (changed, vecBodyGen) <- vectorizeScope scope
         vecBody <- lift $ vecBodyGen (map Access changed)
         return (changed, Vec.BodyStatement vecBody)
     Execute (Exec mres name args) -> do
         vecArgs <- mapM vectorizeAtom args
-        let byReference (ByReference, _) = \case
-              Vec.Access name _ -> Just [name]
-              _                 -> Nothing
-            byReference (ByValue, _) = const (Just [])
-        funcSig <- lookupFuncSig funcSigs name
-        sidenames <- case zipWith byReference (funcSigParamTypes funcSig) vecArgs
-                          & sequence
-                     of Nothing -> throwError NoReference
-                        Just ns -> return (concat ns)
-        let resnames = case mres of
-                PUnit -> empty
-                PAccess name -> pure name
+        let patFlatten = \case
+              PUnit -> []
+              PAccess name -> [name]
+              PTuple p1 p2 -> patFlatten p1 ++ patFlatten p2
+        let resnames = patFlatten mres
         -- BUG: if a function is called without a return value (mres = Nothing)
         -- then its value isn't bound anywhere, resulting in a pattern tuple
         -- with incorrect amount of variables
@@ -129,13 +114,13 @@ vectorizeStatement funcSigs = \case
         let vecExecute
               | impure    = Vec.Execute name vecArgs
               | otherwise = Vec.Assign (Vec.Call name vecArgs)
-        return $ (resnames ++ sidenames, vecExecute)
+        return (resnames, vecExecute)
     ForStatement forCycle -> do
         vecRange <- vectorizeAtom (forCycle ^. forRange)
         let np f = f (forCycle ^. forName) Vec.Immutable
         (changed, vecStatement)
             <- local (np M.insert)
-             $ vectorizeStatement funcSigs (forCycle ^. forStatement)
+             $ vectorizeStatement (forCycle ^. forStatement)
         argIndices <- mapM (naming lookupIndex) changed
         let vecLambda = Vec.Lambda [patTuple argIndices, np Vec.PAccess] vecStatement
         let vecForCycle = Vec.ForCycle vecLambda (expTuple argIndices) vecRange
@@ -143,8 +128,8 @@ vectorizeStatement funcSigs = \case
     IfStatement ifb -> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
         let noscope = Scope (M.empty :: M.Map Name Type)
-        (changedThen, vecBodyThenGen) <- vectorizeScope funcSigs (ifb ^. ifThen & noscope)
-        (changedElse, vecBodyElseGen) <- vectorizeScope funcSigs (ifb ^. ifElse & noscope)
+        (changedThen, vecBodyThenGen) <- vectorizeScope (ifb ^. ifThen & noscope)
+        (changedElse, vecBodyElseGen) <- vectorizeScope (ifb ^. ifElse & noscope)
         let changed = nub $ changedThen ++ changedElse
         let accessChanged = map Access changed
         vecBodyThen <- lift $ vecBodyThenGen accessChanged
@@ -165,13 +150,6 @@ lookupIndex name = do
     indices <- ask
     M.lookup name indices
        & maybe (throwError $ NoAccess name indices) return
-
-lookupFuncSig :: E m => M.Map Name (FuncSig ByType) -> Name -> m (FuncSig ByType)
--- TODO: real signatures for builtin operators
-lookupFuncSig _ (NameOp _) = return $ FuncSig TypeUnit []
-lookupFuncSig funcSigs name
-    = M.lookup name funcSigs
-    & maybe (throwError $ NoFunction name) return
 
 indexUpdate :: V t m => Name -> t m Vec.Index
 indexUpdate name = lookupIndex name >>= \case
