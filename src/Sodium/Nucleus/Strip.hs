@@ -15,7 +15,7 @@ import Sodium.Nucleus.Name
 -- TODO: apply multiple times for nested namespaces
 strip :: Mask a => [String] -> a -> a
 strip reserved a = runReader (mask a) (return . r)
-    where r = appEndo (resolve (map Name reserved) (collect a))
+    where r = appEndo (resolve (map (Name . return) reserved) (collect a))
 
 collect :: Mask a => a -> S.Set Name
 collect a = execWriter (runReaderT (mask a) check)
@@ -38,7 +38,7 @@ resolve reserved collected = M.foldMapWithKey go (freq collected)
             x -> x
 
 nsSplit :: Name -> (Name, NameSpace)
-nsSplit (NameSpace ns name) = (name, Just ns)
+nsSplit (Name (n:ns)) = (Name ns, Just n)
 nsSplit name = (name, Nothing)
 
 type NameSpace = Maybe String

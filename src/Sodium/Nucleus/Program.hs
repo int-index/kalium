@@ -31,10 +31,9 @@ deriving instance Ord  Type
 deriving instance Show Type
 
 data Name
-    = NameSpace String Name
-    | NameMain
+    = NameMain
     | NameOp Operator
-    | Name String
+    | Name [String]
     deriving (Eq, Ord, Show)
 
 data Operator

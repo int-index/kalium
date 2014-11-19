@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Sodium.Haskell.Convert (convert, reserved) where
 
-import Data.List (genericReplicate)
+import Data.List (genericReplicate, intercalate)
 import Control.Monad
 import Control.Applicative
 -- S for Src, D for Dest
@@ -45,8 +45,7 @@ transformName :: S.Name -> D.Name
 transformName = \case
     S.NameMain -> "main"
     S.NameOp op -> convOp op
-    S.Name name -> name
-    S.NameSpace namespace name -> namespace ++ "'" ++ transformName name
+    S.Name ns -> intercalate "'" ns
 
 -- TODO: the complete list of unqualified names
 reserved = keywords ++ words

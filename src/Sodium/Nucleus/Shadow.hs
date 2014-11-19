@@ -66,5 +66,6 @@ instance Unshadow Body where
 
 mask' :: Mask a => S.Set Name -> a -> a
 mask' shadowed a = runIdentity (runReaderT (mask a) (Identity . handle))
-    where handle name | S.member name shadowed = NameSpace "shadow" name
-                      | otherwise = name
+    where handle name@(Name ns)
+            | S.member name shadowed = Name ("shadow":ns)
+          handle name = name

@@ -33,7 +33,7 @@ import Control.Monad.Except
 translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
 translate src = do
     pas <- liftErr E.parseError (P.parse src)
-    let namestack0 = map (V.NameSpace "g" . V.Name . ('g':) . show) [0..]
+    let namestack0 = map ((\name -> V.Name ["g", name]) . ('g':) . show) [0..]
     (scalar, namestack1) <- liftErr E.pasconvError
         (P.convert pas `runStateT` namestack0)
     (atomic, namestack2) <- liftErr E.typeError

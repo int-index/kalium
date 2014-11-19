@@ -39,8 +39,8 @@ data TypeError
 convert :: (NameStack t m, MonadError TypeError m) => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
 convert program = runReaderT (conv program) (TypeScope M.empty M.empty)
 
-nameV = D.NameSpace "v" . D.Name
-nameF = D.NameSpace "f" . D.Name
+nameV name = D.Name ["v", name]
+nameF name = D.Name ["f", name]
 
 class Conv s d | s -> d where
     conv :: (NameStack t m, MonadError TypeError m) => s -> ReaderT TypeScope m d
