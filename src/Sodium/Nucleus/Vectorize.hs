@@ -99,27 +99,29 @@ vectorizeStatement = \case
         (changed, vecBodyGen) <- vectorizeScope scope
         vecBody <- lift $ vecBodyGen (map Access changed)
         return (changed, Vec.BodyStatement vecBody)
-    Execute (Exec mres name args) -> do
-        vecArgs <- mapM vectorizeAtom args
-        let patFlatten = \case
-              PUnit -> []
-              PAccess name -> [name]
-              PTuple p1 p2 -> patFlatten p1 ++ patFlatten p2
-        let resnames = patFlatten mres
-        -- BUG: if a function is called without a return value (mres = Nothing)
-        -- then its value isn't bound anywhere, resulting in a pattern tuple
-        -- with incorrect amount of variables
-
+    Execute (Exec pat name args) -> do
         -- TODO: purity flag in function signature
         let impure = case name of
               NameOp (OpReadLn _) -> True
               NameOp OpGetLn      -> True
               NameOp OpPrintLn    -> True
               _ -> False
-        let vecExecute
-              | impure    = Vec.Execute name vecArgs
-              | otherwise = Vec.Assign (Vec.Call name vecArgs)
-        return (resnames, vecExecute)
+        vecArgs <- mapM vectorizeAtom args
+        let patFlatten = \case
+              PUnit -> []
+              PAccess name -> [name]
+              PTuple p1 p2 -> patFlatten p1 ++ patFlatten p2
+        let changed = patFlatten pat
+        boundIndices <- namingIndexUpdates changed
+        local (M.fromList boundIndices `M.union`) $ do
+            vecPattern <- vectorizePattern pat
+            results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
+            let vecExecute
+                  | impure    = Vec.Execute name vecArgs
+                  | otherwise = Vec.Assign (Vec.Call name vecArgs)
+                vecBind = Vec.Bind vecPattern vecExecute
+                vecBody = Vec.Body M.empty [vecBind] results
+            return (changed, Vec.BodyStatement vecBody)
     ForStatement forCycle -> do
         vecRange <- vectorizeAtom (forCycle ^. forRange)
         let np f = f (forCycle ^. forName) Vec.Immutable
@@ -149,6 +151,12 @@ vectorizeAtom :: V t m => Atom -> t m Vec.Expression
 vectorizeAtom = \case
     Primary a -> return (Vec.Primary a)
     Access name -> smartAccess name <$> lookupIndex name
+
+vectorizePattern :: V t m => Pattern -> t m Vec.Pattern
+vectorizePattern = \case
+    PUnit -> return Vec.PUnit
+    PAccess name -> smartPAccess name <$> lookupIndex name
+    PTuple p1 p2 -> Vec.PTuple <$> vectorizePattern p1 <*> vectorizePattern p2
 
 lookupIndex :: V t m => Name -> t m Vec.Index
 lookupIndex name = do
