@@ -68,6 +68,7 @@ data Operator
     | OpSnd
     | OpSingleton
     | OpIntToDouble
+    | OpUndefined
     deriving (Eq, Ord, Show)
 
 data Literal where

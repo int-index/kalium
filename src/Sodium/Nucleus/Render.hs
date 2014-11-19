@@ -66,6 +66,7 @@ instance Render Operator where
         OpSnd -> "snd"
         OpSingleton -> "single"
         OpIntToDouble -> "cast-" ++ render TypeInteger ++ "-" ++ render TypeDouble
+        OpUndefined -> "undefined"
 
 instance Render FuncSig where
     render funcSig = unwords

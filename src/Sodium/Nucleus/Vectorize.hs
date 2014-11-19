@@ -14,7 +14,6 @@ import Sodium.Util
 
 data Error
     = NoAccess Name Vec.Indices
-    | NoFunction Name
     | UpdateImmutable Name
     | NoReference
     deriving (Show)
@@ -45,8 +44,14 @@ mkPatTuple pats = foldr1 Vec.PTuple pats
 mkExpTuple [  ] = Vec.Primary (Lit STypeUnit ())
 mkExpTuple pats = foldr1 (Vec.CallOp2 OpPair) pats
 
-patTuple = mkPatTuple . map (uncurry Vec.PAccess)
-expTuple = mkExpTuple . map (uncurry Vec.Access)
+smartPAccess _name Vec.Uninitialized = Vec.PWildCard
+smartPAccess  name index = Vec.PAccess name index
+
+smartAccess  _name Vec.Uninitialized = Vec.Call (NameOp OpUndefined) []
+smartAccess   name index = Vec.Access  name index
+
+patTuple = mkPatTuple . map (uncurry smartPAccess)
+expTuple = mkExpTuple . map (uncurry smartAccess)
 
 vectorizeBody :: (V t m, Scoping v) => Scope v Body Pattern Atom -> t m ([Name], Vec.Body)
 vectorizeBody scope = do
@@ -121,7 +126,7 @@ vectorizeStatement = \case
             <- local (np M.insert)
              $ vectorizeStatement (forCycle ^. forStatement)
         argIndices <- mapM (naming lookupIndex) changed
-        let vecLambda = Vec.Lambda [patTuple argIndices, np Vec.PAccess] vecStatement
+        let vecLambda = Vec.Lambda [patTuple argIndices, np smartPAccess] vecStatement
         let vecForCycle = Vec.ForCycle vecLambda (expTuple argIndices) vecRange
         return (changed, Vec.ForStatement vecForCycle)
     IfStatement ifb -> do
@@ -142,7 +147,7 @@ vectorizeStatement = \case
 vectorizeAtom :: V t m => Atom -> t m Vec.Expression
 vectorizeAtom = \case
     Primary a -> return (Vec.Primary a)
-    Access name -> Vec.Access name <$> lookupIndex name
+    Access name -> smartAccess name <$> lookupIndex name
 
 lookupIndex :: V t m => Name -> t m Vec.Index
 lookupIndex name = do

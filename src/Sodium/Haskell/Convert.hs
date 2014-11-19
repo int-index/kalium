@@ -70,7 +70,7 @@ instance Conv Name where
         S.Index n -> return
             $ transformName name ++ genericReplicate n '\''
         S.Immutable -> return $ "const'" ++ transformName name
-        S.Uninitialized -> return "undefined"
+        S.Uninitialized -> Nothing
 
 instance Conv S.Type where
     type Norm S.Type = H.Type
@@ -312,3 +312,4 @@ convOp = \case
     S.OpReadLn _ -> "readLn"
     S.OpSingleton -> "return"
     S.OpIntToDouble -> "fromIntegral"
+    S.OpUndefined -> "undefined"

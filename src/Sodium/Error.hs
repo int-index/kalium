@@ -27,7 +27,6 @@ parseError e = ParseError name line column
 vectorizeError :: V.Error -> Error
 vectorizeError = \case
     V.NoAccess name indices -> NoAccess name (M.keys indices)
-    V.NoFunction name       -> NoFunction name
     V.UpdateImmutable name  -> UpdateImmutable name
     V.NoReference           -> NoReference
 
