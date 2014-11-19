@@ -20,7 +20,6 @@ data FuncSig
     { _funcName :: Name
     , _funcParamTypes :: [Type]
     , _funcRetType :: Type
-    , _funcRetRefs :: [Type]
     } deriving (Eq)
 
 data Func

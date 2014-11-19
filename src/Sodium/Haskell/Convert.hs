@@ -26,7 +26,7 @@ class Conv s where
 instance Conv S.Program where
     type Norm S.Program = H.Module
     conv (S.Program funcs) = do
-        funcDefs <- mapM conv funcs
+        funcDefs <- concat <$> mapM conv funcs
         return $ H.Module H.noLoc
             (H.ModuleName "Main")
             (extensions ["LambdaCase", "TupleSections", "MultiWayIf"])
@@ -201,18 +201,24 @@ instance Conv S.Statement where
             _ -> mzero
 
 instance Conv S.Func where
-    type Norm S.Func = H.Decl
-    conv (S.Func (S.FuncSig S.NameMain paramTypes S.TypeUnit []) _ clBody) = do
+    type Norm S.Func = [H.Decl]
+    conv (S.Func (S.FuncSig S.NameMain paramTypes S.TypeUnit) _ clBody) = do
         guard $ null paramTypes
         hsBody <- conv clBody
-        return $ D.funcDef "main" [] hsBody
+        hsType <- conv S.TypeUnit
+        let sig = H.TypeSig H.noLoc [H.Ident "main"]
+                (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
+        return [sig, D.funcDef "main" [] hsBody]
     conv fun = pureconv fun
 
-    type Pure S.Func = H.Decl
-    pureconv (S.Func (S.FuncSig name _ _ _) params clBody)
-         = D.funcDef (transformName name) paramNames
-        <$> pureconv clBody
-        where paramNames = map transformName params
+    type Pure S.Func = [H.Decl]
+    pureconv (S.Func (S.FuncSig name paramTypes retType) params clBody) = do
+        let paramNames = map transformName params
+        hsBody <- pureconv clBody
+        let hsName = transformName name
+        hsType <- foldr1 H.TyFun <$> mapM conv (paramTypes ++ [retType])
+        let sig = H.TypeSig H.noLoc [H.Ident hsName] hsType
+        return [sig, D.funcDef hsName paramNames hsBody]
 
 instance (Conv a, Norm a ~ H.Exp, Pure a ~ H.Exp) => Conv (S.Lambda a) where
     type Norm (S.Lambda a) = H.Exp

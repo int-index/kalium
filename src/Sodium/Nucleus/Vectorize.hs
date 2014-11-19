@@ -37,7 +37,6 @@ vectorizeFunc (name, func) = do
     let vecFuncSig = Vec.FuncSig name
           (func & funcSig & funcSigParamTypes)
           (func & funcSig & funcSigType)
-          []
     return $ Vec.Func vecFuncSig (params & map fst) (Vec.BodyStatement vecBody)
 
 mkPatTuple [  ] = Vec.PUnit

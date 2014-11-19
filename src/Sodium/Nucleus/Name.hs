@@ -96,7 +96,6 @@ instance Mask FuncSig where
     mask  =  funcName    mask
          >=> funcParamTypes  mask
          >=> funcRetType mask
-         >=> funcRetRefs mask
 
 instance Mask Program where
     mask  =  programFuncs mask

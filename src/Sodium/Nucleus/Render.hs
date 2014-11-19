@@ -69,7 +69,6 @@ instance Render FuncSig where
         [ render (funcSig ^. funcName)
         , "->"
         , render (funcSig ^. funcRetType)
-        , commas (map render (funcSig ^. funcRetRefs))
         ]
 
 instance Render Literal where
