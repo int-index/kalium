@@ -2,12 +2,15 @@
 {-# LANGUAGE GADTs #-}
 module Sodium.Nucleus.Render where
 
-import Data.List
+import Prelude   hiding (unlines)
+import Data.List hiding (unlines)
 import qualified Data.Map as M
 import Control.Lens hiding (Index, Fold)
 
 import Sodium.Nucleus.Program
 import Sodium.Nucleus.Program.Vector
+
+unlines = intercalate "\n"
 
 class Render a where
     render :: a -> String
@@ -16,7 +19,7 @@ tick :: Char
 tick = '`'
 
 indent :: String -> String
-indent = intercalate "\n" . map ("  "++) . lines
+indent = unlines . map ("  "++) . filter (not.null) . lines
 
 parens :: String -> String
 parens s = "(" ++ s ++ ")"
@@ -72,7 +75,13 @@ instance Render FuncSig where
         ]
 
 instance Render Literal where
-    render (Lit _ _) = "1"
+    render (Lit STypeInteger a) = show a
+    render (Lit STypeDouble  a) = show a
+    render (Lit STypeBoolean a) = show a
+    render (Lit STypeChar    a) = show a
+    render (Lit STypeUnit    a) = show a
+    render (Lit (STypeList STypeChar) a) = show a
+    render _ = "LITERAL"
 
 instance Render Type where
     render = \case
@@ -97,13 +106,9 @@ instance Render Func where
 
 instance Render Body where
     render body = unlines $
-        [ "$$"
-        , let vars = map
-                (\(name, ty) -> render name ++ ": " ++ render ty)
-                (body ^. bodyVars . to M.toList)
-          in indent (unlines vars)
-        , ".."
-        ] ++ map render (body ^. bodyBinds) ++
+        ((\(name, ty) -> "$ " ++ render name ++ ": " ++ render ty ++ "\n")
+        `map` (body ^. bodyVars . to M.toList))
+        ++ map render (body ^. bodyBinds) ++
         [ unwords ["=>", render (body ^. bodyResult)]
         ]
 

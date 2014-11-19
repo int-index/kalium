@@ -17,4 +17,8 @@ processFiles filename1 filename2 = do
     content <- readFile filename1
     case runExcept (Sodium.translate content) of
         Left e  -> putStrLn (show e)
-        Right r -> writeFile filename2 r
+        Right (log, r) -> do
+            forM log $ \repr -> do
+                putStrLn repr
+                putStr "\n\n"
+            writeFile filename2 r

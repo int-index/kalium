@@ -30,9 +30,7 @@ import Control.Monad.Writer hiding (pass)
 import Control.Monad.State
 import Control.Monad.Except
 
-import Debug.Trace
-
-translate :: (Applicative m, MonadError E.Error m) => String -> m String
+translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
 translate src = do
     pas <- liftErr E.parseError (P.parse src)
     let namestack0 = map (V.NameSpace "g" . V.Name . ('g':) . show) [0..]
@@ -45,10 +43,9 @@ translate src = do
         (atomize' valued `runStateT` namestack2)
     vector <- liftErr E.vectorizeError (vectorize atomicValued)
     let noshadow = unshadow vector
-    let optimal = let (a, log) = runWriterT (closureM pass noshadow)
-                               `evalState` namestack3
-                  in trace (concat $ map R.render log) a
-    return $ prettyPrint (H.convert (strip H.reserved optimal))
+    let (optimal, log) = runWriterT (closureM pass noshadow) `evalState` namestack3
+    let dest = prettyPrint $ H.convert $ strip H.reserved optimal
+    return (map R.render log, dest)
 
 liftErr :: MonadError e' m => (e -> e') -> Except e a -> m a
 liftErr h m = either (throwError . h) return (runExcept m)
