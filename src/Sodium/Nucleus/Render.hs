@@ -102,7 +102,7 @@ instance Render Program where
 instance Render Func where
     render func = unlines
         [ render (func ^. funcSig)
-        , indent $ render (func ^. funcStatement)
+        , indent $ render (func ^. funcLambda . lamAction)
         ]
 
 instance Render Body where

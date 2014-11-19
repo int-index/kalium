@@ -36,7 +36,8 @@ vectorizeFunc (name, func) = do
     let vecFuncSig = Vec.FuncSig name
           (func & funcSig & funcSigParamTypes)
           (func & funcSig & funcSigType)
-    return $ Vec.Func vecFuncSig (params & map fst) (Vec.BodyStatement vecBody)
+    let vecFuncLambda = Vec.Lambda (params & map (\(name, _) -> smartPAccess name (Vec.Index 0))) (Vec.BodyStatement vecBody)
+    return $ Vec.Func vecFuncSig vecFuncLambda
 
 mkPatTuple [  ] = Vec.PUnit
 mkPatTuple pats = foldr1 Vec.PTuple pats

@@ -25,8 +25,7 @@ data FuncSig
 data Func
     = Func
     { _funcSig :: FuncSig
-    , _funcParams :: [Name]
-    , _funcStatement :: Statement
+    , _funcLambda :: Lambda Statement
     } deriving (Eq)
 
 data Body

@@ -15,7 +15,7 @@ import Sodium.Nucleus.Program.Vector
 import Sodium.Util (mAsList)
 
 unshadow :: Program -> Program
-unshadow program = program & programFuncs . traversed . funcStatement %~ unshadow'
+unshadow program = program & programFuncs . traversed . funcLambda . lamAction %~ unshadow'
     where unshadow' statement = runReader (unsh statement) initScope
           initScope = S.fromList (program ^.. programFuncs . traversed . funcSig . funcName)
 
