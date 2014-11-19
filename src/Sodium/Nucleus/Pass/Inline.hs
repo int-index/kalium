@@ -36,6 +36,7 @@ inlineBody = evalStateT unconsBind where
         when (expr ^? _Access == Nothing) $ guard (count <= 1)
         return body
     merge :: NameStack t m => Pattern -> StateT Body m Pattern
+    {-
     merge p@(PTuple pat1 pat2)
         | Just top1 <- pat1 ^? _PAccess
         , Just top2 <- pat2 ^? _PAccess
@@ -49,6 +50,7 @@ inlineBody = evalStateT unconsBind where
                                , S.null (eb1 `S.intersection` eb2)
                             -> put body >> return pat
                           _ -> return p
+    -}
     merge pat = return pat
 
 subst :: Expression -> Expression -> (Expression -> Expression)
