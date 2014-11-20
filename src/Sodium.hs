@@ -30,21 +30,27 @@ import Control.Monad.Writer hiding (pass)
 import Control.Monad.State
 import Control.Monad.Except
 
+namestack :: [V.Name]
+namestack = map ((\name -> V.Name ["g", name]) . ('g':) . show) [0..]
+
 translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
 translate src = do
     pas <- P.parse src
-    let namestack0 = map ((\name -> V.Name ["g", name]) . ('g':) . show) [0..]
-    (scalar, namestack1) <- P.convert pas `runStateT` namestack0
-    (atomic, namestack2) <- atomize' scalar `runStateT` namestack1
-    let valued = valueficate atomic
-    (atomicValued, namestack3) <- atomize' valued `runStateT` namestack2
-    vector <- vectorize atomicValued
-    let noshadow = unshadow vector
-    let (optimal, log) = runWriterT (closureM pass noshadow) `evalState` namestack3
+    (optimal, log) <- flip evalStateT namestack
+          $ P.convert pas
+        >>= atomize'
+        >>= atomize' . valueficate
+        >>= vectorize
+        >>= optimize . unshadow
     let dest = prettyPrint $ H.convert $ strip H.reserved optimal
     return (map R.render log, dest)
 
-pass :: (MonadWriter [V.Program] m, N.NameStack t m) => V.Program -> m V.Program
+type TranslationLog = [V.Program]
+
+optimize :: N.NameStack t m => V.Program -> m (V.Program, TranslationLog)
+optimize program = runWriterT (closureM pass program)
+
+pass :: (MonadWriter TranslationLog m, N.NameStack t m) => V.Program -> m V.Program
 pass program = tell [program] >> f program
     where f  =  return . argClean
             <=< return . compute
