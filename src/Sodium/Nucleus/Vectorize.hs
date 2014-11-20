@@ -12,21 +12,19 @@ import Sodium.Nucleus.Scalar.Program
 import qualified Sodium.Nucleus.Program.Vector as Vec
 import Sodium.Util
 
-data Error
-    = NoAccess Name Vec.Indices
-    | UpdateImmutable Name
-    | NoReference
-    deriving (Show)
+class Error e where
+    errorNoAccess :: Name -> Vec.Indices -> e
+    errorUpdateImmutable :: Name -> e
 
-type E m = (Applicative m, MonadError Error m)
-type V t m = (MonadTrans t, MonadReader Vec.Indices (t m), E m, E (t m))
+type E e m = (Applicative m, Error e, MonadError e m)
+type V e t m = (MonadTrans t, MonadReader Vec.Indices (t m), E e m, E e (t m))
 
-vectorize :: E m => Program Type Pattern Atom -> m Vec.Program
+vectorize :: E e m => Program Type Pattern Atom -> m Vec.Program
 vectorize program = do
     vecFuncs <- mapM vectorizeFunc (program ^. programFuncs & M.toList)
     return $ Vec.Program vecFuncs
 
-vectorizeFunc :: E m => (Name, Func Type Pattern Atom) -> m Vec.Func
+vectorizeFunc :: E e m => (Name, Func Type Pattern Atom) -> m Vec.Func
 vectorizeFunc (name, func) = do
     let params = func ^. funcScope . scopeVars
     let r = vectorizeBody (func ^. funcScope . scopeElem)
@@ -54,7 +52,7 @@ smartAccess   name index = Vec.Access  name index
 patTuple = mkPatTuple . map (uncurry smartPAccess)
 expTuple = mkExpTuple . map (uncurry smartAccess)
 
-vectorizeBody :: (V t m, Scoping v) => Scope v Body Pattern Atom -> t m ([Name], Vec.Body)
+vectorizeBody :: (V e t m, Scoping v) => Scope v Body Pattern Atom -> t m ([Name], Vec.Body)
 vectorizeBody scope = do
     let vars = scope ^. scopeVars
     let Body statement result = scope ^. scopeElem
@@ -62,10 +60,10 @@ vectorizeBody scope = do
     vecBody <- lift $ vecBodyGen [result]
     return (changed, vecBody)
 
-namingIndexUpdates :: V t m => [Name] -> t m (Pairs Name Vec.Index)
+namingIndexUpdates :: V e t m => [Name] -> t m (Pairs Name Vec.Index)
 namingIndexUpdates = mapM (naming indexUpdate)
 
-vectorizeScope :: (V t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Body)
+vectorizeScope :: (V e t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Body)
 vectorizeScope scope = do
     let vars = scope ^. scopeVars . to scoping
     local (initIndices Vec.Uninitialized vars `M.union`) $ do
@@ -79,7 +77,7 @@ vectorizeScope scope = do
             let changedNonlocal = filter (`M.notMember` vars) changed
             return (changedNonlocal, vecBodyGen)
 
-vectorizeStatement :: V t m => Statement Pattern Atom -> t m ([Name], Vec.Statement)
+vectorizeStatement :: V e t m => Statement Pattern Atom -> t m ([Name], Vec.Statement)
 vectorizeStatement = \case
     Pass -> return ([], Vec.Assign $ Vec.Primary (Lit STypeUnit ()))
     Follow st1 st2 -> do
@@ -147,28 +145,28 @@ vectorizeStatement = \case
                 ]
         return $ (changed, Vec.MultiIfStatement vecMultiIf)
 
-vectorizeAtom :: V t m => Atom -> t m Vec.Expression
+vectorizeAtom :: V e t m => Atom -> t m Vec.Expression
 vectorizeAtom = \case
     Primary a -> return (Vec.Primary a)
     Access name -> smartAccess name <$> lookupIndex name
 
-vectorizePattern :: V t m => Pattern -> t m Vec.Pattern
+vectorizePattern :: V e t m => Pattern -> t m Vec.Pattern
 vectorizePattern = \case
     PUnit -> return Vec.PUnit
     PAccess name -> smartPAccess name <$> lookupIndex name
     PTuple p1 p2 -> Vec.PTuple <$> vectorizePattern p1 <*> vectorizePattern p2
 
-lookupIndex :: V t m => Name -> t m Vec.Index
+lookupIndex :: V e t m => Name -> t m Vec.Index
 lookupIndex name = do
     indices <- ask
     M.lookup name indices
-       & maybe (throwError $ NoAccess name indices) return
+       & maybe (throwError $ errorNoAccess name indices) return
 
-indexUpdate :: V t m => Name -> t m Vec.Index
+indexUpdate :: V e t m => Name -> t m Vec.Index
 indexUpdate name = lookupIndex name >>= \case
     Vec.Index n -> return (Vec.Index $ succ n)
     Vec.Uninitialized -> return (Vec.Index 0)
-    Vec.Immutable -> throwError (UpdateImmutable name)
+    Vec.Immutable -> throwError (errorUpdateImmutable name)
 
 naming op = \name -> (,) name <$> op name
 

@@ -17,12 +17,12 @@ import Sodium.Nucleus.Scalar.Typecheck
 import Sodium.Nucleus.Name
 import Sodium.Util
 
-atomize' :: (Atomize a, MonadError TypeError m, NameStack t m)
+atomize' :: (Atomize a, MonadError e m, Error e, NameStack t m)
          => a Expression -> m (a Atom)
 atomize' a = runReaderT (atomize a) mempty
 
 class Atomize a where
-    atomize :: (TypeEnv m, NameStack t m) => a Expression -> m (a Atom)
+    atomize :: (TypeEnv e m, NameStack t m) => a Expression -> m (a Atom)
 
 instance Typing param => Atomize (Program param Pattern) where
     atomize = typeIntro $ programFuncs (traverse atomize)
@@ -63,7 +63,7 @@ atomizeStatement w = do
     return $ ScopeStatement
            $ Scope (scoping vardecls) (group (statements `snoc` statement a))
 
-atomizeExpression :: (TypeEnv m, NameStack t m) => Expression
+atomizeExpression :: (TypeEnv e m, NameStack t m) => Expression
                   -> WriterT (Pairs Name Type, [Statement Pattern Atom]) m Atom
 atomizeExpression = \case
     Atom atom -> return atom

@@ -13,9 +13,9 @@ import qualified Data.Map  as M
 
 import Sodium.Nucleus.Scalar.Program
 
-data TypeError
-    = NoAccess Name Vars
-    | NoFunction Name
+class Error e where
+    errorNoAccess :: Name -> Vars -> e
+    errorNoFunction :: Name -> e
 
 declareLenses [d|
 
@@ -31,10 +31,10 @@ instance Monoid TypeScope where
     mappend (TypeScope funs1 vars1) (TypeScope funs2 vars2)
         = TypeScope (mappend funs1 funs2) (mappend vars1 vars2)
 
-type TypeEnv m = (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
+type TypeEnv e m = (Applicative m, MonadReader TypeScope m, MonadError e m, Error e)
 
 class Typecheck a where
-    typecheck :: TypeEnv m => a -> m Type
+    typecheck :: TypeEnv e m => a -> m Type
 
 instance Typecheck Literal where
     typecheck = return . typecheckLiteral
@@ -44,13 +44,13 @@ instance Typecheck Atom where
     typecheck (Access name) = do
         vars <- asks (view tsVariables)
         M.lookup name vars
-            & maybe (throwError $ NoAccess name vars) return
+            & maybe (throwError $ errorNoAccess name vars) return
 
-lookupFuncSig :: TypeEnv m => Name -> m FuncSig
+lookupFuncSig :: TypeEnv e m => Name -> m FuncSig
 lookupFuncSig name = do
     funcSigs <- asks (view tsFunctions)
     M.lookup name funcSigs
-        & maybe (throwError (NoFunction name)) return
+        & maybe (throwError $ errorNoFunction name) return
 
 instance Typecheck Expression where
     typecheck (Atom atom) = typecheck atom
@@ -59,14 +59,14 @@ instance Typecheck Expression where
             mapM typecheck args >>= builtinOpType op
         | otherwise = funcSigType <$> lookupFuncSig name
 
-builtinOpType :: TypeEnv m => Operator -> [Type] -> m Type
+builtinOpType :: TypeEnv e m => Operator -> [Type] -> m Type
 builtinOpType _ _ = return TypeUnit
 
 
 class TypeIntro a where
     typeIntro' :: a -> TypeScope -> TypeScope
 
-typeIntro :: (TypeIntro a, TypeEnv m) => (a -> m b) -> (a -> m b)
+typeIntro :: (TypeIntro a, TypeEnv e m) => (a -> m b) -> (a -> m b)
 typeIntro k x = local (typeIntro' x) (k x)
 
 instance Typing param => TypeIntro (Program param expr pat) where

@@ -32,23 +32,17 @@ import Control.Monad.Except
 
 translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
 translate src = do
-    pas <- liftErr E.parseError (P.parse src)
+    pas <- P.parse src
     let namestack0 = map ((\name -> V.Name ["g", name]) . ('g':) . show) [0..]
-    (scalar, namestack1) <- liftErr E.pasconvError
-        (P.convert pas `runStateT` namestack0)
-    (atomic, namestack2) <- liftErr E.typeError
-        (atomize' scalar `runStateT` namestack1)
+    (scalar, namestack1) <- P.convert pas `runStateT` namestack0
+    (atomic, namestack2) <- atomize' scalar `runStateT` namestack1
     let valued = valueficate atomic
-    (atomicValued, namestack3) <- liftErr E.typeError
-        (atomize' valued `runStateT` namestack2)
-    vector <- liftErr E.vectorizeError (vectorize atomicValued)
+    (atomicValued, namestack3) <- atomize' valued `runStateT` namestack2
+    vector <- vectorize atomicValued
     let noshadow = unshadow vector
     let (optimal, log) = runWriterT (closureM pass noshadow) `evalState` namestack3
     let dest = prettyPrint $ H.convert $ strip H.reserved optimal
     return (map R.render log, dest)
-
-liftErr :: MonadError e' m => (e -> e') -> Except e a -> m a
-liftErr h m = either (throwError . h) return (runExcept m)
 
 pass :: (MonadWriter [V.Program] m, N.NameStack t m) => V.Program -> m V.Program
 pass program = tell [program] >> f program

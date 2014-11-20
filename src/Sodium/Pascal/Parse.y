@@ -1,11 +1,11 @@
 {
-module Sodium.Pascal.Parse (parse, tokenize) where
+module Sodium.Pascal.Parse (parse, tokenize, Error(..)) where
 
 import qualified Data.Map as M
 import Data.Ratio
 
 import Control.Monad
-import Control.Monad.Trans.Except
+import Control.Monad.Except
 
 import qualified Sodium.Pascal.Tokenize as T
 import Sodium.Pascal.Program
@@ -211,8 +211,13 @@ parseErr _ = mzero
 
 binary op x y = Call (Left op) [x, y]
 
-parse :: String -> Except P.ParseError Program
-parse = except . P.parse parser ""
+class Error e where
+    errorParse :: P.ParseError -> e
+
+parse :: (Error e, MonadError e m) => String -> m Program
+parse s = case P.parse parser "" s of
+    Left  e -> throwError (errorParse e)
+    Right a -> return a
 
 match_quote [c] = Primary (LitChar c)
 match_quote cs  = Primary (LitStr cs)

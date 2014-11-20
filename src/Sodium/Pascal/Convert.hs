@@ -3,7 +3,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
  
-module Sodium.Pascal.Convert (convert, TypeError(..)) where
+module Sodium.Pascal.Convert (convert, Error(..)) where
 
 import qualified Data.Map as M
 import Data.Traversable
@@ -11,6 +11,7 @@ import Data.Traversable
 import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.Except
+import Control.Monad.Trans.Maybe
 import Control.Lens
 -- S for Src, D for Dest
 import qualified Sodium.Pascal.Program as S
@@ -28,21 +29,20 @@ declareLenses [d|
 
                 |]
 
-data TypeError
-    = TypeError
-    | NoAccess
-    | NoFunction
-    | TypeVoid
-    deriving (Eq, Show)
+class Error e where
+    errorTypecheck  :: e
+    errorNoAccess   :: e
+    errorNoFunction :: e
 
-convert :: (NameStack t m, MonadError TypeError m) => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
+convert :: (NameStack t m, MonadError e m, Error e)
+        => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
 convert program = runReaderT (conv program) (TypeScope M.empty M.empty)
 
 nameV name = D.Name ["v", name]
 nameF name = D.Name ["f", name]
 
 class Conv s d | s -> d where
-    conv :: (NameStack t m, MonadError TypeError m) => s -> ReaderT TypeScope m d
+    conv :: (NameStack t m, MonadError e m, Error e) => s -> ReaderT TypeScope m d
 
 instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
     conv (S.Program funcs vars body)
@@ -137,14 +137,14 @@ typeOfLiteral = \case
     S.LitChar _ -> S.TypeChar
     S.LitStr  _ -> S.TypeString
 
-typeOfAccess :: (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
+typeOfAccess :: (Applicative m, MonadReader TypeScope m, MonadError e m, Error e)
              => S.Name -> m S.Type
 typeOfAccess name = do
     mtype <- asks (M.lookup name . view tsVariables)
-    maybe (throwError NoAccess) return mtype
+    maybe (throwError errorNoAccess) return mtype
 
-typecasts :: (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
-        => S.Expression -> m [S.Expression]
+typecasts :: (Applicative m, MonadReader TypeScope m, MonadError e m, Error e)
+          => S.Expression -> m [S.Expression]
 typecasts expr@(S.Primary lit) = return $ typecasting (typeOfLiteral lit) expr
 typecasts expr@(S.Access name) = do
     ty <- typeOfAccess name
@@ -154,9 +154,8 @@ typecasts (S.Call nameOp args) = do
     let calls = S.Call nameOp <$> sequenceA possibleArgs
     niceCalls <- traverse typechecking calls
     return (concat niceCalls)
-        where typechecking expr = catchError
-                (pure expr <$ typecheck expr)
-                (\_ -> return empty)
+        where typechecking expr =  maybe empty (\_ -> pure expr)
+                               <$> typecheck' expr
 
 typecasting :: S.Type -> S.Expression -> [S.Expression]
 typecasting ty expr = expr : [op1App tc expr | tc <- tcs]
@@ -165,17 +164,21 @@ typecasting ty expr = expr : [op1App tc expr | tc <- tcs]
             S.TypeInteger -> [S.OpIntToReal]
             _ -> []
 
-typecheck :: (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
-          => S.Expression -> m S.Type
-typecheck = \case
+typecheck expr = do
+    mty <- typecheck' expr
+    maybe (throwError errorTypecheck) return mty
+
+typecheck' :: (Applicative m, MonadReader TypeScope m, MonadError e m, Error e)
+          => S.Expression -> m (Maybe S.Type)
+typecheck' = runMaybeT . \case
     S.Primary lit -> return (typeOfLiteral lit)
     S.Access name -> typeOfAccess name
     S.Call (Right name) _ -> do -- TODO: check argument types
         mfuncsig <- asks (M.lookup name . view tsFunctions)
         case mfuncsig of
-            Nothing -> throwError NoFunction
+            Nothing -> throwError errorNoFunction
             Just (S.FuncSig _ mtype) -> case mtype of
-                Nothing -> throwError TypeVoid
+                Nothing -> badType
                 Just t -> return t
     S.Call (Left op) args -> do
         tys <- traverse typecheck args
@@ -198,7 +201,8 @@ typecheck = \case
             (S.OpNot     , [S.TypeBoolean]) -> return S.TypeBoolean
             (S.OpCharToString, [S.TypeChar   ]) -> return S.TypeString
             (S.OpIntToReal   , [S.TypeInteger]) -> return S.TypeReal
-            _ -> throwError TypeError
+            _ -> badType
+    where badType = MaybeT (return Nothing)
 
 op1App :: S.Operator -> S.Expression -> S.Expression
 op1App op e = S.Call (Left op) [e]
@@ -211,7 +215,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
             tcs <- typecasts expr'
             tyW <- typecheck (S.Access name')
             tc <- filterM (\tc -> (==) tyW <$> typecheck tc) tcs >>= \case
-                [] -> throwError TypeError
+                [] -> throwError errorTypecheck
                 tc:_ -> return tc
             expr <- conv tc
             return $ D.assign name expr
