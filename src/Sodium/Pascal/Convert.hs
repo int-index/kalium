@@ -33,7 +33,6 @@ data TypeError
     | NoAccess
     | NoFunction
     | TypeVoid
-    | TypeNoCast
     deriving (Eq, Show)
 
 convert :: (NameStack t m, MonadError TypeError m) => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
@@ -130,18 +129,47 @@ convWriteLn exprs = do
           wrap <$> conv expr
     D.Exec D.PUnit (D.NameOp D.OpPrintLn) <$> traverse convArg exprs
 
+typeOfLiteral :: S.Literal -> S.Type
+typeOfLiteral = \case
+    S.LitBool _ -> S.TypeBoolean
+    S.LitInt  _ -> S.TypeInteger
+    S.LitReal _ -> S.TypeReal
+    S.LitChar _ -> S.TypeChar
+    S.LitStr  _ -> S.TypeString
+
+typeOfAccess :: (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
+             => S.Name -> m S.Type
+typeOfAccess name = do
+    mtype <- asks (M.lookup name . view tsVariables)
+    maybe (throwError NoAccess) return mtype
+
+typecasts :: (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
+        => S.Expression -> m [S.Expression]
+typecasts expr@(S.Primary lit) = return $ typecasting (typeOfLiteral lit) expr
+typecasts expr@(S.Access name) = do
+    ty <- typeOfAccess name
+    return $ typecasting ty expr
+typecasts (S.Call nameOp args) = do
+    possibleArgs <- traverse typecasts args
+    let calls = S.Call nameOp <$> sequenceA possibleArgs
+    niceCalls <- traverse typechecking calls
+    return (concat niceCalls)
+        where typechecking expr = catchError
+                (pure expr <$ typecheck expr)
+                (\_ -> return empty)
+
+typecasting :: S.Type -> S.Expression -> [S.Expression]
+typecasting ty expr = expr : [op1App tc expr | tc <- tcs]
+    where tcs = case ty of
+            S.TypeChar    -> [S.OpCharToString]
+            S.TypeInteger -> [S.OpIntToReal]
+            _ -> []
+
 typecheck :: (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
           => S.Expression -> m S.Type
 typecheck = \case
-    S.Primary lit -> return $ case lit of
-        S.LitBool _ -> S.TypeBoolean
-        S.LitInt  _ -> S.TypeInteger
-        S.LitReal _ -> S.TypeReal
-        S.LitChar _ -> S.TypeChar
-        S.LitStr  _ -> S.TypeString
-    S.Access name -> do
-        mtype <- asks (M.lookup name . view tsVariables)
-        maybe (throwError NoAccess) return mtype
+    S.Primary lit -> return (typeOfLiteral lit)
+    S.Access name -> typeOfAccess name
     S.Call (Right name) _ -> do -- TODO: check argument types
         mfuncsig <- asks (M.lookup name . view tsFunctions)
         case mfuncsig of
@@ -175,15 +203,6 @@ typecheck = \case
 op1App :: S.Operator -> S.Expression -> S.Expression
 op1App op e = S.Call (Left op) [e]
 
-typecasts :: (Applicative m, MonadReader TypeScope m, MonadError TypeError m)
-          => S.Expression -> m [S.Expression]
-typecasts expr = do
-    ty <- typecheck expr
-    return $ expr : case ty of
-        S.TypeChar -> [op1App S.OpCharToString expr]
-        S.TypeInteger -> [op1App S.OpIntToReal expr]
-        _ -> []
-
 instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
     conv = \case
         S.BodyStatement body -> D.statement <$> conv body
@@ -192,7 +211,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
             tcs <- typecasts expr'
             tyW <- typecheck (S.Access name')
             tc <- filterM (\tc -> (==) tyW <$> typecheck tc) tcs >>= \case
-                [] -> throwError TypeNoCast
+                [] -> throwError TypeError
                 tc:_ -> return tc
             expr <- conv tc
             return $ D.assign name expr
