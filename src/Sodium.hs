@@ -22,13 +22,12 @@ import qualified Sodium.Haskell.Convert as H (convert, reserved)
 import qualified Sodium.Error as E
 import qualified Sodium.Nucleus.Program.Vector as V
 import qualified Sodium.Nucleus.Render as R
-import qualified Sodium.Nucleus.Name as N
 
 import Data.Bool
 import Control.Applicative
 import Control.Monad.Writer hiding (pass)
-import Control.Monad.State
 import Control.Monad.Except
+import Control.Monad.Supply
 
 namestack :: [V.Name]
 namestack = map ((\name -> V.Name ["g", name]) . ('g':) . show) [0..]
@@ -36,7 +35,7 @@ namestack = map ((\name -> V.Name ["g", name]) . ('g':) . show) [0..]
 translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
 translate src = do
     pas <- P.parse src
-    (optimal, log) <- flip evalStateT namestack
+    (optimal, log) <- flip evalSupplyT namestack
           $ P.convert pas
         >>= atomize'
         >>= atomize' . valueficate
@@ -47,10 +46,10 @@ translate src = do
 
 type TranslationLog = [V.Program]
 
-optimize :: N.NameStack t m => V.Program -> m (V.Program, TranslationLog)
+optimize :: (Applicative m, MonadSupply V.Name m) => V.Program -> m (V.Program, TranslationLog)
 optimize program = runWriterT (closureM pass program)
 
-pass :: (MonadWriter TranslationLog m, N.NameStack t m) => V.Program -> m V.Program
+pass :: (Applicative m, MonadWriter TranslationLog m, MonadSupply V.Name m) => V.Program -> m V.Program
 pass program = tell [program] >> f program
     where f  =  return . argClean
             <=< return . compute

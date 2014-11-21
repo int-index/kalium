@@ -10,17 +10,6 @@ import Sodium.Nucleus.Program.Vector
 
 import Sodium.Util (mAsList)
 
-class HasNameSource t where
-    nameSource :: Lens' t [Name]
-
-instance HasNameSource [Name] where
-    nameSource = id
-
-type NameStack t m = (Applicative m, MonadState t m, HasNameSource t)
-
-namepop :: NameStack t m => m Name
-namepop = (nameSource `uses` head) <* (nameSource %= tail)
-
 checkRef :: Mask a => a -> Name -> Bool
 checkRef a name' = getAny . execWriter
                  $ runReaderT (mask a) check

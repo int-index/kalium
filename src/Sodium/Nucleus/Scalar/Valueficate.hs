@@ -96,17 +96,3 @@ gather :: Program ByType pat expr -> ReferenceInfo
 gather = M.map inspect . view programFuncs where
     inspect = map check . view (funcScope . scopeVars)
     check (_name, (by, _ty)) = by == ByReference
-
-{-
-valueficate1 :: NameStack t m
-             => Func ByType Pattern Atom -> m (Func Type Pattern Expression)
-valueficate1 func = do
-    let funcscope = func ^. funcScope
-        funcscope1 = (funcscope & scopeVars . traversed . _2 %~ snd)
-        type1 = typeTuple (func ^. funcType : map snd refs)
-        refs = do
-            (name, (by, ty)) <- funcscope ^. scopeVars
-            guard (by == ByReference)
-            return (name, ty)
-    return $ Func type1 funcscope1
--}

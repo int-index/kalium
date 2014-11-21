@@ -1,22 +1,23 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Sodium.Nucleus.Pass.Inline (inline) where
 
 import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.State
+import Control.Monad.Supply
 import qualified Data.Set as S
 import Control.Lens hiding (Index, Fold)
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
-import Sodium.Nucleus.Name
 
-inline :: NameStack t m => Program -> m Program
+inline :: (Applicative m, MonadSupply Name m) => Program -> m Program
 inline = recmapped inlineBody
 
-inlineBody :: NameStack t m => Body -> m Body
+inlineBody :: (Applicative m, MonadSupply Name m) => Body -> m Body
 inlineBody = evalStateT unconsBind where
-    unconsBind :: NameStack t m => StateT Body m Body
+    unconsBind :: (Applicative m, MonadSupply Name m) => StateT Body m Body
     unconsBind = uses bodyBinds uncons >>= maybe get go
     go (bind', binds) = do
         bodyBinds .= binds
@@ -35,12 +36,12 @@ inlineBody = evalStateT unconsBind where
               $ recmapped inl body'
         when (expr ^? _Access == Nothing) $ guard (count <= 1)
         return body
-    merge :: NameStack t m => Pattern -> StateT Body m Pattern
+    merge :: (Applicative m, MonadSupply Name m) => Pattern -> StateT Body m Pattern
     {-
     merge p@(PTuple pat1 pat2)
         | Just top1 <- pat1 ^? _PAccess
         , Just top2 <- pat2 ^? _PAccess
-        = do top <- lift $ namepop <&> \name -> (name, Immutable)
+        = do top <- supply <&> \name -> (name, Immutable)
              let model =  CallOp2 OpPair (review _Access top1) (review _Access top2)
              let pat   = _PAccess # top
              let expr  =  _Access # top

@@ -10,19 +10,19 @@ import Control.Lens
 import Control.Monad.Writer
 import Control.Monad.Reader
 import Control.Monad.Except
+import Control.Monad.Supply
 import Control.Applicative
 import Sodium.Nucleus.Scalar.Program
 import Sodium.Nucleus.Scalar.Build (statement, group)
 import Sodium.Nucleus.Scalar.Typecheck
-import Sodium.Nucleus.Name
 import Sodium.Util
 
-atomize' :: (Atomize a, MonadError e m, Error e, NameStack t m)
+atomize' :: (Atomize a, MonadError e m, Error e, MonadSupply Name m, Applicative m)
          => a Expression -> m (a Atom)
 atomize' a = runReaderT (atomize a) mempty
 
 class Atomize a where
-    atomize :: (TypeEnv e m, NameStack t m) => a Expression -> m (a Atom)
+    atomize :: (TypeEnv e m, MonadSupply Name m) => a Expression -> m (a Atom)
 
 instance Typing param => Atomize (Program param Pattern) where
     atomize = typeIntro $ programFuncs (traverse atomize)
@@ -63,13 +63,13 @@ atomizeStatement w = do
     return $ ScopeStatement
            $ Scope (scoping vardecls) (group (statements `snoc` statement a))
 
-atomizeExpression :: (TypeEnv e m, NameStack t m) => Expression
+atomizeExpression :: (TypeEnv e m, MonadSupply Name m) => Expression
                   -> WriterT (Pairs Name Type, [Statement Pattern Atom]) m Atom
 atomizeExpression = \case
     Atom atom -> return atom
     e@(Call op args) -> do
         eArgs <- mapM atomizeExpression args
-        name  <- namepop
+        name  <- supply
         ty <- typecheck e
         let vardecl = (name, ty)
         tell ([vardecl], [Execute $ Exec (PAccess name) op eArgs])

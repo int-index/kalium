@@ -11,13 +11,13 @@ import Data.Traversable
 import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.Except
+import Control.Monad.Supply
 import Control.Monad.Trans.Maybe
 import Control.Lens
 -- S for Src, D for Dest
 import qualified Sodium.Pascal.Program as S
 import qualified Sodium.Nucleus.Scalar.Program as D
 import qualified Sodium.Nucleus.Scalar.Build   as D
-import Sodium.Nucleus.Name
 import Sodium.Util
 
 declareLenses [d|
@@ -34,7 +34,7 @@ class Error e where
     errorNoAccess   :: e
     errorNoFunction :: e
 
-convert :: (NameStack t m, MonadError e m, Error e)
+convert :: (Applicative m, MonadSupply D.Name m, MonadError e m, Error e)
         => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
 convert program = runReaderT (conv program) (TypeScope M.empty M.empty)
 
@@ -42,7 +42,8 @@ nameV name = D.Name ["v", name]
 nameF name = D.Name ["f", name]
 
 class Conv s d | s -> d where
-    conv :: (NameStack t m, MonadError e m, Error e) => s -> ReaderT TypeScope m d
+    conv :: (Applicative m, MonadSupply D.Name m, MonadError e m, Error e)
+         => s -> ReaderT TypeScope m d
 
 instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
     conv (S.Program funcs vars body)
@@ -242,7 +243,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
         S.CaseBranch expr leafs mBodyElse -> do
             clType <- typecheck expr >>= conv
             clExpr <- conv expr
-            clName <- namepop
+            clName <- supply
             let clCaseExpr = D.expression clName
             let instRange = \case
                     Right (exprFrom, exprTo)

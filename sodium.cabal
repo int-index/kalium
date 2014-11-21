@@ -51,6 +51,7 @@ library
                        lens,
                        profunctors,
                        singletons,
+                       monad-supply,
                        haskell-src-exts == 1.16.*,
                        parsec
   ghc-options:         -W -O2
