@@ -67,7 +67,7 @@ data MultiIf a
     } deriving (Eq)
 
 data Expression
-    = Access Name Index
+    = Access Name IndexTag
     | Fold Name Expression Expression
     | Call Name [Expression]
     | Primary Literal
@@ -76,18 +76,14 @@ data Expression
 
 pattern CallOp2 op x y = Call (NameOp op) [x, y]
 
-data Index
-    = Index Integer
-    | Immutable
-    | Uninitialized
+data IndexTag
+    = IndexTag Integer
+    | ImmutableTag
     deriving (Eq, Ord, Show)
-
-type Indices
-    = M.Map Name Index
 
 data Pattern
     = PTuple Pattern Pattern
-    | PAccess Name Index
+    | PAccess Name IndexTag
     | PWildCard
     | PUnit
     deriving (Eq)

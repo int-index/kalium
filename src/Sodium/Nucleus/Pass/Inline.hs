@@ -59,7 +59,7 @@ subst model expr expr'
     | model == expr' = expr
     | otherwise = expr'
 
-exprBound :: Expression -> Writer (S.Set (Name, Index)) Expression
+exprBound :: Expression -> Writer (S.Set (Name, IndexTag)) Expression
 exprBound expr = do
     case expr of
         Access name i -> tell (S.singleton (name, i))
@@ -76,7 +76,7 @@ noExec = r where
         Execute _ _ -> Nothing
         statement -> Just statement
 
-type Inline = ReaderT ((Name, Index), Expression) (Writer (Sum Integer))
+type Inline = ReaderT ((Name, IndexTag), Expression) (Writer (Sum Integer))
 
 inl :: Expression -> Inline Expression
 inl expr'@(Access name' j) = do

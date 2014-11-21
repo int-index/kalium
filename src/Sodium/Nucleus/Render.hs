@@ -132,11 +132,10 @@ instance Render Pattern where
         PAccess name index -> render name ++ render index
         PWildCard -> "_"
 
-instance Render Index where
+instance Render IndexTag where
     render = \case
-        Index i -> "-" ++ show i
-        Immutable -> "#"
-        Uninitialized -> "?"
+        IndexTag i -> "-" ++ show i
+        ImmutableTag -> "#"
 
 instance Render Expression where
     render = \case

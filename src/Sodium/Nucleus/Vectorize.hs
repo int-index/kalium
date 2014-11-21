@@ -13,11 +13,20 @@ import qualified Sodium.Nucleus.Program.Vector as Vec
 import Sodium.Util
 
 class Error e where
-    errorNoAccess :: Name -> Vec.Indices -> e
+    errorNoAccess :: Name -> Indices -> e
     errorUpdateImmutable :: Name -> e
 
 type E e m = (Applicative m, Error e, MonadError e m)
-type V e t m = (MonadTrans t, MonadReader Vec.Indices (t m), E e m, E e (t m))
+type V e t m = (MonadTrans t, MonadReader Indices (t m), E e m, E e (t m))
+
+data Index
+    = Index Integer
+    | Immutable
+    | Uninitialized
+    deriving (Eq, Ord, Show)
+
+type Indices
+    = M.Map Name Index
 
 vectorize :: E e m => Program Type Pattern Atom -> m Vec.Program
 vectorize program = do
@@ -30,11 +39,11 @@ vectorizeFunc (name, func) = do
     let r = vectorizeBody (func ^. funcScope . scopeElem)
     (_, vecBody)
             <- runReaderT r
-            $ initIndices (Vec.Index 0) (scoping params)
+            $ initIndices (Index 0) (scoping params)
     let vecFuncSig = Vec.FuncSig name
           (func & funcSig & funcSigParamTypes)
           (func & funcSig & funcSigType)
-    let vecFuncLambda = Vec.Lambda (params & map (\(name, _) -> smartPAccess name (Vec.Index 0))) (Vec.BodyStatement vecBody)
+    let vecFuncLambda = Vec.Lambda (params & map (\(name, _) -> smartPAccess name (Index 0))) (Vec.BodyStatement vecBody)
     return $ Vec.Func vecFuncSig vecFuncLambda
 
 mkPatTuple [  ] = Vec.PUnit
@@ -43,11 +52,15 @@ mkPatTuple pats = foldr1 Vec.PTuple pats
 mkExpTuple [  ] = Vec.Primary (Lit STypeUnit ())
 mkExpTuple pats = foldr1 (Vec.CallOp2 OpPair) pats
 
-smartPAccess _name Vec.Uninitialized = Vec.PWildCard
-smartPAccess  name index = Vec.PAccess name index
+smartPAccess name = \case
+    Uninitialized -> Vec.PWildCard
+    Index index   -> Vec.PAccess name (Vec.IndexTag index)
+    Immutable     -> Vec.PAccess name Vec.ImmutableTag
 
-smartAccess  _name Vec.Uninitialized = Vec.Call (NameOp OpUndefined) []
-smartAccess   name index = Vec.Access  name index
+smartAccess name = \case
+    Uninitialized -> Vec.Call (NameOp OpUndefined) []
+    Index index   -> Vec.Access name (Vec.IndexTag index)
+    Immutable     -> Vec.Access name Vec.ImmutableTag
 
 patTuple = mkPatTuple . map (uncurry smartPAccess)
 expTuple = mkExpTuple . map (uncurry smartAccess)
@@ -60,13 +73,13 @@ vectorizeBody scope = do
     vecBody <- lift $ vecBodyGen [result]
     return (changed, vecBody)
 
-namingIndexUpdates :: V e t m => [Name] -> t m (Pairs Name Vec.Index)
+namingIndexUpdates :: V e t m => [Name] -> t m (Pairs Name Index)
 namingIndexUpdates = mapM (naming indexUpdate)
 
 vectorizeScope :: (V e t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Body)
 vectorizeScope scope = do
     let vars = scope ^. scopeVars . to scoping
-    local (initIndices Vec.Uninitialized vars `M.union`) $ do
+    local (initIndices Uninitialized vars `M.union`) $ do
         (changed, vecStatement) <- vectorizeStatement (scope ^. scopeElem)
         boundIndices <- namingIndexUpdates changed
         local (M.fromList boundIndices `M.union`) $ do
@@ -122,7 +135,7 @@ vectorizeStatement = \case
             return (changed, Vec.BodyStatement vecBody)
     ForStatement forCycle -> do
         vecRange <- vectorizeAtom (forCycle ^. forRange)
-        let np f = f (forCycle ^. forName) Vec.Immutable
+        let np f = f (forCycle ^. forName) Immutable
         (changed, vecStatement)
             <- local (np M.insert)
              $ vectorizeStatement (forCycle ^. forStatement)
@@ -156,19 +169,19 @@ vectorizePattern = \case
     PAccess name -> smartPAccess name <$> lookupIndex name
     PTuple p1 p2 -> Vec.PTuple <$> vectorizePattern p1 <*> vectorizePattern p2
 
-lookupIndex :: V e t m => Name -> t m Vec.Index
+lookupIndex :: V e t m => Name -> t m Index
 lookupIndex name = do
     indices <- ask
     M.lookup name indices
        & maybe (throwError $ errorNoAccess name indices) return
 
-indexUpdate :: V e t m => Name -> t m Vec.Index
+indexUpdate :: V e t m => Name -> t m Index
 indexUpdate name = lookupIndex name >>= \case
-    Vec.Index n -> return (Vec.Index $ succ n)
-    Vec.Uninitialized -> return (Vec.Index 0)
-    Vec.Immutable -> throwError (errorUpdateImmutable name)
+    Index n -> return (Index $ succ n)
+    Uninitialized -> return (Index 0)
+    Immutable -> throwError (errorUpdateImmutable name)
 
 naming op = \name -> (,) name <$> op name
 
-initIndices :: Vec.Index -> M.Map Name a -> Vec.Indices
+initIndices :: Index -> M.Map Name a -> Indices
 initIndices n = M.map (const n)

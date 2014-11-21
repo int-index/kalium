@@ -55,7 +55,7 @@ keywords = words
       \   module newtype of qualified then type where        "
 
 
-data Name = Name S.Name S.Index
+data Name = Name S.Name S.IndexTag
     deriving (Eq)
 
 instance Conv Name where
@@ -64,10 +64,9 @@ instance Conv Name where
 
     type Pure Name = D.Name
     pureconv (Name name i) = case i of
-        S.Index n -> return
+        S.IndexTag n -> return
             $ transformName name ++ genericReplicate n '\''
-        S.Immutable -> return $ "const'" ++ transformName name
-        S.Uninitialized -> Nothing
+        S.ImmutableTag -> return $ "const'" ++ transformName name
 
 instance Conv S.Type where
     type Norm S.Type = H.Type
