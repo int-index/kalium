@@ -15,8 +15,8 @@ import Sodium.Nucleus.Program.Vector
 import Sodium.Util (mAsList)
 
 unshadow :: Program -> Program
-unshadow program = program & programFuncs . traversed . funcLambda . lamAction %~ unshadow'
-    where unshadow' statement = runReader (unsh statement) initScope
+unshadow program = program & programFuncs . traversed %~ unshadow'
+    where unshadow' func = runReader (unsh func) initScope
           initScope = S.fromList (program ^.. programFuncs . traversed . funcSig . funcName)
 
 type UnshadowScope m = (Applicative m, MonadReader (S.Set Name) m)
@@ -39,17 +39,21 @@ instance Unshadow a => Unshadow (MultiIf a) where
     unsh  = (multiIfLeafs . traversed . _2) unsh
 
 instance (Mask a, Unshadow a) => Unshadow (ForCycle a) where
+    unsh = forLambda unsh
+
+instance Unshadow Func where
+    unsh = funcLambda unsh
+
+instance (Mask a, Unshadow a) => Unshadow (Lambda a) where
     unsh = execStateT $ do
-        let getBound = S.unions <$> uses
-                (forLambda . lamPatterns)
-                (map (S.fromList . patBound))
+        let getBound = S.unions <$> uses lamPatterns (map (S.fromList . patBound))
         scope <- ask
         bound <- getBound
         let shadow = mask' (scope `S.intersection` bound)
-        forLambda %= shadow
+        modify shadow
 
         bound' <- getBound
-        local (S.union bound') $ unsh' (forLambda . lamAction)
+        local (S.union bound') $ unsh' lamAction
 
 instance Unshadow Body where
     unsh = execStateT $ do
