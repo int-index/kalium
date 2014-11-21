@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE GADTs #-}
 module Sodium.Nucleus.Pass.Compute (compute) where
 

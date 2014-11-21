@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE GADTs #-}
 module Sodium.Nucleus.Pattern where
 

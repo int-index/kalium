@@ -1,5 +1,4 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE PatternSynonyms #-}
 module Sodium.Nucleus.Program.Vector
     ( module Sodium.Nucleus.Program.Vector
     , module Sodium.Nucleus.Program

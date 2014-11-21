@@ -54,7 +54,7 @@ instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
                 let noparams = D.Scope ([] :: Pairs D.Name D.ByType)
                 return $ D.Func D.TypeUnit (noparams clBody)
             clFuncs <- traverse conv funcs
-            return $ D.Program (M.fromList $ (D.NameMain, clMain):clFuncs)
+            return $ D.Program (M.fromList $ (D.NameOp (D.OpMain), clMain):clFuncs)
         where funcSigs = M.unions (map funcSigOf funcs)
               funcSigOf (S.Func name funcSig _ _) = M.singleton name funcSig
 

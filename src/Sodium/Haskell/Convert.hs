@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances, FlexibleContexts  #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 module Sodium.Haskell.Convert (convert, reserved) where
 
@@ -43,7 +42,6 @@ instance Conv S.Program where
 
 transformName :: S.Name -> D.Name
 transformName = \case
-    S.NameMain -> "main"
     S.NameOp op -> convOp op
     S.Name ns -> intercalate "'" ns
 
@@ -201,11 +199,11 @@ instance Conv S.Statement where
 
 instance Conv S.Func where
     type Norm S.Func = [H.Decl]
-    conv (S.Func (S.FuncSig S.NameMain paramTypes S.TypeUnit) (S.Lambda _ clBody)) = do
+    conv (S.Func (S.FuncSig (S.NameOp S.OpMain) paramTypes S.TypeUnit) (S.Lambda _ clBody)) = do
         guard $ null paramTypes
         hsBody <- conv clBody
         hsType <- conv S.TypeUnit
-        let hsName = H.Ident "main"
+        let hsName = H.Ident (convOp S.OpMain)
         let sig = H.TypeSig H.noLoc [hsName]
                 (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
         return [sig, D.funcDef hsName [] hsBody]
@@ -313,3 +311,4 @@ convOp = \case
     S.OpSingleton -> "return"
     S.OpIntToDouble -> "fromIntegral"
     S.OpUndefined -> "undefined"
+    S.OpMain -> "main"

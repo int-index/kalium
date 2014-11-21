@@ -30,11 +30,13 @@ singletons [d|
 deriving instance Ord  Type
 deriving instance Show Type
 
-data Name
-    = NameMain
-    | NameOp Operator
-    | Name [String]
+data Name1 tag
+    = NameOp Operator
+    | Name1 [String] tag
     deriving (Eq, Ord, Show)
+
+type Name = Name1 ()
+pattern Name ns = Name1 ns ()
 
 data Operator
     = OpAdd
@@ -68,6 +70,7 @@ data Operator
     | OpSingleton
     | OpIntToDouble
     | OpUndefined
+    | OpMain
     deriving (Eq, Ord, Show)
 
 data Literal where

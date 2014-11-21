@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Sodium.Nucleus.Pass.BindClean (bindClean) where
 

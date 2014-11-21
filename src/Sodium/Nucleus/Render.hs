@@ -30,7 +30,6 @@ commas = parens . intercalate ", "
 instance Render Name where
     render = \case
         Name ns -> intercalate "'" ns
-        NameMain  -> tick : "main"
         NameOp op -> render op
 
 instance Render Operator where
@@ -66,6 +65,7 @@ instance Render Operator where
         OpSingleton -> "single"
         OpIntToDouble -> "cast-" ++ render TypeInteger ++ "-" ++ render TypeDouble
         OpUndefined -> "undefined"
+        OpMain -> "main"
 
 instance Render FuncSig where
     render funcSig = unwords
