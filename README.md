@@ -7,11 +7,19 @@ development, so nothing is documented.
 
 ## Building
 
-Cabal is used as the building system. You are advised to install all the
-dependencies listed in the corresponding section of the `*.cabal` file using
-your system package manager.
+Download (using git clone):
+* https://github.com/int-index/sodium to `/path/to/sodium`
+* https://github.com/int-index/monad-supply to `/path/to/monad-supply`
 
-Then build the project itself with `cabal build`.
+The paths can be arbitrary. Then change your directory to `/path/to/sodium` and
+initialize the builting environment. Issue the following commands:
+
+* `cabal sandbox init`
+* `cabal sandbox add-source /path/to/monad-supply`.
+* `cabal install --dependencies-only`.
+
+If something goes wrong, you can always `cabal sandbox delete` and then repeat
+the steps above. Now you can build the project itself with `cabal build`.
 
 
 ## Testing
