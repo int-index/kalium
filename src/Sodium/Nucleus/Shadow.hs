@@ -19,7 +19,7 @@ unshadow program = program & programFuncs . traversed %~ unshadow'
     where unshadow' func = runReader (unsh func) initScope
           initScope = S.fromList (program ^.. programFuncs . traversed . funcSig . funcName)
 
-type UnshadowScope m = (Applicative m, MonadReader (S.Set Name) m)
+type UnshadowScope m = (Applicative m, MonadReader (S.Set (Name1 IndexTag)) m)
 
 class Unshadow a where
     unsh :: UnshadowScope m => a -> m a
@@ -68,8 +68,8 @@ instance Unshadow Body where
         bound' <- getBound
         local (S.union bound') $ unsh' (bodyBinds . traversed . bindStatement)
 
-mask' :: Mask a => S.Set Name -> a -> a
+mask' :: Mask a => S.Set (Name1 IndexTag) -> a -> a
 mask' shadowed a = runIdentity (runReaderT (mask a) (Identity . handle))
-    where handle name@(Name ns)
-            | S.member name shadowed = Name ("shadow":ns)
+    where handle name@(Name1 ns tag)
+            | S.member name shadowed = Name1 ("shadow":ns) tag
           handle name = name

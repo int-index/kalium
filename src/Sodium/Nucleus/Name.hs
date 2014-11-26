@@ -10,7 +10,7 @@ import Sodium.Nucleus.Program.Vector
 
 import Sodium.Util (mAsList)
 
-checkRef :: Mask a => a -> Name -> Bool
+checkRef :: Mask a => a -> Name1 IndexTag -> Bool
 checkRef a name' = getAny . execWriter
                  $ runReaderT (mask a) check
     where check name = do
@@ -18,7 +18,7 @@ checkRef a name' = getAny . execWriter
             return name
 
 class Mask a where
-    mask :: (Applicative m, Monad m) => a -> ReaderT (Name -> m Name) m a
+    mask :: (Applicative m, Monad m) => a -> ReaderT (Name1 IndexTag -> m (Name1 IndexTag)) m a
 
 instance (Mask a, Mask b) => Mask (a, b) where
     mask = _1 mask >=> _2 mask
@@ -29,7 +29,7 @@ instance (Mask a, Mask b, Mask c) => Mask (a, b, c) where
 instance Mask a => Mask [a] where
     mask = traverse mask
 
-instance Mask Name where
+instance Mask (Name1 IndexTag) where
     mask name = do
         k <- ask
         lift (k name)
@@ -39,11 +39,11 @@ instance Mask Type where
     mask = return
 
 instance Mask Pattern where
-    mask  = (_PAccess . _1) mask
+    mask  =  _PAccess mask
          >=> _PTuple mask
 
 instance Mask Expression where
-    mask  =  (_Access . _1) mask
+    mask  =  _Access mask
          >=> _Fold  mask
          >=> _Call  mask
          >=> _MultiIfExpression mask

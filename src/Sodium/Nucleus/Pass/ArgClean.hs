@@ -24,7 +24,7 @@ argCleanFunc func = do
     func & funcLambda . lamPatterns .~ catMaybes mparams
          & funcSig . funcParamTypes %~ catMaybes . zipWith untag mparams
          & return
-    where tag param@(PAccess name (IndexTag 0))
+    where tag param@(PAccess name)
             | checkRef (func ^. funcLambda . lamAction) name = Just param
           tag _ = Nothing
           untag Nothing  _ = Nothing

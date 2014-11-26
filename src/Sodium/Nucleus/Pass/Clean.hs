@@ -32,7 +32,7 @@ cleanUsage _ PUnit = PWildCard
 cleanUsage scope (PTuple pat1 pat2) = PTuple
   (cleanUsage scope pat1)
   (cleanUsage scope pat2)
-cleanUsage scope (PAccess name _)
+cleanUsage scope (PAccess name)
   | not (checkRef scope name) = PWildCard
 cleanUsage _ pat = pat
 

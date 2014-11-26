@@ -29,10 +29,10 @@ inlineBody = evalStateT unconsBind where
               && bind ^. bindStatement . to noExec
               = return
     elim bind = \body' -> do
-        Bind (PAccess name i) (Assign expr) <- return bind
+        Bind (PAccess name) (Assign expr) <- return bind
         let (body, count)
               = runWriter
-              $ flip runReaderT ((name, i), expr)
+              $ flip runReaderT (name, expr)
               $ recmapped inl body'
         when (expr ^? _Access == Nothing) $ guard (count <= 1)
         return body
@@ -59,10 +59,10 @@ subst model expr expr'
     | model == expr' = expr
     | otherwise = expr'
 
-exprBound :: Expression -> Writer (S.Set (Name, IndexTag)) Expression
+exprBound :: Expression -> Writer (S.Set (Name1 IndexTag)) Expression
 exprBound expr = do
     case expr of
-        Access name i -> tell (S.singleton (name, i))
+        Access name -> tell (S.singleton name)
         _ -> return ()
     return expr
 
@@ -76,12 +76,12 @@ noExec = r where
         Execute _ _ -> Nothing
         statement -> Just statement
 
-type Inline = ReaderT ((Name, IndexTag), Expression) (Writer (Sum Integer))
+type Inline = ReaderT (Name1 IndexTag, Expression) (Writer (Sum Integer))
 
 inl :: Expression -> Inline Expression
-inl expr'@(Access name' j) = do
+inl expr'@(Access name') = do
         (name, expr) <- ask
-        if name == (name', j)
+        if name == name'
             then tell (Sum 1) >> return expr
             else return expr'
 inl expr' = return expr'

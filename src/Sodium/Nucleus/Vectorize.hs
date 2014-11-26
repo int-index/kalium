@@ -9,6 +9,7 @@ import Control.Monad.Except
 import Control.Lens hiding (Index)
 import qualified Data.Map as M
 import Sodium.Nucleus.Scalar.Program
+import Sodium.Nucleus.Program.Vector (indexTag, retag)
 import qualified Sodium.Nucleus.Program.Vector as Vec
 import Sodium.Util
 
@@ -40,10 +41,11 @@ vectorizeFunc (name, func) = do
     (_, vecBody)
             <- runReaderT r
             $ initIndices (Index 0) (scoping params)
-    let vecFuncSig = Vec.FuncSig name
+    let vecFuncSig = Vec.FuncSig (retag name)
           (func & funcSig & funcSigParamTypes)
           (func & funcSig & funcSigType)
-    let vecFuncLambda = Vec.Lambda (params & map (\(name, _) -> smartPAccess name (Index 0))) (Vec.BodyStatement vecBody)
+    let mkParam (name, _) = smartPAccess name (Index 0)
+        vecFuncLambda = Vec.Lambda (map mkParam params) (Vec.BodyStatement vecBody)
     return $ Vec.Func vecFuncSig vecFuncLambda
 
 mkPatTuple [  ] = Vec.PUnit
@@ -54,13 +56,13 @@ mkExpTuple pats = foldr1 (Vec.CallOp2 OpPair) pats
 
 smartPAccess name = \case
     Uninitialized -> Vec.PWildCard
-    Index index   -> Vec.PAccess name (Vec.IndexTag index)
-    Immutable     -> Vec.PAccess name Vec.ImmutableTag
+    Index index   -> Vec.PAccess (Vec.IndexTag index `indexTag` name)
+    Immutable     -> Vec.PAccess (Vec.ImmutableTag   `indexTag` name)
 
 smartAccess name = \case
     Uninitialized -> Vec.Call (NameOp OpUndefined) []
-    Index index   -> Vec.Access name (Vec.IndexTag index)
-    Immutable     -> Vec.Access name Vec.ImmutableTag
+    Index index   -> Vec.Access (Vec.IndexTag index `indexTag` name)
+    Immutable     -> Vec.Access (Vec.ImmutableTag   `indexTag` name)
 
 patTuple = mkPatTuple . map (uncurry smartPAccess)
 expTuple = mkExpTuple . map (uncurry smartAccess)
@@ -76,6 +78,13 @@ vectorizeBody scope = do
 namingIndexUpdates :: V e t m => [Name] -> t m (Pairs Name Index)
 namingIndexUpdates = mapM (naming indexUpdate)
 
+theTerribleHackWithVariables :: M.Map Name t -> M.Map (Name1 Vec.IndexTag) t
+theTerribleHackWithVariables vars = M.fromList $ do
+    (name, t) <- M.toList vars
+    tag <- Vec.ImmutableTag : map Vec.IndexTag [0..42]
+    return (indexTag tag name, t)
+
+
 vectorizeScope :: (V e t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Body)
 vectorizeScope scope = do
     let vars = scope ^. scopeVars . to scoping
@@ -85,7 +94,8 @@ vectorizeScope scope = do
         local (M.fromList boundIndices `M.union`) $ do
             indices <- ask
             let vecBodyGen results
-                    = Vec.Body vars [Vec.Bind (patTuple boundIndices) vecStatement]
+                    = Vec.Body (theTerribleHackWithVariables vars)
+                        [Vec.Bind (patTuple boundIndices) vecStatement]
                     <$> runReaderT (mkExpTuple <$> mapM vectorizeAtom results) indices
             let changedNonlocal = filter (`M.notMember` vars) changed
             return (changedNonlocal, vecBodyGen)
@@ -128,8 +138,8 @@ vectorizeStatement = \case
             vecPattern <- vectorizePattern pat
             results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
             let vecExecute
-                  | impure    = Vec.Execute name vecArgs
-                  | otherwise = Vec.Assign (Vec.Call name vecArgs)
+                  | impure    = Vec.Execute (retag name) vecArgs
+                  | otherwise = Vec.Assign (Vec.Call (retag name) vecArgs)
                 vecBind = Vec.Bind vecPattern vecExecute
                 vecBody = Vec.Body M.empty [vecBind] results
             return (changed, Vec.BodyStatement vecBody)

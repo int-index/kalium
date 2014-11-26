@@ -40,11 +40,6 @@ instance Conv S.Program where
     type Pure S.Program = ()
     pureconv _ = Nothing
 
-transformName :: S.Name -> D.Name
-transformName = \case
-    S.NameOp op -> convOp op
-    S.Name ns -> intercalate "'" ns
-
 -- TODO: the complete list of unqualified names
 reserved = keywords ++ words
     " show read readLn getLine return foldl \
@@ -55,18 +50,20 @@ keywords = words
       \   module newtype of qualified then type where        "
 
 
-data Name = Name S.Name S.IndexTag
-    deriving (Eq)
+transformName :: S.Name1 S.IndexTag -> D.Name
+transformName = \case
+    S.NameOp op -> convOp op
+    S.Name1 ns tag -> let s = intercalate "'" ns in case tag of
+        S.IndexTag n -> s ++ "'" ++ show n
+        S.ImmutableTag -> s ++ "'" ++ "const"
+        S.GlobalTag -> s
 
-instance Conv Name where
-    type Norm Name = D.Name
+instance Conv (S.Name1 S.IndexTag) where
+    type Norm (S.Name1 S.IndexTag) = D.Name
     conv = pureconv
 
-    type Pure Name = D.Name
-    pureconv (Name name i) = case i of
-        S.IndexTag n -> return
-            $ transformName name ++ genericReplicate n '\''
-        S.ImmutableTag -> return $ "const'" ++ transformName name
+    type Pure (S.Name1 S.IndexTag) = D.Name
+    pureconv = return . transformName
 
 instance Conv S.Type where
     type Norm S.Type = H.Type
@@ -238,7 +235,7 @@ instance Conv S.Pattern where
     type Pure S.Pattern = H.Pat
     pureconv S.PUnit = return (H.PTuple H.Boxed [])
     pureconv S.PWildCard = return H.PWildCard
-    pureconv (S.PAccess name i) = H.PVar . H.Ident <$> pureconv (Name name i)
+    pureconv (S.PAccess name) = H.PVar . H.Ident <$> pureconv name
     pureconv (S.PTuple pat1 pat2) = H.PTuple H.Boxed <$> mapM pureconv [pat1, pat2]
 
 
@@ -252,7 +249,7 @@ instance Conv S.Expression where
 
 convexpr :: S.Expression -> Maybe H.Exp
 convexpr (S.Primary lit) = return (convlit lit)
-convexpr (S.Access name i) = D.access <$> pureconv (Name name i)
+convexpr (S.Access name) = D.access <$> pureconv name
 convexpr (S.Call op exprs) = do
     hsExprs <- mapM convexpr exprs
     return $ case op of

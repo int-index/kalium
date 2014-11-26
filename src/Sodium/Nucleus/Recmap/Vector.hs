@@ -12,6 +12,7 @@ module Sodium.Nucleus.Recmap.Vector
 
 import Control.Applicative
 import Control.Monad
+import qualified Data.Map as M
 import Control.Lens hiding (Fold)
 import Data.Monoid
 import Sodium.Nucleus.Recmap
@@ -22,7 +23,7 @@ data Vector
 instance Recmap Vector where
     type RecmapFirst  Vector = Body
     type RecmapSecond Vector = Statement
-    type RecmapLocal  Vector = Vars
+    type RecmapLocal  Vector = M.Map (Name1 IndexTag) Type
     recmap_children_first rm body
         = localize rm (body ^. bodyVars)
         $ (bodyBinds . traversed . bindStatement) (recmap_second rm) body
@@ -74,8 +75,8 @@ instance RecmapMk Expression where
 
 recExpr :: Monad' m => LensLike' m Expression Expression
 recExpr f = \case
-    e@(Access _ _) -> f e
-    e@(Primary  _) -> f e
+    e@(Access  _) -> f e
+    e@(Primary _) -> f e
     Call op exprs  -> (Call op <$> traverse rf exprs) >>= f
     Fold op expr range -> (Fold op <$> rf expr <*> rf range) >>= f
     MultiIfExpression multiIf ->
@@ -83,7 +84,7 @@ recExpr f = \case
         >>= f
     where rf = recExpr f
 
-localizer :: Monad' m => (forall a . Vars -> m a -> m a) -> Recmapper Vector m
+localizer :: Monad' m => (forall a . M.Map (Name1 IndexTag) Type -> m a -> m a) -> Recmapper Vector m
 localizer lc = mempty { localize = lc }
 
 -- Be careful! Not a valid setter:

@@ -27,9 +27,9 @@ parens s = "(" ++ s ++ ")"
 commas :: [String] -> String
 commas = parens . intercalate ", "
 
-instance Render Name where
+instance Render (Name1 IndexTag) where
     render = \case
-        Name ns -> intercalate "'" ns
+        Name1 ns tag -> intercalate "'" ns ++ render tag
         NameOp op -> render op
 
 instance Render Operator where
@@ -129,17 +129,18 @@ instance Render Pattern where
     render = \case
         PUnit -> "()"
         PTuple pat1 pat2 -> commas (map render [pat1, pat2])
-        PAccess name index -> render name ++ render index
+        PAccess name -> render name
         PWildCard -> "_"
 
 instance Render IndexTag where
     render = \case
         IndexTag i -> "-" ++ show i
         ImmutableTag -> "#"
+        GlobalTag -> ""
 
 instance Render Expression where
     render = \case
-        Access name index -> render name ++ render index
+        Access name -> render name
         Primary lit -> render lit
         Call op args -> render op ++ commas (map render args)
         MultiIfExpression multiIf -> render multiIf

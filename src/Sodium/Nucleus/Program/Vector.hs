@@ -16,7 +16,7 @@ data Program
 
 data FuncSig
     = FuncSig
-    { _funcName :: Name
+    { _funcName :: Name1 IndexTag
     , _funcParamTypes :: [Type]
     , _funcRetType :: Type
     } deriving (Eq)
@@ -29,7 +29,7 @@ data Func
 
 data Body
     = Body
-    { _bodyVars  :: Vars
+    { _bodyVars  :: M.Map (Name1 IndexTag) Type
     , _bodyBinds :: [Bind Statement]
     , _bodyResult :: Expression
     } deriving (Eq)
@@ -42,7 +42,7 @@ data Bind a
 
 data Statement
     = Assign Expression
-    | Execute Name [Expression]
+    | Execute (Name1 IndexTag) [Expression]
     | ForStatement (ForCycle Statement)
     | MultiIfStatement (MultiIf Statement)
     | BodyStatement Body
@@ -67,9 +67,9 @@ data MultiIf a
     } deriving (Eq)
 
 data Expression
-    = Access Name IndexTag
-    | Fold Name Expression Expression
-    | Call Name [Expression]
+    = Access (Name1 IndexTag)
+    | Fold (Name1 IndexTag) Expression Expression
+    | Call (Name1 IndexTag) [Expression]
     | Primary Literal
     | MultiIfExpression (MultiIf Expression)
     deriving (Eq)
@@ -79,11 +79,19 @@ pattern CallOp2 op x y = Call (NameOp op) [x, y]
 data IndexTag
     = IndexTag Integer
     | ImmutableTag
+    | GlobalTag
     deriving (Eq, Ord, Show)
+
+indexTag :: IndexTag -> Name1 () -> Name1 IndexTag
+indexTag GlobalTag (NameOp op) = NameOp op
+indexTag tag (Name1 ns _) = Name1 ns tag
+
+retag :: Name -> Name1 IndexTag
+retag = indexTag GlobalTag
 
 data Pattern
     = PTuple Pattern Pattern
-    | PAccess Name IndexTag
+    | PAccess (Name1 IndexTag)
     | PWildCard
     | PUnit
     deriving (Eq)
