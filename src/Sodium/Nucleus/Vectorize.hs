@@ -52,7 +52,7 @@ mkPatTuple [  ] = Vec.PUnit
 mkPatTuple pats = foldr1 Vec.PTuple pats
 
 mkExpTuple [  ] = Vec.Primary (Lit STypeUnit ())
-mkExpTuple pats = foldr1 (Vec.CallOp2 OpPair) pats
+mkExpTuple pats = foldr1 (Vec.OpAccess OpPair `Vec.Call2`) pats
 
 smartPAccess name = \case
     Uninitialized -> Vec.PWildCard
@@ -139,7 +139,7 @@ vectorizeStatement = \case
             results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
             let vecExecute
                   | impure    = Vec.Execute (retag name) vecArgs
-                  | otherwise = Vec.Assign (Vec.Call (Vec.Access $ retag name) vecArgs)
+                  | otherwise = Vec.Assign (foldl1 Vec.Call $ Vec.Access (retag name):vecArgs)
                 vecBind = Vec.Bind vecPattern vecExecute
                 vecBody = Vec.Body M.empty [vecBind] results
             return (changed, Vec.BodyStatement vecBody)

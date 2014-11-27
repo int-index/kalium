@@ -77,7 +77,7 @@ recExpr :: Monad' m => LensLike' m Expression Expression
 recExpr f = \case
     e@(Access  _) -> f e
     e@(Primary _) -> f e
-    Call op exprs  -> (Call op <$> traverse rf exprs) >>= f
+    Call expr1 expr2 -> (Call <$> rf expr1 <*> rf expr2) >>= f
     MultiIfExpression multiIf ->
         (MultiIfExpression <$> (multiIfLeafs . traversed . both) rf multiIf)
         >>= f

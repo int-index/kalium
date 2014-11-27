@@ -13,7 +13,7 @@ patBound _ = []
 patMatch :: Pattern -> Expression -> Bool
 patMatch PWildCard _ = True
 patMatch PUnit (Primary (Lit STypeUnit ())) = True
-patMatch (PTuple x1 x2) (CallOp2 OpPair y1 y2) = patMatch x1 y1 && patMatch x2 y2
+patMatch (PTuple x1 x2) (Call2 (OpAccess OpPair) y1 y2) = patMatch x1 y1 && patMatch x2 y2
 patMatch (PAccess name1) (Access name2) = name1 == name2
 patMatch _ _ = False
 
@@ -22,6 +22,6 @@ patMatch _ _ = False
 expMatch :: Pattern -> Expression -> Bool
 expMatch PWildCard _ = False
 expMatch PUnit (Primary (Lit STypeUnit ())) = True
-expMatch (PTuple x1 x2) (CallOp2 OpPair y1 y2) = expMatch x1 y1 && expMatch x2 y2
+expMatch (PTuple x1 x2) (Call2 (OpAccess OpPair) y1 y2) = expMatch x1 y1 && expMatch x2 y2
 expMatch (PAccess name1) (Access name2) = name1 == name2
 expMatch _ _ = False

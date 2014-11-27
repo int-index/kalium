@@ -68,13 +68,14 @@ data MultiIf a
 
 data Expression
     = Access (Name1 IndexTag)
-    | Call Expression [Expression]
+    | Call Expression Expression
     | Primary Literal
     | MultiIfExpression (MultiIf Expression)
     deriving (Eq)
 
 pattern OpAccess op = Access (NameOp op)
-pattern CallOp2 op x y = Call (OpAccess op) [x, y]
+pattern Call2 a b c   = Call (Call  a b)   c
+pattern Call3 a b c d = Call (Call2 a b c) d
 
 data IndexTag
     = IndexTag Integer

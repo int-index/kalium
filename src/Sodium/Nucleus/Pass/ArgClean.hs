@@ -15,6 +15,8 @@ argClean program = p & over recmapped (appEndo f)
     where (p, f) = runWriter (program & (programFuncs . traversed) argCleanFunc)
 
 argCleanFunc :: Func -> Writer (Endo Expression) Func
+argCleanFunc = return
+{-
 argCleanFunc func = do
     let mparams = map tag $ func ^. funcLambda . lamPatterns
     let f (Call op args) | op == Access (func ^. funcSig . funcName)
@@ -29,3 +31,4 @@ argCleanFunc func = do
           tag _ = Nothing
           untag Nothing  _ = Nothing
           untag (Just _) x = Just x
+-}

@@ -143,7 +143,7 @@ instance Render Expression where
     render = \case
         Access name -> render name
         Primary lit -> render lit
-        Call op args -> render op ++ commas (map render args)
+        Call expr1 expr2 -> render expr1 ++ parens (render expr2)
         MultiIfExpression multiIf -> render multiIf
 
 instance Render (MultiIf Statement) where
