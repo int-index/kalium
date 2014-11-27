@@ -2,7 +2,6 @@
 module Sodium (translate) where
 
 import Sodium.Nucleus.Vectorize   (vectorize)
-import Sodium.Nucleus.Shadow      (unshadow)
 import Sodium.Nucleus.Scalar.Atomize (atomize')
 import Sodium.Nucleus.Scalar.Valueficate (valueficate)
 import Sodium.Nucleus.Strip (strip)
@@ -40,7 +39,7 @@ translate src = do
         >>= atomize'
         >>= atomize' . valueficate
         >>= vectorize
-        >>= optimize . unshadow
+        >>= optimize
     let dest = prettyPrint $ H.convert $ strip H.reserved optimal
     return (map R.render log, dest)
 

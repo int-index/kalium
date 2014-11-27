@@ -25,7 +25,6 @@ library
                        Sodium.Nucleus.Scalar.Atomize
                        Sodium.Nucleus.Scalar.Valueficate
                        Sodium.Nucleus.Vectorize
-                       Sodium.Nucleus.Shadow
                        Sodium.Nucleus.Pass.Flatten
                        Sodium.Nucleus.Pass.JoinMultiIf
                        Sodium.Nucleus.Pass.Inline

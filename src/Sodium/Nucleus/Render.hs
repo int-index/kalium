@@ -107,11 +107,8 @@ instance Render Func where
 
 instance Render Body where
     render body = unlines $
-        ((\(name, ty) -> "$ " ++ render name ++ ": " ++ render ty ++ "\n")
-        `map` (body ^. bodyVars . to M.toList))
-        ++ map render (body ^. bodyBinds) ++
-        [ unwords ["=>", render (body ^. bodyResult)]
-        ]
+        map render (body ^. bodyBinds) ++
+        [ unwords ["=>", render (body ^. bodyResult)] ]
 
 instance Render (Bind Statement) where
     render bind = render (bind ^. bindPattern)

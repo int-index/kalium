@@ -8,8 +8,6 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Sodium.Nucleus.Program.Vector
 
-import Sodium.Util (mAsList)
-
 checkRef :: Mask a => a -> Name1 IndexTag -> Bool
 checkRef a name' = getAny . execWriter
                  $ runReaderT (mask a) check
@@ -67,8 +65,7 @@ instance Mask Statement where
          >=> _BodyStatement mask
 
 instance Mask Body where
-    mask  = (bodyVars . mAsList . traversed . _1) mask
-         >=> bodyBinds  mask
+    mask  =  bodyBinds  mask
          >=> bodyResult mask
 
 instance Mask a => Mask (Bind a) where

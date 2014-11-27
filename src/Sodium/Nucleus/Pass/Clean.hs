@@ -2,7 +2,6 @@ module Sodium.Nucleus.Pass.Clean (clean) where
 
 import Control.Lens hiding (Index, Fold)
 import Control.Monad.Writer
-import qualified Data.Map as M
 import Data.List
 import Sodium.Nucleus.Program.Vector
 import Sodium.Nucleus.Recmap.Vector
@@ -11,14 +10,7 @@ import Sodium.Nucleus.Name
 clean :: Program -> Program
 clean = runIdentity . recmap cleaner
 
-cleaner =  recmapper (return . cleanVars)
-        <> recmapper (return . cleanBody)
-        <> recmapper (return . cleanStatement)
-
-cleanVars :: Body -> Body
-cleanVars body = (bodyVars %~ M.filterWithKey cc) body where
-    cc name _ = checkRef (bodyComponents body) name
-    bodyComponents body = (body ^. bodyResult, body ^. bodyBinds)
+cleaner = recmapper (return . cleanBody) <> recmapper (return . cleanStatement)
 
 cleanBody :: Body -> Body
 cleanBody body = body & bodyBinds .~ binds where

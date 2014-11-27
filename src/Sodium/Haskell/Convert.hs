@@ -84,7 +84,7 @@ instance Conv S.Type where
 instance Conv S.Body where
 
     type Norm S.Body = H.Exp
-    conv (S.Body _ statements resultExpr) = do
+    conv (S.Body statements resultExpr) = do
         hsStatements <- mapM conv statements
         hsRetValue <- conv resultExpr
         let hsStatement
@@ -96,7 +96,7 @@ instance Conv S.Body where
             statements -> H.Do statements
 
     type Pure S.Body = H.Exp
-    pureconv (S.Body _ statements resultExpr) = do
+    pureconv (S.Body statements resultExpr) = do
         hsValueDefs <- mapM pureconv statements
         hsRetValue <- pureconv resultExpr
         return $ D.pureLet hsValueDefs hsRetValue

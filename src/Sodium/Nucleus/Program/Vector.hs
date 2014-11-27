@@ -29,8 +29,7 @@ data Func
 
 data Body
     = Body
-    { _bodyVars  :: M.Map (Name1 IndexTag) Type
-    , _bodyBinds :: [Bind Statement]
+    { _bodyBinds :: [Bind Statement]
     , _bodyResult :: Expression
     } deriving (Eq)
 

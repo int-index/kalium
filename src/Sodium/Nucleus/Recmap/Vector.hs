@@ -23,9 +23,9 @@ data Vector
 instance Recmap Vector where
     type RecmapFirst  Vector = Body
     type RecmapSecond Vector = Statement
-    type RecmapLocal  Vector = M.Map (Name1 IndexTag) Type
+    type RecmapLocal  Vector = ()
     recmap_children_first rm body
-        = localize rm (body ^. bodyVars)
+        = localize rm ()
         $ (bodyBinds . traversed . bindStatement) (recmap_second rm) body
     recmap_children_second rm = onMultiIf <=< onBody <=< onFor where
         r1 = recmap_first  rm
@@ -83,7 +83,7 @@ recExpr f = \case
         >>= f
     where rf = recExpr f
 
-localizer :: Monad' m => (forall a . M.Map (Name1 IndexTag) Type -> m a -> m a) -> Recmapper Vector m
+localizer :: Monad' m => (forall a . () -> m a -> m a) -> Recmapper Vector m
 localizer lc = mempty { localize = lc }
 
 -- Be careful! Not a valid setter:
