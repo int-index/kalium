@@ -15,5 +15,5 @@ forCycleMatch
     | Lambda [PAccess name1, PAccess name2] action <- lam
     , Assign (Call op args) <- action
     , args == [Access name1, Access name2]
-    = Just (Assign $ Fold op argExpr range)
+    = Just (Assign $ Call (NameOp OpFold) [Access op, argExpr, range])
 forCycleMatch _ = Nothing

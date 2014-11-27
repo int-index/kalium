@@ -78,7 +78,6 @@ recExpr f = \case
     e@(Access  _) -> f e
     e@(Primary _) -> f e
     Call op exprs  -> (Call op <$> traverse rf exprs) >>= f
-    Fold op expr range -> (Fold op <$> rf expr <*> rf range) >>= f
     MultiIfExpression multiIf ->
         (MultiIfExpression <$> (multiIfLeafs . traversed . both) rf multiIf)
         >>= f

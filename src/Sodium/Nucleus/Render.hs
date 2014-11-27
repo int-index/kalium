@@ -51,6 +51,7 @@ instance Render Operator where
         OpElem -> "elem"
         OpShow -> "show"
         OpNegate -> "negate"
+        OpFold    -> "fold"
         OpProduct -> "product"
         OpSum -> "sum"
         OpAnd' -> "and'"

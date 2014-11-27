@@ -56,6 +56,7 @@ data Operator
     | OpElem
     | OpShow
     | OpNegate
+    | OpFold
     | OpProduct
     | OpSum
     | OpAnd'

@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Sodium.Haskell.Convert (convert, reserved) where
 
-import Data.List (genericReplicate, intercalate)
+import Data.List (intercalate)
 import Control.Monad
 import Control.Applicative
 -- S for Src, D for Dest
@@ -256,10 +256,6 @@ convexpr (S.Call op exprs) = do
         S.NameOp S.OpSingleton -> H.List hsExprs
         S.NameOp S.OpPair -> D.expTuple hsExprs
         _ -> betaL (D.access (transformName op) : hsExprs)
-convexpr (S.Fold op expr range) = do
-    hsArgExpr <- convexpr expr
-    hsRange <- convexpr range
-    return $ betaL [D.access "foldl", D.access (transformName op), hsArgExpr, hsRange]
 convexpr (S.MultiIfExpression multiIf) = pureconv multiIf
 
 convlit :: S.Literal -> H.Exp
@@ -278,6 +274,7 @@ convOp :: S.Operator -> D.Name
 convOp = \case
     S.OpNegate   -> "negate"
     S.OpShow     -> "show"
+    S.OpFold     -> "foldl"
     S.OpProduct  -> "product"
     S.OpSum      -> "sum"
     S.OpAnd'     -> "and"
