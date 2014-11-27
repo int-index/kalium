@@ -37,7 +37,7 @@ patClean (PTuple pat1 pat2) = go id OpFst `mplus` go swap OpSnd where
     go con op = do
         let (p1, p2) = con (pat1, pat2)
         let wrap (PWildCard, _) = do
-                let cln expr = return $ Call (NameOp op) [expr]
+                let cln expr = return $ Call (OpAccess op) [expr]
                 return (p1, cln)
             wrap (p0, cln') = do
                 let cln (CallOp2 OpPair expr1 expr2) = do

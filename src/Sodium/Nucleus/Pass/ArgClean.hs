@@ -17,7 +17,7 @@ argClean program = p & over recmapped (appEndo f)
 argCleanFunc :: Func -> Writer (Endo Expression) Func
 argCleanFunc func = do
     let mparams = map tag $ func ^. funcLambda . lamPatterns
-    let f (Call op args) | op == func ^. funcSig . funcName
+    let f (Call op args) | op == Access (func ^. funcSig . funcName)
             = Call op (catMaybes $ zipWith untag mparams args)
         f expr = expr
     tell (Endo f)

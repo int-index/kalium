@@ -171,7 +171,7 @@ instance Conv S.Statement where
             (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
     conv (S.Execute (S.NameOp S.OpPrintLn) args)
         = case args of
-            [S.Call (S.NameOp S.OpShow) [arg]] -> H.App (D.access "print") <$> conv arg
+            [S.Call (S.OpAccess S.OpShow) [arg]] -> H.App (D.access "print") <$> conv arg
             args -> (<$> mapM conv args) $ \case
                 [] -> H.App (D.access "putStrLn") (H.Lit (H.String ""))
                 hsExprs
@@ -252,10 +252,12 @@ convexpr (S.Primary lit) = return (convlit lit)
 convexpr (S.Access name) = D.access <$> pureconv name
 convexpr (S.Call op exprs) = do
     hsExprs <- mapM convexpr exprs
-    return $ case op of
-        S.NameOp S.OpSingleton -> H.List hsExprs
-        S.NameOp S.OpPair -> D.expTuple hsExprs
-        _ -> betaL (D.access (transformName op) : hsExprs)
+    case op of
+        S.OpAccess S.OpSingleton -> return (H.List hsExprs)
+        S.OpAccess S.OpPair -> return (D.expTuple hsExprs)
+        _ -> do
+            hsOp <- convexpr op
+            return $ betaL (hsOp : hsExprs)
 convexpr (S.MultiIfExpression multiIf) = pureconv multiIf
 
 convlit :: S.Literal -> H.Exp

@@ -145,7 +145,6 @@ instance Render Expression where
         Primary lit -> render lit
         Call op args -> render op ++ commas (map render args)
         MultiIfExpression multiIf -> render multiIf
-        _ -> "EXPR"
 
 instance Render (MultiIf Statement) where
     render multiIf =

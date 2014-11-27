@@ -60,7 +60,7 @@ smartPAccess name = \case
     Immutable     -> Vec.PAccess (Vec.ImmutableTag   `indexTag` name)
 
 smartAccess name = \case
-    Uninitialized -> Vec.Call (NameOp OpUndefined) []
+    Uninitialized -> Vec.Access (NameOp OpUndefined)
     Index index   -> Vec.Access (Vec.IndexTag index `indexTag` name)
     Immutable     -> Vec.Access (Vec.ImmutableTag   `indexTag` name)
 
@@ -139,7 +139,7 @@ vectorizeStatement = \case
             results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
             let vecExecute
                   | impure    = Vec.Execute (retag name) vecArgs
-                  | otherwise = Vec.Assign (Vec.Call (retag name) vecArgs)
+                  | otherwise = Vec.Assign (Vec.Call (Vec.Access $ retag name) vecArgs)
                 vecBind = Vec.Bind vecPattern vecExecute
                 vecBody = Vec.Body M.empty [vecBind] results
             return (changed, Vec.BodyStatement vecBody)
