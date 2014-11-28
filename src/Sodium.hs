@@ -20,7 +20,6 @@ import qualified Sodium.Pascal.Convert as P (convert)
 import qualified Sodium.Haskell.Convert as H (convert, reserved)
 import qualified Sodium.Error as E
 import qualified Sodium.Nucleus.Program.Vector as V
-import qualified Sodium.Nucleus.Render as R
 
 import Data.Bool
 import Control.Applicative
@@ -41,7 +40,7 @@ translate src = do
         >>= vectorize
         >>= optimize
     let dest = prettyPrint $ H.convert $ strip H.reserved optimal
-    return (map R.render log, dest)
+    return (map (prettyPrint . H.convert) log, dest)
 
 type TranslationLog = [V.Program]
 

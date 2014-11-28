@@ -38,7 +38,6 @@ library
                        Sodium.Nucleus.Recmap
                        Sodium.Nucleus.Pattern
                        Sodium.Nucleus.Name
-                       Sodium.Nucleus.Render
                        Sodium.Nucleus.Strip
 
   build-depends:       base,
