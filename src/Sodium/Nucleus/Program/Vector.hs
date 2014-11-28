@@ -27,10 +27,10 @@ data Func
     , _funcLambda :: Lambda Statement
     } deriving (Eq)
 
-data Body
+data Body a
     = Body
-    { _bodyBinds :: [Bind Statement]
-    , _bodyResult :: Expression
+    { _bodyBinds :: [Bind a]
+    , _bodyResult :: a
     } deriving (Eq)
 
 data Bind a
@@ -44,7 +44,7 @@ data Statement
     | Execute (Name1 IndexTag) [Expression]
     | ForStatement ForCycle
     | MultiIfStatement (MultiIf Statement)
-    | BodyStatement Body
+    | BodyStatement (Body Statement)
     | LambdaStatement (Lambda Statement)
     deriving (Eq)
 

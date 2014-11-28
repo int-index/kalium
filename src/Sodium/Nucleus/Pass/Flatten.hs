@@ -9,10 +9,10 @@ import Sodium.Nucleus.Pattern
 flatten :: Program -> Program
 flatten = over recmapped flattenBody
 
-flattenBody :: Body -> Body
+flattenBody :: Body Statement -> Body Statement
 flattenBody = bodyBinds %~ concatMap flattenBind
 
-flattenBodyBind :: Body -> ([Bind Statement], Body)
+flattenBodyBind :: Body Statement -> ([Bind Statement], Body Statement)
 flattenBodyBind body = (freeBinds, set bodyBinds closedBinds body)
     where (freeBinds, closedBinds) = span isFree (body ^. bodyBinds)
           isFree = view (bindPattern . to patBound . to null)

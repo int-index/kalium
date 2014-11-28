@@ -65,7 +65,7 @@ instance Mask Statement where
          >=> _BodyStatement mask
          >=> _LambdaStatement mask
 
-instance Mask Body where
+instance Mask a => Mask (Body a) where
     mask  =  bodyBinds  mask
          >=> bodyResult mask
 

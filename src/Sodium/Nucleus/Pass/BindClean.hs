@@ -13,7 +13,7 @@ import Sodium.Util (Pairs)
 bindClean :: Program -> Program
 bindClean = over recmapped bindCleanBody
 
-bindCleanBody :: Body -> Body
+bindCleanBody :: Body Statement -> Body Statement
 bindCleanBody = bodyBinds . traversed %~ bindCleanBind
 
 bindCleanBind :: Bind Statement -> Bind Statement
@@ -59,7 +59,7 @@ class CleanRet a where
 instance CleanRet Expression where
     cleanRet = id
 
-instance CleanRet Body where
+instance CleanRet (Body Statement) where
     cleanRet cc = bodyResult (cleanRet cc)
 
 instance CleanRet (MultiIf Statement) where

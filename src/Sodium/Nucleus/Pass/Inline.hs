@@ -15,9 +15,9 @@ import Sodium.Nucleus.Recmap.Vector
 inline :: (Applicative m, MonadSupply Name m) => Program -> m Program
 inline = recmapped inlineBody
 
-inlineBody :: (Applicative m, MonadSupply Name m) => Body -> m Body
+inlineBody :: (Applicative m, MonadSupply Name m) => Body Statement -> m (Body Statement)
 inlineBody = evalStateT unconsBind where
-    unconsBind :: (Applicative m, MonadSupply Name m) => StateT Body m Body
+    unconsBind :: (Applicative m, MonadSupply Name m) => StateT (Body Statement) m (Body Statement)
     unconsBind = uses bodyBinds uncons >>= maybe get go
     go (bind', binds) = do
         bodyBinds .= binds
@@ -36,7 +36,7 @@ inlineBody = evalStateT unconsBind where
               $ recmapped inl body'
         when (expr ^? _Access == Nothing) $ guard (count <= 1)
         return body
-    merge :: (Applicative m, MonadSupply Name m) => Pattern -> StateT Body m Pattern
+    merge :: (Applicative m, MonadSupply Name m) => Pattern -> StateT (Body Statement) m Pattern
     merge p@(PTuple pat1 pat2)
         | Just top1 <- pat1 ^? _PAccess
         , Just top2 <- pat2 ^? _PAccess

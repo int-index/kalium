@@ -12,9 +12,10 @@ extractBody = over recmapped (tryApply bodyMatch)
 
 bodyMatch :: Statement -> Maybe Statement
 bodyMatch (BodyStatement body)
-    | null (body ^. bodyBinds) = return $ Assign (body ^. bodyResult)
+    | null (body ^. bodyBinds) = return (body ^. bodyResult)
     | otherwise = do
         [bind] <- return (body ^. bodyBinds)
-        guard $ expMatch (bind ^. bindPattern) (body ^. bodyResult)
+        Assign expr <- return (body ^. bodyResult)
+        guard $ expMatch (bind ^. bindPattern) expr
         return (bind ^. bindStatement)
 bodyMatch _ = Nothing

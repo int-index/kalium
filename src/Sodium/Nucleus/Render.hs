@@ -105,7 +105,7 @@ instance Render Func where
         , indent $ render (func ^. funcLambda . lamAction)
         ]
 
-instance Render Body where
+instance Render (Body Statement) where
     render body = unlines $
         map render (body ^. bodyBinds) ++
         [ unwords ["=>", render (body ^. bodyResult)] ]

@@ -12,7 +12,7 @@ clean = runIdentity . recmap cleaner
 
 cleaner = recmapper (return . cleanBody) <> recmapper (return . cleanStatement)
 
-cleanBody :: Body -> Body
+cleanBody :: Body Statement -> Body Statement
 cleanBody body = body & bodyBinds .~ binds where
     cleanBind [] = []
     cleanBind (bind:binds) = [bind & bindPattern %~ cleanUsage scope]

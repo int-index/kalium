@@ -67,7 +67,7 @@ smartAccess name = \case
 patTuple = mkPatTuple . map (uncurry smartPAccess)
 expTuple = mkExpTuple . map (uncurry smartAccess)
 
-vectorizeBody :: (V e t m, Scoping v) => Scope v Body Pattern Atom -> t m ([Name], Vec.Body)
+vectorizeBody :: (V e t m, Scoping v) => Scope v Body Pattern Atom -> t m ([Name], Vec.Body Vec.Statement)
 vectorizeBody scope = do
     let vars = scope ^. scopeVars
     let Body statement result = scope ^. scopeElem
@@ -78,7 +78,7 @@ vectorizeBody scope = do
 namingIndexUpdates :: V e t m => [Name] -> t m (Pairs Name Index)
 namingIndexUpdates = mapM (naming indexUpdate)
 
-vectorizeScope :: (V e t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Body)
+vectorizeScope :: (V e t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m (Vec.Body Vec.Statement))
 vectorizeScope scope = do
     let vars = scope ^. scopeVars . to scoping
     local (initIndices Uninitialized vars `M.union`) $ do
@@ -89,7 +89,7 @@ vectorizeScope scope = do
             let vecBodyGen results
                     = Vec.Body
                         [Vec.Bind (patTuple boundIndices) vecStatement]
-                    <$> runReaderT (mkExpTuple <$> mapM vectorizeAtom results) indices
+                    <$> runReaderT (Vec.Assign . mkExpTuple <$> mapM vectorizeAtom results) indices
             let changedNonlocal = filter (`M.notMember` vars) changed
             return (changedNonlocal, vecBodyGen)
 
@@ -107,7 +107,7 @@ vectorizeStatement = \case
                 results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
                 let vecBind1 = Vec.Bind (patTuple boundIndices1) vecStatement1
                     vecBind2 = Vec.Bind (patTuple boundIndices2) vecStatement2
-                    vecBody  = Vec.Body [vecBind1, vecBind2] results
+                    vecBody  = Vec.Body [vecBind1, vecBind2] (Vec.Assign results)
                 return (changed, Vec.BodyStatement vecBody)
     ScopeStatement scope -> do
         (changed, vecBodyGen) <- vectorizeScope scope
@@ -134,7 +134,7 @@ vectorizeStatement = \case
                   | impure    = Vec.Execute (retag name) vecArgs
                   | otherwise = Vec.Assign (foldl1 Vec.Call $ Vec.Access (retag name):vecArgs)
                 vecBind = Vec.Bind vecPattern vecExecute
-                vecBody = Vec.Body [vecBind] results
+                vecBody = Vec.Body [vecBind] (Vec.Assign results)
             return (changed, Vec.BodyStatement vecBody)
     ForStatement forCycle -> do
         vecRange <- vectorizeAtom (forCycle ^. forRange)

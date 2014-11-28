@@ -81,24 +81,20 @@ instance Conv S.Type where
         S.TypeList S.TypeChar -> return $ H.TyCon (D.hsName "String")
         S.TypeList ts -> H.TyList <$> pureconv ts
 
-instance Conv S.Body where
+instance Conv (S.Body S.Statement) where
 
-    type Norm S.Body = H.Exp
-    conv (S.Body statements resultExpr) = do
+    type Norm (S.Body S.Statement) = H.Exp
+    conv (S.Body statements resultStatement) = do
         hsStatements <- mapM conv statements
-        hsRetValue <- conv resultExpr
-        let hsStatement
-              = D.doExecute
-              $ H.App (D.access "return")
-              $ hsRetValue
+        hsStatement  <- D.doExecute <$> conv resultStatement
         return $ case hsStatements ++ [hsStatement] of
             [H.Qualifier expression] -> expression
             statements -> H.Do statements
 
-    type Pure S.Body = H.Exp
-    pureconv (S.Body statements resultExpr) = do
+    type Pure (S.Body S.Statement) = H.Exp
+    pureconv (S.Body statements statement) = do
         hsValueDefs <- mapM pureconv statements
-        hsRetValue <- pureconv resultExpr
+        hsRetValue <- pureconv statement
         return $ D.pureLet hsValueDefs hsRetValue
 
 
