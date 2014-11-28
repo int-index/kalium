@@ -29,9 +29,8 @@ cleanUsage scope (PAccess name)
 cleanUsage _ pat = pat
 
 cleanStatement :: Statement -> Statement
-cleanStatement = over _ForStatement cleanForCycle
+cleanStatement = over _LambdaStatement cleanLambda
   where
-    cleanForCycle :: ForCycle Statement -> ForCycle Statement
-    cleanForCycle forCycle
-      = forCycle &  forLambda . lamPatterns . traversed
-                 %~ cleanUsage (forCycle ^. forLambda . lamAction)
+    cleanLambda :: Lambda Statement -> Lambda Statement
+    cleanLambda lambda = lambda & lamPatterns . traversed
+        %~ cleanUsage (lambda ^. lamAction)

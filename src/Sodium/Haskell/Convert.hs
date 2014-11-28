@@ -102,8 +102,8 @@ instance Conv S.Body where
         return $ D.pureLet hsValueDefs hsRetValue
 
 
-instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.ForCycle a) where
-    type Norm (S.ForCycle a) = H.Exp
+instance Conv S.ForCycle where
+    type Norm S.ForCycle = H.Exp
     conv (S.ForCycle lam argExpr exprRange) = do
         hsRange <- conv exprRange
         hsArgExpr <- conv argExpr
@@ -115,7 +115,7 @@ instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.ForCycle a) where
             , hsRange
             ]
 
-    type Pure (S.ForCycle a) = H.Exp
+    type Pure S.ForCycle = H.Exp
     pureconv (S.ForCycle lam argExpr exprRange) = do
         hsRange <- pureconv exprRange
         hsArgExpr <- pureconv argExpr
@@ -184,6 +184,7 @@ instance Conv S.Statement where
     conv (S.MultiIfStatement multiIf) = conv multiIf
     conv (S.BodyStatement body) = conv body
     conv (S.Assign expr) = H.App (D.access "return") <$> conv expr
+    conv (S.LambdaStatement lam) = conv lam
 
     type Pure S.Statement = H.Exp
     pureconv = \case
@@ -191,6 +192,7 @@ instance Conv S.Statement where
             S.ForStatement forCycle -> pureconv forCycle
             S.MultiIfStatement multiIf -> pureconv multiIf
             S.BodyStatement body -> pureconv body
+            S.LambdaStatement lam -> pureconv lam
             _ -> mzero
 
 instance Conv S.Func where

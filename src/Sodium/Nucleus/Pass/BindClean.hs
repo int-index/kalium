@@ -65,11 +65,14 @@ instance CleanRet Body where
 instance CleanRet (MultiIf Statement) where
     cleanRet cc  = (multiIfLeafs . traversed . _2) (cleanRet cc)
 
-instance CleanRet (ForCycle Statement) where
+instance CleanRet ForCycle where
     -- even if the value is not
     -- used outside the loop, it
     -- still needs to be passed
     cleanRet cc = const mzero
+
+instance CleanRet (Lambda Statement) where
+    cleanRet cc = lamAction (cleanRet cc)
 
 instance CleanRet Statement where
     cleanRet cc
@@ -78,3 +81,4 @@ instance CleanRet Statement where
         >=> _ForStatement     (cleanRet cc)
         >=> _MultiIfStatement (cleanRet cc)
         >=> _BodyStatement    (cleanRet cc)
+        >=> _LambdaStatement  (cleanRet cc)

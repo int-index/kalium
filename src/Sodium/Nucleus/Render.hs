@@ -122,6 +122,7 @@ instance Render Statement where
         BodyStatement body -> render body
         MultiIfStatement multiIf -> render multiIf
         ForStatement forCycle -> render forCycle
+        LambdaStatement _ -> "LAMBDA"
 
 instance Render Pattern where
     render = \case
@@ -156,5 +157,5 @@ instance Render (MultiIf Expression) where
                 = "| " ++ render cond ++ ": " ++ render expression ++ ";"
         in "(" ++ unwords (map rLeaf $ multiIf ^. multiIfLeafs) ++ ")"
 
-instance Render (ForCycle a) where
+instance Render ForCycle where
     render _ = "LOOP"

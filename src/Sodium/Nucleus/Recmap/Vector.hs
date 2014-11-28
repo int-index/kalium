@@ -5,7 +5,6 @@ module Sodium.Nucleus.Recmap.Vector
     , Recmap
     , recmapper
     , recmap
-    , localizer
     , recmapped
     , recExpr
     ) where
@@ -27,12 +26,13 @@ instance Recmap Vector where
     recmap_children_first rm body
         = localize rm ()
         $ (bodyBinds . traversed . bindStatement) (recmap_second rm) body
-    recmap_children_second rm = onMultiIf <=< onBody <=< onFor where
+    recmap_children_second rm = onMultiIf <=< onBody <=< onFor <=< onLam where
         r1 = recmap_first  rm
         r2 = recmap_second rm
         onMultiIf = _MultiIfStatement $ (multiIfLeafs . traversed . _2) r2
-        onFor = _ForStatement $ (forLambda . lamAction) r2
+        onFor = _ForStatement (forStatement r2)
         onBody = _BodyStatement r1
+        onLam = _LambdaStatement (lamAction r2)
 
 
 class Recmappable a where
@@ -82,9 +82,6 @@ recExpr f = \case
         (MultiIfExpression <$> (multiIfLeafs . traversed . both) rf multiIf)
         >>= f
     where rf = recExpr f
-
-localizer :: Monad' m => (forall a . () -> m a -> m a) -> Recmapper Vector m
-localizer lc = mempty { localize = lc }
 
 -- Be careful! Not a valid setter:
 -- over recmapped f . over recmapped g /= over recmapped (f . g)

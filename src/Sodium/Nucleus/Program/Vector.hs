@@ -42,14 +42,15 @@ data Bind a
 data Statement
     = Assign Expression
     | Execute (Name1 IndexTag) [Expression]
-    | ForStatement (ForCycle Statement)
+    | ForStatement ForCycle
     | MultiIfStatement (MultiIf Statement)
     | BodyStatement Body
+    | LambdaStatement (Lambda Statement)
     deriving (Eq)
 
-data ForCycle a
+data ForCycle
     = ForCycle
-    { _forLambda  :: Lambda a
+    { _forStatement :: Statement
     , _forArgExpr :: Expression
     , _forRange   :: Expression
     } deriving (Eq)

@@ -45,8 +45,8 @@ instance Mask Expression where
          >=> _Call  mask
          >=> _MultiIfExpression mask
 
-instance Mask a => Mask (ForCycle a) where
-    mask  =  forLambda   mask
+instance Mask ForCycle where
+    mask  =  forStatement mask
          >=> forArgExpr  mask
          >=> forRange    mask
 
@@ -63,6 +63,7 @@ instance Mask Statement where
          >=> _ForStatement mask
          >=> _MultiIfStatement mask
          >=> _BodyStatement mask
+         >=> _LambdaStatement mask
 
 instance Mask Body where
     mask  =  bodyBinds  mask

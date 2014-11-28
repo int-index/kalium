@@ -144,7 +144,7 @@ vectorizeStatement = \case
              $ vectorizeStatement (forCycle ^. forStatement)
         argIndices <- mapM (naming lookupIndex) changed
         let vecLambda = Vec.Lambda [patTuple argIndices, np smartPAccess] vecStatement
-        let vecForCycle = Vec.ForCycle vecLambda (expTuple argIndices) vecRange
+        let vecForCycle = Vec.ForCycle (Vec.LambdaStatement vecLambda) (expTuple argIndices) vecRange
         return (changed, Vec.ForStatement vecForCycle)
     IfStatement ifb -> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
