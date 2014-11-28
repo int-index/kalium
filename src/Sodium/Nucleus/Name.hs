@@ -75,7 +75,7 @@ instance Mask a => Mask (Bind a) where
 
 instance Mask Func where
     mask  =  funcSig       mask
-         >=> funcLambda    mask
+         >=> funcStatement mask
 
 instance Mask FuncSig where
     mask  =  funcName    mask

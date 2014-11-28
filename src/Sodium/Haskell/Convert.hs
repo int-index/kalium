@@ -193,32 +193,32 @@ instance Conv S.Statement where
 
 instance Conv S.Func where
     type Norm S.Func = [H.Decl]
-    conv (S.Func (S.FuncSig (S.NameOp S.OpMain) paramTypes S.TypeUnit) (S.Lambda _ clBody)) = do
-        guard $ null paramTypes
-        hsBody <- conv clBody
+    conv (S.Func (S.FuncSig (S.NameOp S.OpMain) [] S.TypeUnit) statement) = do
+        hsStatement <- conv statement
         hsType <- conv S.TypeUnit
         let hsName = H.Ident (convOp S.OpMain)
         let sig = H.TypeSig H.noLoc [hsName]
                 (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
-        return [sig, D.funcDef hsName [] hsBody]
+        return [sig, D.funcDef hsName [] hsStatement]
     conv fun = pureconv fun
 
     type Pure S.Func = [H.Decl]
-    pureconv (S.Func (S.FuncSig name paramTypes retType) (S.Lambda params clBody)) = do
-        paramNames <- mapM pureconv params
-        hsBody <- pureconv clBody
+    pureconv (S.Func (S.FuncSig name paramTypes retType) statement) = do
+        hsStatement <- pureconv statement
         let hsName = H.Ident (transformName name)
         hsType <- foldr1 H.TyFun <$> mapM conv (paramTypes ++ [retType])
         let sig = H.TypeSig H.noLoc [hsName] hsType
-        return [sig, D.funcDef hsName paramNames hsBody]
+        return [sig, D.funcDef hsName [] hsStatement]
 
 instance (Conv a, Norm a ~ H.Exp, Pure a ~ H.Exp) => Conv (S.Lambda a) where
     type Norm (S.Lambda a) = H.Exp
+    conv (S.Lambda [] act) = conv act
     conv (S.Lambda pats act) = H.Lambda H.noLoc
         <$> mapM conv pats
         <*> conv act
 
     type Pure (S.Lambda a) = H.Exp
+    pureconv (S.Lambda [] act) = pureconv act
     pureconv (S.Lambda pats act) = H.Lambda H.noLoc
         <$> mapM pureconv pats
         <*> pureconv act

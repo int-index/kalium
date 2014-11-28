@@ -20,18 +20,18 @@ getDeepCall name (Call expr1 expr2) = (:) expr2 `fmap` getDeepCall name expr1
 getDeepCall _ _ = Nothing
 
 argCleanFunc :: Func -> Writer (Endo Expression) Func
-argCleanFunc func = do
-    let mparams = map tag $ func ^. funcLambda . lamPatterns
-    let op = func ^. funcSig . funcName
+argCleanFunc (Func sig (LambdaStatement (Lambda pats statement))) = do
+    let mparams = map tag pats
+    let op = sig ^. funcName
         f expr | Just (reverse -> args) <- getDeepCall op expr
                = foldl1 Call (Access op : catMaybes (zipWith untag mparams args))
                | otherwise = expr
     tell (Endo f)
-    func & funcLambda . lamPatterns .~ catMaybes mparams
-         & funcSig . funcParamTypes %~ catMaybes . zipWith untag mparams
-         & return
-    where tag param@(PAccess name)
-            | checkRef (func ^. funcLambda . lamAction) name = Just param
+    let sig'  = sig & funcParamTypes %~ catMaybes . zipWith untag mparams
+        pats' = catMaybes mparams
+    return (Func sig' (LambdaStatement (Lambda pats' statement)))
+    where tag param@(PAccess name) | checkRef statement name = Just param
           tag _ = Nothing
           untag Nothing  _ = Nothing
           untag (Just _) x = Just x
+argCleanFunc func = return func

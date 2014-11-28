@@ -47,7 +47,7 @@ instance Recmappable Statement where
     recmap = recmap_second
 
 instance Recmappable Func where
-    recmap rm func = (funcLambda . lamAction) (recmap rm) func
+    recmap rm = funcStatement (recmap rm)
 
 instance Recmappable Program where
     recmap rm = (programFuncs . traversed) (recmap rm)
