@@ -6,7 +6,9 @@ import qualified Language.Haskell.Exts.SrcLoc as H
 
 type Name = String
 
-funcDef name args exp = H.FunBind [H.Match H.noLoc name args Nothing (rhs exp) (H.BDecls [])]
+funcDef name args = \case
+    H.Lambda _ args' exp -> funcDef name (args ++ args') exp
+    exp -> H.FunBind [H.Match H.noLoc name args Nothing (rhs exp) (H.BDecls [])]
 
 rhs (H.MultiIf alts) = H.GuardedRhss alts
 rhs (H.If cond expr1 expr2) = rhs
