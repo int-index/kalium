@@ -41,7 +41,7 @@ data Bind a
 
 data Statement
     = Assign Expression
-    | Execute (Name1 IndexTag) [Expression]
+    | Execute Expression [Expression]
     | ForStatement ForCycle
     | MultiIfStatement (MultiIf Statement)
     | BodyStatement (Body Statement)

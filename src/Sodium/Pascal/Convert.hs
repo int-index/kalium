@@ -128,7 +128,10 @@ convWriteLn exprs = do
                 S.TypeChar -> \e -> D.Call (D.NameOp D.OpSingleton) [e]
                 _ -> \e -> D.Call (D.NameOp D.OpShow) [e]
           wrap <$> conv expr
-    D.Exec D.PUnit (D.NameOp D.OpPrintLn) <$> traverse convArg exprs
+    arg <- traverse convArg exprs <&> \case
+        [] -> D.expression ""
+        args -> foldl1 (binary (D.NameOp D.OpConcat)) args
+    return $ D.Exec D.PUnit (D.NameOp D.OpPrintLn) [arg]
 
 typeOfLiteral :: S.Literal -> S.Type
 typeOfLiteral = \case

@@ -159,22 +159,16 @@ instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.Bind a) where
 instance Conv S.Statement where
 
     type Norm S.Statement = H.Exp
-    conv (S.Execute (S.NameOp S.OpGetLn) []) = return (D.access "getLine")
-    conv (S.Execute (S.NameOp (S.OpReadLn t)) []) = do
+    conv (S.Execute (S.OpAccess S.OpGetLn) []) = return (D.access "getLine")
+    conv (S.Execute (S.OpAccess (S.OpReadLn t)) []) = do
         hsType <- conv t
         return $ H.ExpTypeSig H.noLoc
             (D.access "readLn")
             (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
-    conv (S.Execute (S.NameOp S.OpPrintLn) args)
-        = case args of
-            [S.Call (S.OpAccess S.OpShow) arg] -> H.App (D.access "print") <$> conv arg
-            args -> (<$> mapM conv args) $ \case
-                [] -> H.App (D.access "putStrLn") (H.Lit (H.String ""))
-                hsExprs
-                    -> D.matchExpression
-                     $ H.App (D.access "putStrLn")
-                     $ foldr1 (\x y -> betaL [D.access "++", x, y])
-                     $ hsExprs
+    conv (S.Execute (S.OpAccess S.OpPrintLn) [arg1])
+        = case arg1 of
+            S.Call (S.OpAccess S.OpShow) arg -> H.App (D.access "print") <$> conv arg
+            arg -> D.matchExpression <$> (H.App (D.access "putStrLn") <$> conv arg)
     conv (S.Execute _ _) = error "Execute..."
     conv (S.ForStatement  forCycle) = conv forCycle
     conv (S.MultiIfStatement multiIf) = conv multiIf
@@ -298,6 +292,7 @@ convOp = \case
     S.OpPrintLn  -> "print"
     S.OpGetLn    -> "getLine"
     S.OpReadLn _ -> "readLn"
+    S.OpConcat   -> "++"
     S.OpSingleton -> "return"
     S.OpIntToDouble -> "fromIntegral"
     S.OpUndefined -> "undefined"

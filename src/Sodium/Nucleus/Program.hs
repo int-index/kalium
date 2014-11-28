@@ -69,6 +69,7 @@ data Operator
     | OpFst
     | OpSnd
     | OpSingleton
+    | OpConcat
     | OpIntToDouble
     | OpUndefined
     | OpMain
