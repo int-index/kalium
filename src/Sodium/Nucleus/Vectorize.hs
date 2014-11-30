@@ -12,7 +12,6 @@ import qualified Data.Map as M
 import Sodium.Nucleus.Scalar.Program
 import Sodium.Nucleus.Program.Vector (indexTag, retag)
 import qualified Sodium.Nucleus.Program.Vector as Vec
-import Sodium.Util
 
 class Error e where
     errorNoAccess :: Name -> [Name] -> e
@@ -70,9 +69,7 @@ mkPAccess :: V e t m => Name -> t m Vec.Pattern
 mkPAccess name = smartPAccess name <$> lookupType name <*> lookupIndex name
 
 mkAccess :: V e t m => Name -> t m Vec.Expression
-mkAccess name = do
-    index <- lookupIndex name
-    return (smartAccess name index)
+mkAccess name = smartAccess name <$> lookupIndex name
 
 expTuple :: V e t m => [Name] -> t m Vec.Expression
 expTuple names = mkExpTuple <$> mapM mkAccess names
@@ -88,22 +85,26 @@ vectorizeBody scope = do
     vecBody <- lift $ vecBodyGen [result]
     return (changed, vecBody)
 
-namingIndexUpdates :: V e t m => [Name] -> t m (Pairs Name Index)
-namingIndexUpdates = mapM (naming indexUpdate)
+updateLocalize names action = do
+    updated <- forM names $ \name -> do
+        index <- lookupIndex name >>= \case
+            Index n -> return (Index $ succ n)
+            Uninitialized -> return (Index 0)
+            Immutable -> throwError (errorUpdateImmutable name)
+        return (name, index)
+    local ((mempty, M.fromList updated) <>) action
 
 vectorizeScope :: (V e t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m (Vec.Body Vec.Statement))
 vectorizeScope scope = do
     let vars = scope ^. scopeVars . to scoping
     local (initIndices Uninitialized vars <>) $ do
         (changed, vecStatement) <- vectorizeStatement (scope ^. scopeElem)
-        boundIndices <- namingIndexUpdates changed
-        local ((mempty, M.fromList boundIndices) <>) $ do
-            pat <- patTuple changed
+        updateLocalize changed $ do
             indices <- ask
-            let vecBodyGen results
-                    = Vec.Body
-                        [Vec.Bind pat vecStatement]
-                    <$> runReaderT (Vec.Assign . mkExpTuple <$> mapM vectorizeAtom results) indices
+            let vecBodyGen results = flip runReaderT indices $ do
+                  pat <- patTuple changed
+                  vecResult <- Vec.Assign . mkExpTuple <$> mapM vectorizeAtom results
+                  return $ Vec.Body [Vec.Bind pat vecStatement] vecResult
             let changedNonlocal = filter (`M.notMember` vars) changed
             return (changedNonlocal, vecBodyGen)
 
@@ -112,12 +113,10 @@ vectorizeStatement = \case
     Pass -> return ([], Vec.Assign $ Vec.Primary (Lit STypeUnit ()))
     Follow st1 st2 -> do
         (changed1, vecStatement1) <- vectorizeStatement st1
-        boundIndices1 <- namingIndexUpdates changed1
-        local ((mempty, M.fromList boundIndices1) <>) $ do
+        updateLocalize changed1 $ do
             vecBind1 <- Vec.Bind <$> patTuple changed1 <*> pure vecStatement1
             (changed2, vecStatement2) <- vectorizeStatement st2
-            boundIndices2 <- namingIndexUpdates changed2
-            local ((mempty, M.fromList boundIndices2) <>) $ do
+            updateLocalize changed2 $ do
                 vecBind2 <- Vec.Bind <$> patTuple changed2 <*> pure vecStatement2
                 let changed = nub $ changed1 ++ changed2
                 results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
@@ -140,8 +139,7 @@ vectorizeStatement = \case
               PAccess name -> [name]
               PTuple p1 p2 -> patFlatten p1 ++ patFlatten p2
         let changed = patFlatten pat
-        boundIndices <- namingIndexUpdates changed
-        local ((mempty, M.fromList boundIndices) <>) $ do
+        updateLocalize changed $ do
             vecPattern <- vectorizePattern pat
             results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
             let vecExecute
@@ -182,7 +180,7 @@ vectorizeStatement = \case
 vectorizeAtom :: V e t m => Atom -> t m Vec.Expression
 vectorizeAtom = \case
     Primary a -> return (Vec.Primary a)
-    Access name -> smartAccess name <$> lookupIndex name
+    Access name -> mkAccess name
 
 vectorizePattern :: V e t m => Pattern -> t m Vec.Pattern
 vectorizePattern = \case
@@ -201,14 +199,6 @@ lookupX f name = do
     xs <- asks f
     M.lookup name xs
        & maybe (throwError $ errorNoAccess name (M.keys xs)) return
-
-indexUpdate :: V e t m => Name -> t m Index
-indexUpdate name = lookupIndex name >>= \case
-    Index n -> return (Index $ succ n)
-    Uninitialized -> return (Index 0)
-    Immutable -> throwError (errorUpdateImmutable name)
-
-naming op = \name -> (,) name <$> op name
 
 initIndices :: Index -> M.Map Name Type -> (Types, Indices)
 initIndices n types = (types, M.map (const n) types)

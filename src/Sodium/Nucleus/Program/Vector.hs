@@ -97,9 +97,6 @@ data Pattern
     | PUnit
     deriving (Eq)
 
-pAccessUNTYPED :: Type
-pAccessUNTYPED = TypeUnit
-
 makeLenses ''FuncSig
 makeLenses ''Func
 makeLenses ''Bind
