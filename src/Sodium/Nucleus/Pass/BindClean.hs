@@ -69,16 +69,16 @@ instance CleanRet ForCycle where
     -- even if the value is not
     -- used outside the loop, it
     -- still needs to be passed
-    cleanRet cc = const mzero
+    cleanRet _cc = const mzero
 
 instance CleanRet (Lambda Statement) where
     cleanRet cc = lamAction (cleanRet cc)
 
 instance CleanRet Statement where
-    cleanRet cc
-         =  _Assign  (cleanRet cc)
-        >=> _Execute (const mzero)
-        >=> _ForStatement     (cleanRet cc)
-        >=> _MultiIfStatement (cleanRet cc)
-        >=> _BodyStatement    (cleanRet cc)
-        >=> _LambdaStatement  (cleanRet cc)
+    cleanRet cc = \case
+        Assign  a -> Assign <$> cleanRet cc a
+        Execute _ -> mzero
+        ForStatement     a -> ForStatement     <$> cleanRet cc a
+        MultiIfStatement a -> MultiIfStatement <$> cleanRet cc a
+        BodyStatement    a -> BodyStatement    <$> cleanRet cc a
+        LambdaStatement  a -> LambdaStatement  <$> cleanRet cc a

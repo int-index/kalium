@@ -5,7 +5,6 @@ module Sodium.Nucleus.Program.Vector
     ) where
 
 import Control.Lens.TH
-import qualified Data.Map as M
 
 import Sodium.Nucleus.Program
 
@@ -86,6 +85,7 @@ data IndexTag
 indexTag :: IndexTag -> Name1 () -> Name1 IndexTag
 indexTag GlobalTag (NameOp op) = NameOp op
 indexTag tag (Name1 ns _) = Name1 ns tag
+indexTag _ _ = error "indexTag: impossible"
 
 retag :: Name -> Name1 IndexTag
 retag = indexTag GlobalTag
@@ -105,7 +105,3 @@ makeLenses ''Lambda
 makeLenses ''ForCycle
 makeLenses ''MultiIf
 makeLenses ''Program
-
-makePrisms ''Expression
-makePrisms ''Statement
-makePrisms ''Pattern

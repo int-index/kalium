@@ -34,12 +34,14 @@ inlineBody = evalStateT unconsBind where
               = runWriter
               $ flip runReaderT (name, expr)
               $ recmapped inl body'
-        when (expr ^? _Access == Nothing) $ guard (count <= 1)
+        case expr of
+            Access _ -> return ()
+            _ -> guard (count <= 1)
         return body
     merge :: (Applicative m, MonadSupply Name m) => Pattern -> StateT (Body Statement) m Pattern
     merge p@(PTuple pat1 pat2)
-        | Just (top1, ty1) <- pat1 ^? _PAccess
-        , Just (top2, ty2) <- pat2 ^? _PAccess
+        | PAccess top1 ty1 <- pat1
+        , PAccess top2 ty2 <- pat2
         = do top <- indexTag GlobalTag <$> supply
              let model =  Call2 (OpAccess OpPair) (Access top1) (Access top2)
              let pat   = PAccess top (TypePair ty1 ty2)

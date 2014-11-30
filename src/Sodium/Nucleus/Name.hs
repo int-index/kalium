@@ -37,13 +37,18 @@ instance Mask Type where
     mask = return
 
 instance Mask Pattern where
-    mask  =  _PAccess mask
-         >=> _PTuple mask
+    mask  =  \case
+        PAccess name ty -> PAccess <$> mask name <*> mask ty
+        PTuple  p1   p2 -> PTuple  <$> mask p1   <*> mask p2
+        PWildCard -> return PWildCard
+        PUnit     -> return PUnit
 
 instance Mask Expression where
-    mask  =  _Access mask
-         >=> _Call  mask
-         >=> _MultiIfExpression mask
+    mask  =  \case
+        Primary lit -> return (Primary lit)
+        Access name -> Access <$> mask name
+        Call expr1 expr2 -> Call <$> mask expr1 <*> mask expr2
+        MultiIfExpression a -> MultiIfExpression <$> mask a
 
 instance Mask ForCycle where
     mask  =  forStatement mask
@@ -58,12 +63,13 @@ instance Mask a => Mask (MultiIf a) where
     mask  =  multiIfLeafs mask
 
 instance Mask Statement where
-    mask  =  _Assign  mask
-         >=> _Execute mask
-         >=> _ForStatement mask
-         >=> _MultiIfStatement mask
-         >=> _BodyStatement mask
-         >=> _LambdaStatement mask
+    mask  = \case
+        Assign  a -> Assign  <$> mask a
+        Execute a -> Execute <$> mask a
+        ForStatement     a -> ForStatement     <$> mask a
+        MultiIfStatement a -> MultiIfStatement <$> mask a
+        BodyStatement    a -> BodyStatement    <$> mask a
+        LambdaStatement  a -> LambdaStatement  <$> mask a
 
 instance Mask a => Mask (Body a) where
     mask  =  bodyBinds  mask

@@ -12,7 +12,6 @@ module Sodium.Nucleus.Recmap.Vector
 
 import Control.Applicative
 import Control.Monad
-import qualified Data.Map as M
 import Control.Lens hiding (Fold)
 import Data.Monoid
 import Sodium.Nucleus.Recmap
@@ -28,13 +27,15 @@ instance Recmap Vector where
         = localize rm () $ (onBinds <=< onResult) body where
         onBinds = (bodyBinds . traversed . bindStatement) (recmap_second rm)
         onResult = bodyResult (recmap_second rm)
-    recmap_children_second rm = onMultiIf <=< onBody <=< onFor <=< onLam where
-        r1 = recmap_first  rm
-        r2 = recmap_second rm
-        onMultiIf = _MultiIfStatement $ (multiIfLeafs . traversed . _2) r2
-        onFor = _ForStatement (forStatement r2)
-        onBody = _BodyStatement r1
-        onLam = _LambdaStatement (lamAction r2)
+    recmap_children_second rm = \case
+        Assign a  -> return (Assign  a)
+        Execute a -> return (Execute a)
+        MultiIfStatement a -> MultiIfStatement <$> (multiIfLeafs . traversed . _2) r2 a
+        ForStatement     a -> ForStatement <$> forStatement r2 a
+        BodyStatement    a -> BodyStatement <$> r1 a
+        LambdaStatement  a -> LambdaStatement <$> lamAction r2 a
+        where r1 = recmap_first  rm
+              r2 = recmap_second rm
 
 
 class Recmappable a where
@@ -65,11 +66,13 @@ instance RecmapMk Statement where
 instance RecmapMk Expression where
     recmapper rmExpr' = mempty { recmap_parent_second = rmStatement }
         where rmExpr = recExpr rmExpr'
-              rmStatement
-                     =  _Assign rmExpr
-                    >=> _Execute rmExpr
-                    >=> _ForStatement     rmForCycle
-                    >=> _MultiIfStatement rmMultiIf
+              rmStatement = \case
+                Assign  a -> Assign  <$> rmExpr a
+                Execute a -> Execute <$> rmExpr a
+                ForStatement     a -> ForStatement <$> rmForCycle a
+                MultiIfStatement a -> MultiIfStatement <$> rmMultiIf a
+                BodyStatement   a -> return (BodyStatement a)
+                LambdaStatement a -> return (LambdaStatement a)
               rmForCycle = forArgExpr rmExpr >=> forRange rmExpr
               rmMultiIf = (multiIfLeafs . traversed . _1) rmExpr
 

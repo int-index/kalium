@@ -25,14 +25,23 @@ joinMultiIfExpression = tryApply joinMultiIf
             MultiIfExpression (MultiIf leafs') -> (leaf:leafs')
             expr -> [leaf, (Primary (Lit STypeBoolean True), expr)]
 
+matchMultiIfStatement :: Statement -> Maybe (MultiIf Statement)
+matchMultiIfStatement = \case
+    MultiIfStatement a -> Just a
+    _ -> Nothing
+
+matchAssign :: Statement -> Maybe Expression
+matchAssign = \case
+    Assign a -> Just a
+    _ -> Nothing
+
 joinMultiIfStatement :: Statement -> Statement
 joinMultiIfStatement = tryApply
-    $ \statement ->  statement
-                 ^? _MultiIfStatement
+    $ \statement ->  matchMultiIfStatement statement
                  >>= matchExpression
                  <&> Assign
 
 matchExpression :: MultiIf Statement -> Maybe Expression
 matchExpression multiIf = do
-    exprLeafs <- (traversed . _2) (preview _Assign) (multiIf ^. multiIfLeafs)
+    exprLeafs <- (traversed . _2) matchAssign (multiIf ^. multiIfLeafs)
     return $ MultiIfExpression $ MultiIf exprLeafs

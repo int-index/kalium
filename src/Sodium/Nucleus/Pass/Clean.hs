@@ -29,7 +29,9 @@ cleanUsage scope (PAccess name _)
 cleanUsage _ pat = pat
 
 cleanStatement :: Statement -> Statement
-cleanStatement = over _LambdaStatement cleanLambda
+cleanStatement = \case
+    LambdaStatement a -> LambdaStatement (cleanLambda a)
+    statement -> statement
   where
     cleanLambda :: Lambda Statement -> Lambda Statement
     cleanLambda lambda = lambda & lamPatterns . traversed
