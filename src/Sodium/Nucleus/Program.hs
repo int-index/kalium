@@ -62,8 +62,9 @@ data Operator
     | OpAnd'
     | OpOr'
     | OpPrintLn
-    | OpGetLn
     | OpReadLn
+    | OpPutLn
+    | OpGetLn
     | OpId
     | OpPair
     | OpFst

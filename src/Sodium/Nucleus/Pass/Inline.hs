@@ -71,7 +71,7 @@ noExec = r where
     r = maybe False (const True) . recmapped failExec
     failExec :: Statement -> Maybe Statement
     failExec = \case
-        Execute _ _ -> Nothing
+        Execute _ -> Nothing
         statement -> Just statement
 
 type Inline = ReaderT (Name1 IndexTag, Expression) (Writer (Sum Integer))

@@ -41,7 +41,7 @@ data Bind a
 
 data Statement
     = Assign Expression
-    | Execute Expression [Expression]
+    | Execute Expression
     | ForStatement ForCycle
     | MultiIfStatement (MultiIf Statement)
     | BodyStatement (Body Statement)

@@ -132,6 +132,7 @@ vectorizeStatement = \case
               NameOp OpReadLn  -> True
               NameOp OpGetLn      -> True
               NameOp OpPrintLn    -> True
+              NameOp OpPutLn -> True
               _ -> False
         vecArgs <- mapM vectorizeAtom args
         let patFlatten = \case
@@ -143,7 +144,7 @@ vectorizeStatement = \case
             vecPattern <- vectorizePattern pat
             results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
             let vecExecute
-                  | impure    = Vec.Execute (Vec.Access (retag name)) vecArgs
+                  | impure    = Vec.Execute (foldl1 Vec.Call $ Vec.Access (retag name):vecArgs)
                   | otherwise = Vec.Assign (foldl1 Vec.Call $ Vec.Access (retag name):vecArgs)
                 vecBind = Vec.Bind vecPattern vecExecute
                 vecBody = Vec.Body [vecBind] (Vec.Assign results)

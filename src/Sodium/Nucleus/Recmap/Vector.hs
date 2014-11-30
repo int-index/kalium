@@ -67,7 +67,7 @@ instance RecmapMk Expression where
         where rmExpr = recExpr rmExpr'
               rmStatement
                      =  _Assign rmExpr
-                    >=> (_Execute . _2 . traversed) rmExpr
+                    >=> _Execute rmExpr
                     >=> _ForStatement     rmForCycle
                     >=> _MultiIfStatement rmMultiIf
               rmForCycle = forArgExpr rmExpr >=> forRange rmExpr

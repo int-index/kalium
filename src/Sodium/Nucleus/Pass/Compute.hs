@@ -31,6 +31,7 @@ match = \case
         -> Call (OpAccess OpAnd')    range
     Call3 (OpAccess OpFold) (OpAccess OpOr) (Primary (Lit STypeBoolean False)) range
         -> Call (OpAccess OpOr')     range
+    Call (OpAccess OpPutLn) (Call (OpAccess OpShow) expr) -> Call (OpAccess OpPrintLn) expr
     expr -> expr
 
 binaryIntegerOp :: Operator -> Maybe (Integer -> Integer -> Integer)
