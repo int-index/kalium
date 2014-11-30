@@ -26,8 +26,8 @@ instance P.Error Error where
               column = P.sourceColumn pos
 
 instance V.Error Error where
-    errorNoAccess name indices = NoAccess name (M.keys indices)
-    errorUpdateImmutable name  = UpdateImmutable name
+    errorNoAccess name names  = NoAccess name names
+    errorUpdateImmutable name = UpdateImmutable name
 
 instance T.Error Error where
     errorNoAccess name vars = NoAccess name (M.keys vars)

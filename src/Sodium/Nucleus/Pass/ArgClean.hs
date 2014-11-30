@@ -30,7 +30,7 @@ argCleanFunc (Func sig (LambdaStatement (Lambda pats statement))) = do
     let sig'  = sig & funcParamTypes %~ catMaybes . zipWith untag mparams
         pats' = catMaybes mparams
     return (Func sig' (LambdaStatement (Lambda pats' statement)))
-    where tag param@(PAccess name) | checkRef statement name = Just param
+    where tag param@(PAccess name _) | checkRef statement name = Just param
           tag _ = Nothing
           untag Nothing  _ = Nothing
           untag (Just _) x = Just x

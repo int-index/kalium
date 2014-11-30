@@ -12,7 +12,7 @@ foldMatch = over recmapped (tryApply forCycleMatch)
 forCycleMatch :: Statement -> Maybe Statement
 forCycleMatch
     (ForStatement (ForCycle (LambdaStatement lam) argExpr range))
-    | Lambda [PAccess name1, PAccess name2] action <- lam
+    | Lambda [PAccess name1 _, PAccess name2 _] action <- lam
     , Assign (Call2 op arg1 arg2) <- action
     , arg1 == Access name1
     , arg2 == Access name2

@@ -92,10 +92,13 @@ retag = indexTag GlobalTag
 
 data Pattern
     = PTuple Pattern Pattern
-    | PAccess (Name1 IndexTag)
+    | PAccess (Name1 IndexTag) Type
     | PWildCard
     | PUnit
     deriving (Eq)
+
+pAccessUNTYPED :: Type
+pAccessUNTYPED = TypeUnit
 
 makeLenses ''FuncSig
 makeLenses ''Func

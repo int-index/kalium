@@ -63,7 +63,7 @@ data Operator
     | OpOr'
     | OpPrintLn
     | OpGetLn
-    | OpReadLn Type
+    | OpReadLn
     | OpId
     | OpPair
     | OpFst

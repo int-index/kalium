@@ -28,7 +28,7 @@ instance Conv S.Program where
         funcDefs <- concat <$> mapM conv funcs
         return $ H.Module H.noLoc
             (H.ModuleName "Main")
-            (extensions ["LambdaCase", "TupleSections", "MultiWayIf"])
+            (extensions ["LambdaCase", "TupleSections", "MultiWayIf", "ScopedTypeVariables"])
             Nothing
             Nothing
             (map importDecl ["Control.Monad", "Control.Applicative"])
@@ -159,12 +159,8 @@ instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.Bind a) where
 instance Conv S.Statement where
 
     type Norm S.Statement = H.Exp
-    conv (S.Execute (S.OpAccess S.OpGetLn) []) = return (D.access "getLine")
-    conv (S.Execute (S.OpAccess (S.OpReadLn t)) []) = do
-        hsType <- conv t
-        return $ H.ExpTypeSig H.noLoc
-            (D.access "readLn")
-            (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
+    conv (S.Execute (S.OpAccess S.OpGetLn)  []) = return (D.access "getLine")
+    conv (S.Execute (S.OpAccess S.OpReadLn) []) = return (D.access "readLn")
     conv (S.Execute (S.OpAccess S.OpPrintLn) [arg1])
         = case arg1 of
             S.Call (S.OpAccess S.OpShow) arg -> H.App (D.access "print") <$> conv arg
@@ -227,7 +223,11 @@ instance Conv S.Pattern where
     type Pure S.Pattern = H.Pat
     pureconv S.PUnit = return (H.PTuple H.Boxed [])
     pureconv S.PWildCard = return H.PWildCard
-    pureconv (S.PAccess name) = H.PVar . H.Ident <$> pureconv name
+    pureconv (S.PAccess name ty) = do
+        hsName <- pureconv name
+        hsType <- pureconv ty
+        let annotate pat = H.PatTypeSig H.noLoc pat hsType
+        return $ annotate (H.PVar (H.Ident hsName))
     pureconv (S.PTuple pat1 pat2) = H.PTuple H.Boxed <$> mapM pureconv [pat1, pat2]
 
 
@@ -291,7 +291,7 @@ convOp = \case
     S.OpSnd      -> "snd"
     S.OpPrintLn  -> "print"
     S.OpGetLn    -> "getLine"
-    S.OpReadLn _ -> "readLn"
+    S.OpReadLn   -> "readLn"
     S.OpConcat   -> "++"
     S.OpSingleton -> "return"
     S.OpIntToDouble -> "fromIntegral"

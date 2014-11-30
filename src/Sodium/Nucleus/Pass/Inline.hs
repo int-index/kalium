@@ -29,7 +29,7 @@ inlineBody = evalStateT unconsBind where
               && bind ^. bindStatement . to noExec
               = return
     elim bind = \body' -> do
-        Bind (PAccess name) (Assign expr) <- return bind
+        Bind (PAccess name _) (Assign expr) <- return bind
         let (body, count)
               = runWriter
               $ flip runReaderT (name, expr)
@@ -38,12 +38,12 @@ inlineBody = evalStateT unconsBind where
         return body
     merge :: (Applicative m, MonadSupply Name m) => Pattern -> StateT (Body Statement) m Pattern
     merge p@(PTuple pat1 pat2)
-        | Just top1 <- pat1 ^? _PAccess
-        , Just top2 <- pat2 ^? _PAccess
+        | Just (top1, ty1) <- pat1 ^? _PAccess
+        , Just (top2, ty2) <- pat2 ^? _PAccess
         = do top <- indexTag GlobalTag <$> supply
-             let model =  Call2 (OpAccess OpPair) (review _Access top1) (review _Access top2)
-             let pat   = _PAccess # top
-             let expr  =  _Access # top
+             let model =  Call2 (OpAccess OpPair) (Access top1) (Access top2)
+             let pat   = PAccess top (TypePair ty1 ty2)
+             let expr  =  Access top
              gets (over recmapped (model `subst` expr))
                 >>= \case body | eb1 <- execWriter (body  & recmapped exprBound)
                                , eb2 <- execWriter (model & recExpr   exprBound)

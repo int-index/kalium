@@ -113,11 +113,10 @@ binary op a b = D.Call op [a,b]
 
 convReadLn [e@(S.Access name')] = do
     let name = nameV name'
-    typecheck e >>= \case
-        S.TypeString -> return $ D.Exec (D.PAccess name) (D.NameOp D.OpGetLn) []
-        ty -> do
-            clType <- conv ty
-            return $ D.Exec (D.PAccess name) (D.NameOp $ D.OpReadLn clType) []
+    op <- typecheck e <&> \case
+        S.TypeString -> D.NameOp D.OpGetLn
+        _            -> D.NameOp D.OpReadLn
+    return $ D.Exec (D.PAccess name) op []
 convReadLn _ = error "IOMagic supports only single-value read operations"
 
 convWriteLn exprs = do
