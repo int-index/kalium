@@ -133,6 +133,7 @@ vectorizeStatement = \case
               NameOp OpGetLn      -> True
               NameOp OpPrintLn    -> True
               NameOp OpPutLn -> True
+              Name1 _ _ -> True
               _ -> False
         vecArgs <- mapM vectorizeAtom args
         let patFlatten = \case

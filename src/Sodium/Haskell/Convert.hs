@@ -5,6 +5,7 @@ module Sodium.Haskell.Convert (convert, reserved) where
 import Data.List (intercalate)
 import Control.Monad
 import Control.Applicative
+import Control.Lens (snoc)
 -- S for Src, D for Dest
 import qualified Sodium.Nucleus.Program.Vector as S
 import qualified Sodium.Haskell.Program as D
@@ -16,14 +17,11 @@ convert = maybe (error "Sodium.Haskell.Convert") id . conv
 
 class Conv s where
 
-    type Norm s :: *
-    conv     :: s -> Maybe (Norm s)
-
-    type Pure s :: *
-    pureconv :: s -> Maybe (Pure s)
+    type Hask s :: *
+    conv :: s -> Maybe (Hask s)
 
 instance Conv S.Program where
-    type Norm S.Program = H.Module
+    type Hask S.Program = H.Module
     conv (S.Program funcs) = do
         funcDefs <- concat <$> mapM conv funcs
         return $ H.Module H.noLoc
@@ -36,9 +34,6 @@ instance Conv S.Program where
       where extensions names = [H.LanguagePragma H.noLoc (map H.Ident names)]
             importDecl s = H.ImportDecl H.noLoc (H.ModuleName s)
                            False False False Nothing Nothing Nothing
-
-    type Pure S.Program = ()
-    pureconv _ = Nothing
 
 -- TODO: the complete list of unqualified names
 reserved = keywords ++ words
@@ -59,31 +54,25 @@ transformName = \case
         S.GlobalTag -> s
 
 instance Conv (S.Name1 S.IndexTag) where
-    type Norm (S.Name1 S.IndexTag) = D.Name
-    conv = pureconv
-
-    type Pure (S.Name1 S.IndexTag) = D.Name
-    pureconv = return . transformName
+    type Hask (S.Name1 S.IndexTag) = D.Name
+    conv = return . transformName
 
 instance Conv S.Type where
-    type Norm S.Type = H.Type
-    conv = pureconv
-
-    type Pure S.Type = H.Type
-    pureconv = \case
+    type Hask S.Type = H.Type
+    conv = \case
         S.TypeInteger -> return $ H.TyCon (D.hsName "Int")
         S.TypeDouble  -> return $ H.TyCon (D.hsName "Double")
         S.TypeBoolean -> return $ H.TyCon (D.hsName "Bool")
         S.TypeChar    -> return $ H.TyCon (D.hsName "Char")
         S.TypeUnit    -> return $ H.TyCon (H.Special H.UnitCon)
         S.TypePair t1 t2  -> (\t1 t2 -> H.TyTuple H.Boxed [t1, t2])
-                         <$> pureconv t1 <*> pureconv t2
+                         <$> conv t1 <*> conv t2
         S.TypeList S.TypeChar -> return $ H.TyCon (D.hsName "String")
-        S.TypeList ts -> H.TyList <$> pureconv ts
+        S.TypeList ts -> H.TyList <$> conv ts
 
 instance Conv (S.Body S.Statement) where
 
-    type Norm (S.Body S.Statement) = H.Exp
+    type Hask (S.Body S.Statement) = H.Exp
     conv (S.Body statements resultStatement) = do
         hsStatements <- mapM conv statements
         hsStatement  <- D.doExecute <$> conv resultStatement
@@ -91,15 +80,8 @@ instance Conv (S.Body S.Statement) where
             [H.Qualifier expression] -> expression
             statements -> H.Do statements
 
-    type Pure (S.Body S.Statement) = H.Exp
-    pureconv (S.Body statements statement) = do
-        hsValueDefs <- mapM pureconv statements
-        hsRetValue <- pureconv statement
-        return $ D.pureLet hsValueDefs hsRetValue
-
-
 instance Conv S.ForCycle where
-    type Norm S.ForCycle = H.Exp
+    type Hask S.ForCycle = H.Exp
     conv (S.ForCycle lam argExpr exprRange) = do
         hsRange <- conv exprRange
         hsArgExpr <- conv argExpr
@@ -111,54 +93,28 @@ instance Conv S.ForCycle where
             , hsRange
             ]
 
-    type Pure S.ForCycle = H.Exp
-    pureconv (S.ForCycle lam argExpr exprRange) = do
-        hsRange <- pureconv exprRange
-        hsArgExpr <- pureconv argExpr
-        hsLam <- pureconv lam
-        return $ betaL [D.access "foldl", hsLam, hsArgExpr, hsRange]
 
+instance (Conv a, Hask a ~ H.Exp) => Conv (S.MultiIf a) where
 
-instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.MultiIf a) where
-
-    type Norm (S.MultiIf a) = H.Exp
+    type Hask (S.MultiIf a) = H.Exp
     conv (S.MultiIf leafs) = do
-        let convLeaf (expr, statement)
-              =  (,)
-             <$> conv expr
-             <*> conv statement
+        let convLeaf (expr, statement) = (,) <$> conv expr <*> conv statement
         leafGens <- mapM convLeaf leafs
         -- TODO: if the last leaf condition is `True`
         --       then replace it with `otherwise`
         return $ D.multiIf leafGens
 
-    type Pure (S.MultiIf a) = H.Exp
-    pureconv (S.MultiIf leafs) = do
-        let convLeaf (expr, statement)
-              =  (,)
-             <$> pureconv expr
-             <*> pureconv statement
-        leafGens <- mapM convLeaf leafs
-        return $ D.multiIf leafGens
 
-instance (Conv a, Pure a ~ H.Exp, Norm a ~ H.Exp) => Conv (S.Bind a) where
+instance (Conv a, Hask a ~ H.Exp) => Conv (S.Bind a) where
 
-    type Norm (S.Bind a) = H.Stmt
+    type Hask (S.Bind a) = H.Stmt
     conv (S.Bind S.PWildCard statement) = D.doExecute <$> conv statement
-    conv (S.Bind pat statement)
-         =  D.doBind
-        <$> conv pat
-        <*> conv statement
+    conv (S.Bind pat statement) = D.doBind <$> conv pat <*> conv statement
 
-    type Pure (S.Bind a) = H.Decl
-    pureconv (S.Bind pat statement)
-         =  D.valueDef
-        <$> pureconv pat
-        <*> pureconv statement
 
 instance Conv S.Statement where
 
-    type Norm S.Statement = H.Exp
+    type Hask S.Statement = H.Exp
     conv (S.Execute expr) = conv expr
     conv (S.ForStatement  forCycle) = conv forCycle
     conv (S.MultiIfStatement multiIf) = conv multiIf
@@ -166,17 +122,9 @@ instance Conv S.Statement where
     conv (S.Assign expr) = H.App (D.access "return") <$> conv expr
     conv (S.LambdaStatement lam) = conv lam
 
-    type Pure S.Statement = H.Exp
-    pureconv = \case
-            S.Assign expr -> pureconv expr
-            S.ForStatement forCycle -> pureconv forCycle
-            S.MultiIfStatement multiIf -> pureconv multiIf
-            S.BodyStatement body -> pureconv body
-            S.LambdaStatement lam -> pureconv lam
-            _ -> mzero
 
 instance Conv S.Func where
-    type Norm S.Func = [H.Decl]
+    type Hask S.Func = [H.Decl]
     conv (S.Func (S.FuncSig (S.NameOp S.OpMain) [] S.TypeUnit) statement) = do
         hsStatement <- conv statement
         hsType <- conv S.TypeUnit
@@ -184,64 +132,53 @@ instance Conv S.Func where
         let sig = H.TypeSig H.noLoc [hsName]
                 (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
         return [sig, D.funcDef hsName [] hsStatement]
-    conv fun = pureconv fun
-
-    type Pure S.Func = [H.Decl]
-    pureconv (S.Func (S.FuncSig name paramTypes retType) statement) = do
-        hsStatement <- pureconv statement
+    conv (S.Func (S.FuncSig name paramTypes retType) statement) = do
+        hsStatement <- conv statement
         let hsName = H.Ident (transformName name)
-        hsType <- foldr1 H.TyFun <$> mapM conv (paramTypes ++ [retType])
+        let tyWrap ty = H.TyCon (D.hsName "IO") `H.TyApp` ty
+        hsType <- foldr1 H.TyFun <$> liftM2
+            (\args res -> args `snoc` tyWrap res)
+            (mapM conv paramTypes)
+            (conv retType)
         let sig = H.TypeSig H.noLoc [hsName] hsType
         return [sig, D.funcDef hsName [] hsStatement]
 
-instance (Conv a, Norm a ~ H.Exp, Pure a ~ H.Exp) => Conv (S.Lambda a) where
-    type Norm (S.Lambda a) = H.Exp
+
+instance (Conv a, Hask a ~ H.Exp) => Conv (S.Lambda a) where
+    type Hask (S.Lambda a) = H.Exp
     conv (S.Lambda [] act) = conv act
     conv (S.Lambda pats act) = H.Lambda H.noLoc
         <$> mapM conv pats
         <*> conv act
 
-    type Pure (S.Lambda a) = H.Exp
-    pureconv (S.Lambda [] act) = pureconv act
-    pureconv (S.Lambda pats act) = H.Lambda H.noLoc
-        <$> mapM pureconv pats
-        <*> pureconv act
-
-
 betaL = foldl1 H.App
 
 instance Conv S.Pattern where
-    type Norm S.Pattern = H.Pat
-    conv = pureconv
-
-    type Pure S.Pattern = H.Pat
-    pureconv S.PUnit = return (H.PTuple H.Boxed [])
-    pureconv S.PWildCard = return H.PWildCard
-    pureconv (S.PAccess name ty) = do
-        hsName <- pureconv name
-        hsType <- pureconv ty
+    type Hask S.Pattern = H.Pat
+    conv S.PUnit = return (H.PTuple H.Boxed [])
+    conv S.PWildCard = return H.PWildCard
+    conv (S.PAccess name ty) = do
+        hsName <- conv name
+        hsType <- conv ty
         let annotate pat = H.PatTypeSig H.noLoc pat hsType
         return $ annotate (H.PVar (H.Ident hsName))
-    pureconv (S.PTuple pat1 pat2) = H.PTuple H.Boxed <$> mapM pureconv [pat1, pat2]
+    conv (S.PTuple pat1 pat2) = H.PTuple H.Boxed <$> mapM conv [pat1, pat2]
 
 
 instance Conv S.Expression where
 
-    type Norm S.Expression = H.Exp
-    conv = pureconv
-
-    type Pure S.Expression = H.Exp
-    pureconv expr = D.matchExpression <$> convexpr expr
+    type Hask S.Expression = H.Exp
+    conv expr = D.matchExpression <$> convexpr expr
 
 convexpr :: S.Expression -> Maybe H.Exp
 convexpr (S.Primary lit) = return (convlit lit)
-convexpr (S.Access name) = D.access <$> pureconv name
+convexpr (S.Access name) = D.access <$> conv name
 convexpr (S.Call  (S.OpAccess S.OpSingleton) expr)
     = H.List <$> mapM convexpr [expr]
 convexpr (S.Call2 (S.OpAccess S.OpPair) expr1 expr2)
     = D.expTuple <$> mapM convexpr [expr1, expr2]
 convexpr (S.Call expr1 expr2) = H.App <$> convexpr expr1 <*> convexpr expr2
-convexpr (S.MultiIfExpression multiIf) = pureconv multiIf
+convexpr (S.MultiIfExpression multiIf) = conv multiIf
 
 convlit :: S.Literal -> H.Exp
 convlit = \case
