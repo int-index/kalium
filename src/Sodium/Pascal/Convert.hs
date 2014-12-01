@@ -270,13 +270,14 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
                         (D.group [D.assign clName clExpr, statement])
 
 instance Conv S.Expression D.Expression where
+    -- TODO: use typecastConv everywhere
     conv = \case
         S.Access name -> return $ D.expression (nameV name)
         S.Call name' exprs -> do
             name <- case name' of
                 Left op -> conv op
                 Right name -> pure (nameF name)
-            D.Call name <$> traverse conv exprs -- TODO: try all typecasts
+            D.Call name <$> traverse conv exprs
         S.Primary lit -> conv lit
 
 instance Conv S.Literal D.Expression where

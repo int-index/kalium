@@ -154,7 +154,7 @@ vectorizeStatement = \case
         vecRange <- vectorizeAtom (forCycle ^. forRange)
         let iter_name  = forCycle ^. forName
             iter_index = Immutable
-            iter_type  = TypeUnit -- TODO: the actual type
+        iter_type <- lookupType iter_name
         local ( (M.singleton iter_name iter_type
                , M.singleton iter_name iter_index) <>) $ do
             (changed, vecStatement) <- vectorizeStatement (forCycle ^. forStatement)
