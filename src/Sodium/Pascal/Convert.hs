@@ -210,17 +210,20 @@ typecheck' = runMaybeT . \case
 op1App :: S.Operator -> S.Expression -> S.Expression
 op1App op e = S.Call (Left op) [e]
 
+typecastConv ty expr = do
+    tcs <- typecasts expr
+    tc <- filterM (\tc -> (==) ty <$> typecheck tc) tcs >>= \case
+        [] -> throwError errorTypecheck
+        tc:_ -> return tc
+    conv tc
+
 instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
     conv = \case
         S.BodyStatement body -> D.statement <$> conv body
         S.Assign name' expr' -> do
             let name = nameV name'
-            tcs <- typecasts expr'
             tyW <- typecheck (S.Access name')
-            tc <- filterM (\tc -> (==) tyW <$> typecheck tc) tcs >>= \case
-                [] -> throwError errorTypecheck
-                tc:_ -> return tc
-            expr <- conv tc
+            expr <- typecastConv tyW expr'
             return $ D.assign name expr
         S.Execute "readln"  exprs -> D.statement <$> convReadLn  exprs
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn exprs
@@ -239,7 +242,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
         S.IfBranch expr bodyThen mBodyElse
              -> fmap D.statement
              $  D.If
-            <$> conv expr
+            <$> typecastConv S.TypeBoolean expr
             <*> conv bodyThen
             <*> (D.statements <$> traverse conv mBodyElse)
         S.CaseBranch expr leafs mBodyElse -> do

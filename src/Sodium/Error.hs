@@ -16,6 +16,7 @@ data Error = ParseError String Int Int
            | NoReference
            | UpdateImmutable N.Name
            | PasConvError
+           | TypeError N.Name [N.Type]
     deriving (Show)
 
 instance P.Error Error where
@@ -32,6 +33,7 @@ instance V.Error Error where
 instance T.Error Error where
     errorNoAccess name vars = NoAccess name (M.keys vars)
     errorNoFunction name    = NoFunction name
+    errorTypeMismatch = TypeError
 
 instance CP.Error Error where
     errorTypecheck  = PasConvError
