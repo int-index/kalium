@@ -70,6 +70,7 @@ data Expression
     | Call Expression Expression
     | Primary Literal
     | MultiIfExpression (MultiIf Expression)
+    | BodyExpression (Body Expression)
     deriving (Eq)
 
 pattern OpAccess op = Access (NameOp op)

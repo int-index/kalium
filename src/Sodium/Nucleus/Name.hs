@@ -49,6 +49,7 @@ instance Mask Expression where
         Access name -> Access <$> mask name
         Call expr1 expr2 -> Call <$> mask expr1 <*> mask expr2
         MultiIfExpression a -> MultiIfExpression <$> mask a
+        BodyExpression a -> BodyExpression <$> mask a
 
 instance Mask ForCycle where
     mask  =  forStatement mask

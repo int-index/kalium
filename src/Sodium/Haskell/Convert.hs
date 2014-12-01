@@ -80,6 +80,13 @@ instance Conv (S.Body S.Statement) where
             [H.Qualifier expression] -> expression
             statements -> H.Do statements
 
+instance Conv (S.Body S.Expression) where
+    type Hask (S.Body S.Expression) = H.Exp
+    conv (S.Body expressions resultExpression) = do
+        hsValueDefs <- mapM conv expressions
+        hsRetValue <- conv resultExpression
+        return $ D.pureLet hsValueDefs hsRetValue
+
 instance Conv S.ForCycle where
     type Hask S.ForCycle = H.Exp
     conv (S.ForCycle lam argExpr exprRange) = do
@@ -105,11 +112,17 @@ instance (Conv a, Hask a ~ H.Exp) => Conv (S.MultiIf a) where
         return $ D.multiIf leafGens
 
 
-instance (Conv a, Hask a ~ H.Exp) => Conv (S.Bind a) where
+instance Conv (S.Bind S.Statement) where
 
-    type Hask (S.Bind a) = H.Stmt
+    type Hask (S.Bind S.Statement) = H.Stmt
     conv (S.Bind S.PWildCard statement) = D.doExecute <$> conv statement
     conv (S.Bind pat statement) = D.doBind <$> conv pat <*> conv statement
+
+instance Conv (S.Bind S.Expression) where
+
+    type Hask (S.Bind S.Expression) = H.Decl
+    conv (S.Bind pat statement) = D.valueDef <$> conv pat <*> conv statement
+
 
 
 instance Conv S.Statement where
@@ -179,6 +192,7 @@ convexpr (S.Call2 (S.OpAccess S.OpPair) expr1 expr2)
     = D.expTuple <$> mapM convexpr [expr1, expr2]
 convexpr (S.Call expr1 expr2) = H.App <$> convexpr expr1 <*> convexpr expr2
 convexpr (S.MultiIfExpression multiIf) = conv multiIf
+convexpr (S.BodyExpression body) = conv body
 
 convlit :: S.Literal -> H.Exp
 convlit = \case

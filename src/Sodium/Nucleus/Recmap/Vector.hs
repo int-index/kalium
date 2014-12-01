@@ -84,6 +84,8 @@ recExpr f = \case
     MultiIfExpression multiIf ->
         (MultiIfExpression <$> (multiIfLeafs . traversed . both) rf multiIf)
         >>= f
+    BodyExpression body ->
+        (BodyExpression <$> ((bodyBinds . traversed . bindStatement) rf >=> bodyResult rf) body)
     where rf = recExpr f
 
 -- Be careful! Not a valid setter:
