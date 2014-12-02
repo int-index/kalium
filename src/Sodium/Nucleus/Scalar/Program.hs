@@ -58,6 +58,7 @@ data Statement pat expr
 
 data Pattern
     = PUnit
+    | PWildCard
     | PAccess Name
     | PTuple Pattern Pattern
 

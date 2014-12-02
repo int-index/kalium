@@ -229,7 +229,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn exprs
         S.Execute name exprs
              -> fmap D.statement
-             $  D.Exec D.PUnit (nameF name)
+             $  D.Exec D.PWildCard (nameF name)
             <$> traverse conv exprs
         S.ForCycle name fromExpr toExpr statement -> do
             let clName = nameV name

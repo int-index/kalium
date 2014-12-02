@@ -137,6 +137,7 @@ vectorizeStatement = \case
               _ -> False
         vecArgs <- mapM vectorizeAtom args
         let patFlatten = \case
+              PWildCard -> []
               PUnit -> []
               PAccess name -> [name]
               PTuple p1 p2 -> patFlatten p1 ++ patFlatten p2
@@ -187,6 +188,7 @@ vectorizeAtom = \case
 vectorizePattern :: V e t m => Pattern -> t m Vec.Pattern
 vectorizePattern = \case
     PUnit -> return Vec.PUnit
+    PWildCard -> return Vec.PWildCard
     PAccess name -> mkPAccess name
     PTuple p1 p2 -> Vec.PTuple <$> vectorizePattern p1 <*> vectorizePattern p2
 
