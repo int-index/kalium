@@ -3,7 +3,7 @@ module Sodium.Nucleus.Pass.ExtractBody (extractBody) where
 import Control.Lens
 import Control.Monad
 import Sodium.Nucleus.Program.Vector
-import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Recmap
 import Sodium.Nucleus.Pattern
 import Sodium.Util (tryApply)
 

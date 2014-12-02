@@ -1,7 +1,7 @@
 module Sodium.Nucleus.Pass.FoldMatch (foldMatch) where
 
 import Sodium.Nucleus.Program.Vector
-import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Recmap
 import Control.Lens (over)
 
 import Sodium.Util (tryApply)

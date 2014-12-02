@@ -4,7 +4,7 @@ import Control.Lens hiding (Index, Fold)
 import Control.Monad.Writer
 import Data.List
 import Sodium.Nucleus.Program.Vector
-import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Recmap
 import Sodium.Nucleus.Name
 
 clean :: Program -> Program

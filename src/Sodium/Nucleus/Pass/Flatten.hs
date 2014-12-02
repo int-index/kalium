@@ -3,7 +3,7 @@ module Sodium.Nucleus.Pass.Flatten (flatten) where
 import Control.Lens
 
 import Sodium.Nucleus.Program.Vector
-import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Recmap
 import Sodium.Nucleus.Pattern
 
 flatten :: Program -> Program

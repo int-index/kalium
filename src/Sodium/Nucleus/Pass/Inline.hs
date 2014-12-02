@@ -10,7 +10,7 @@ import Control.Monad.Supply
 import qualified Data.Set as S
 import Control.Lens hiding (Index, Fold)
 import Sodium.Nucleus.Program.Vector
-import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Recmap
 
 inline :: (Applicative m, MonadSupply Name m) => Program -> m Program
 inline = recmapped inlineBody

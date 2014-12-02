@@ -7,7 +7,7 @@ import Control.Lens
 import Data.Tuple
 
 import Sodium.Nucleus.Program.Vector
-import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Recmap
 import Sodium.Util (Pairs)
 
 bindClean :: Program -> Program

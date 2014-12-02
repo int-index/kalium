@@ -7,7 +7,7 @@ import Control.Monad.Writer
 import Control.Lens
 
 import Sodium.Nucleus.Program.Vector
-import Sodium.Nucleus.Recmap.Vector
+import Sodium.Nucleus.Recmap
 import Sodium.Nucleus.Name
 
 argClean :: Program -> Program

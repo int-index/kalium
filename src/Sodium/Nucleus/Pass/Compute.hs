@@ -3,7 +3,7 @@ module Sodium.Nucleus.Pass.Compute (compute) where
 
 import Control.Lens hiding (Index, Fold)
 import Sodium.Nucleus.Program.Vector
-import Sodium.Nucleus.Recmap.Vector (recmapped)
+import Sodium.Nucleus.Recmap (recmapped)
 
 compute :: Program -> Program
 compute = over recmapped match
