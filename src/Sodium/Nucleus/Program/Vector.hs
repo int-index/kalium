@@ -7,7 +7,6 @@ module Sodium.Nucleus.Program.Vector
 import Control.Lens.TH
 
 import Sodium.Nucleus.Program
-import Sodium.Util
 
 data Program
     = Program
@@ -24,34 +23,29 @@ data FuncSig
 data Func
     = Func
     { _funcSig :: FuncSig
-    , _funcStatement :: Statement
+    , _funcExpression :: Expression
     } deriving (Eq)
 
-follow pat statement result
-    = BindStatement statement (LambdaStatement pat result)
-
-data Statement
-    = Execute Expression
-    | ForStatement Statement Statement Statement
-    | IfStatement Statement Statement Statement
-    | LambdaStatement Pattern Statement
-    | BindStatement Statement Statement
-    deriving (Eq)
-
-assign a = Execute (Call (OpAccess OpTaint) a)
-
-lambda [] a = a
-lambda (p:ps) a = LambdaStatement p (lambda ps a)
+follow pat statement result = bind statement (Lambda pat result)
+bind a1 a2 = Atom (OpAccess OpBind) `App` a1 `App` a2
 
 data Expression
+    = Atom Atom
+    | Lambda Pattern Expression
+    | App Expression Expression
+    deriving (Eq)
+
+taint = App (Atom (OpAccess OpTaint))
+
+lambda [] a = a
+lambda (p:ps) a = Lambda p (lambda ps a)
+
+data Atom
     = Access (Name1 IndexTag)
-    | Call Expression Expression
     | Primary Literal
     deriving (Eq)
 
 pattern OpAccess op = Access (NameOp op)
-pattern Call2 a b c   = Call (Call  a b)   c
-pattern Call3 a b c d = Call (Call2 a b c) d
 
 data IndexTag
     = IndexTag Integer

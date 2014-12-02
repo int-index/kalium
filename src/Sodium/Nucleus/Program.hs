@@ -56,7 +56,9 @@ data Operator
     | OpElem
     | OpShow
     | OpNegate
+    | OpIf
     | OpFold
+    | OpFoldTainted
     | OpProduct
     | OpSum
     | OpAnd'
@@ -71,6 +73,7 @@ data Operator
     | OpSnd
     | OpSingleton
     | OpTaint
+    | OpBind
     | OpConcat
     | OpIntToDouble
     | OpUndefined

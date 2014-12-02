@@ -25,7 +25,6 @@ library
                        Sodium.Nucleus.Scalar.Atomize
                        Sodium.Nucleus.Scalar.Valueficate
                        Sodium.Nucleus.Vectorize
-                       Sodium.Nucleus.Pattern
                        Sodium.Nucleus.Name
                        Sodium.Nucleus.Strip
 

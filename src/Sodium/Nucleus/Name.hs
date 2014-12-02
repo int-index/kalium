@@ -43,23 +43,20 @@ instance Mask Pattern where
         PWildCard -> return PWildCard
         PUnit     -> return PUnit
 
-instance Mask Expression where
+instance Mask Atom where
     mask  =  \case
         Primary lit -> return (Primary lit)
         Access name -> Access <$> mask name
-        Call expr1 expr2 -> Call <$> mask expr1 <*> mask expr2
 
-instance Mask Statement where
+instance Mask Expression where
     mask  = \case
-        Execute a -> Execute <$> mask a
-        ForStatement op a x -> ForStatement <$> mask op <*> mask a <*> mask x
-        IfStatement cond a1 a2 -> IfStatement <$> mask cond <*> mask a1 <*> mask a2
-        LambdaStatement pat a -> LambdaStatement <$> mask pat <*> mask a
-        BindStatement a1 a2 -> BindStatement <$> mask a1 <*> mask a2
+        Atom a -> Atom <$> mask a
+        Lambda pat a -> Lambda <$> mask pat <*> mask a
+        App a1 a2 -> App <$> mask a1 <*> mask a2
 
 instance Mask Func where
     mask  =  funcSig       mask
-         >=> funcStatement mask
+         >=> funcExpression mask
 
 instance Mask FuncSig where
     mask  =  funcName    mask

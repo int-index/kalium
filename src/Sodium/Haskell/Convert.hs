@@ -29,7 +29,7 @@ instance Conv S.Program where
             (extensions ["LambdaCase", "TupleSections", "MultiWayIf", "ScopedTypeVariables"])
             Nothing
             Nothing
-            (map importDecl ["Control.Monad", "Control.Applicative"])
+            (map importDecl ["Control.Monad", "Control.Applicative", "Data.Bool"])
             funcDefs
       where extensions names = [H.LanguagePragma H.noLoc (map H.Ident names)]
             importDecl s = H.ImportDecl H.noLoc (H.ModuleName s)
@@ -71,20 +71,12 @@ instance Conv S.Type where
         S.TypeList ts -> H.TyList <$> conv ts
 
 
-instance Conv S.Statement where
+instance Conv S.Expression where
 
-    type Hask S.Statement = H.Exp
-    conv (S.Execute expr) = conv expr
-    conv (S.ForStatement op a b) = do
-        hsOp <- conv op
-        hsA  <- conv a
-        hsB  <- conv b
-        return $ betaL [ D.access "foldM", hsOp, hsA, hsB ]
-
-    conv (S.IfStatement cond act1 act2) = H.If <$> conv cond <*> conv act1 <*> conv act2
-    conv (S.LambdaStatement pat act) = H.Lambda H.noLoc <$> mapM conv [pat] <*> conv act
-    conv (S.BindStatement statement result) = let lAp = liftA2 H.App in
-        pure (D.access ">>=") `lAp` conv statement `lAp` conv result
+    type Hask S.Expression = H.Exp
+    conv (S.Atom expr) = conv expr
+    conv (S.Lambda pat act) = H.Lambda H.noLoc <$> mapM conv [pat] <*> conv act
+    conv (S.App a1 a2) = H.App <$> conv a1 <*> conv a2
 
 
 instance Conv S.Func where
@@ -107,10 +99,6 @@ instance Conv S.Func where
         let sig = H.TypeSig H.noLoc [hsName] hsType
         return [sig, D.funcDef hsName [] hsStatement]
 
-
-
-betaL = foldl1 H.App
-
 instance Conv S.Pattern where
     type Hask S.Pattern = H.Pat
     conv S.PUnit = return (H.PTuple H.Boxed [])
@@ -123,19 +111,11 @@ instance Conv S.Pattern where
     conv (S.PTuple pat1 pat2) = H.PTuple H.Boxed <$> mapM conv [pat1, pat2]
 
 
-instance Conv S.Expression where
+instance Conv S.Atom where
 
-    type Hask S.Expression = H.Exp
-    conv expr = D.matchExpression <$> convexpr expr
-
-convexpr :: S.Expression -> Maybe H.Exp
-convexpr (S.Primary lit) = return (convlit lit)
-convexpr (S.Access name) = D.access <$> conv name
-convexpr (S.Call  (S.OpAccess S.OpSingleton) expr)
-    = H.List <$> mapM convexpr [expr]
-convexpr (S.Call2 (S.OpAccess S.OpPair) expr1 expr2)
-    = D.expTuple <$> mapM convexpr [expr1, expr2]
-convexpr (S.Call expr1 expr2) = H.App <$> convexpr expr1 <*> convexpr expr2
+    type Hask S.Atom = H.Exp
+    conv (S.Primary lit) = return (convlit lit)
+    conv (S.Access name) = D.access <$> conv name
 
 convlit :: S.Literal -> H.Exp
 convlit = \case
@@ -153,7 +133,9 @@ convOp :: S.Operator -> D.Name
 convOp = \case
     S.OpNegate   -> "negate"
     S.OpShow     -> "show"
+    S.OpIf       -> "bool"
     S.OpFold     -> "foldl"
+    S.OpFoldTainted -> "foldM"
     S.OpProduct  -> "product"
     S.OpSum      -> "sum"
     S.OpAnd'     -> "and"
@@ -183,6 +165,7 @@ convOp = \case
     S.OpPrintLn  -> "print"
     S.OpConcat   -> "++"
     S.OpSingleton -> "return"
+    S.OpBind      -> ">>="
     S.OpTaint     -> "return"
     S.OpIntToDouble -> "fromIntegral"
     S.OpUndefined -> "undefined"
