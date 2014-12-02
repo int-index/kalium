@@ -7,6 +7,7 @@ module Sodium.Nucleus.Program.Vector
 import Control.Lens.TH
 
 import Sodium.Nucleus.Program
+import Sodium.Util
 
 data Program
     = Program
@@ -27,45 +28,25 @@ data Func
     } deriving (Eq)
 
 follow pat statement result
-    = BindStatement statement (LambdaStatement $ Lambda pat result)
+    = BindStatement statement (LambdaStatement pat result)
 
 data Statement
     = Execute Expression
-    | ForStatement ForCycle
-    | MultiIfStatement (MultiIf Statement)
-    | LambdaStatement (Lambda Statement)
+    | ForStatement Statement Statement Statement
+    | IfStatement Statement Statement Statement
+    | LambdaStatement Pattern Statement
     | BindStatement Statement Statement
     deriving (Eq)
 
 assign a = Execute (Call (OpAccess OpTaint) a)
 
-data ForCycle
-    = ForCycle
-    { _forStatement :: Statement
-    , _forArgExpr :: Expression
-    , _forRange   :: Expression
-    } deriving (Eq)
-
-data Lambda a
-    = Lambda
-    { _lamPattern :: Pattern
-    , _lamAction :: a
-    } deriving (Eq)
-
 lambda [] a = a
-lambda (p:ps) a = LambdaStatement (Lambda p (lambda ps a))
-
-data MultiIf a
-    = MultiIf
-    { _multiIfLeafs :: [(Expression, a)]
-    } deriving (Eq)
+lambda (p:ps) a = LambdaStatement p (lambda ps a)
 
 data Expression
     = Access (Name1 IndexTag)
     | Call Expression Expression
     | Primary Literal
-    | MultiIfExpression (MultiIf Expression)
-    | LambdaExpression (Lambda Expression)
     deriving (Eq)
 
 pattern OpAccess op = Access (NameOp op)
@@ -95,7 +76,4 @@ data Pattern
 
 makeLenses ''FuncSig
 makeLenses ''Func
-makeLenses ''Lambda
-makeLenses ''ForCycle
-makeLenses ''MultiIf
 makeLenses ''Program

@@ -164,8 +164,10 @@ vectorizeStatement = \case
             argPat <- patTuple changed
             iterPat <- mkPAccess iter_name
             let vecLambda = Vec.lambda [argPat, iterPat] vecStatement
-            let vecForCycle = Vec.ForCycle vecLambda argExp vecRange
-            return (changed, Vec.ForStatement vecForCycle)
+            let vecFor = Vec.ForStatement vecLambda
+                        (Vec.Execute argExp)
+                        (Vec.Execute vecRange)
+            return (changed, vecFor)
     IfStatement ifb -> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
         let noscope = Scope (M.empty :: M.Map Name Type)
@@ -175,11 +177,8 @@ vectorizeStatement = \case
         let accessChanged = map Access changed
         vecBodyThen <- lift $ vecBodyThenGen accessChanged
         vecBodyElse <- lift $ vecBodyElseGen accessChanged
-        let vecMultiIf = Vec.MultiIf
-                [ (vecCond, vecBodyThen)
-                , (Vec.Primary (Lit STypeBoolean True), vecBodyElse)
-                ]
-        return $ (changed, Vec.MultiIfStatement vecMultiIf)
+        let vecIf = Vec.IfStatement (Vec.Execute vecCond) vecBodyThen vecBodyElse
+        return (changed, vecIf)
 
 vectorizeAtom :: V e t m => Atom -> t m Vec.Expression
 vectorizeAtom = \case

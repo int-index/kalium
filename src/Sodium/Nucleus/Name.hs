@@ -48,27 +48,13 @@ instance Mask Expression where
         Primary lit -> return (Primary lit)
         Access name -> Access <$> mask name
         Call expr1 expr2 -> Call <$> mask expr1 <*> mask expr2
-        MultiIfExpression a -> MultiIfExpression <$> mask a
-        LambdaExpression a -> LambdaExpression <$> mask a
-
-instance Mask ForCycle where
-    mask  =  forStatement mask
-         >=> forArgExpr  mask
-         >=> forRange    mask
-
-instance Mask a => Mask (Lambda a) where
-    mask  =  lamPattern mask
-         >=> lamAction   mask
-
-instance Mask a => Mask (MultiIf a) where
-    mask  =  multiIfLeafs mask
 
 instance Mask Statement where
     mask  = \case
         Execute a -> Execute <$> mask a
-        ForStatement     a -> ForStatement     <$> mask a
-        MultiIfStatement a -> MultiIfStatement <$> mask a
-        LambdaStatement  a -> LambdaStatement  <$> mask a
+        ForStatement op a x -> ForStatement <$> mask op <*> mask a <*> mask x
+        IfStatement cond a1 a2 -> IfStatement <$> mask cond <*> mask a1 <*> mask a2
+        LambdaStatement pat a -> LambdaStatement <$> mask pat <*> mask a
         BindStatement a1 a2 -> BindStatement <$> mask a1 <*> mask a2
 
 instance Mask Func where

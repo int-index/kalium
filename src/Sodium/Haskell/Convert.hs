@@ -70,38 +70,19 @@ instance Conv S.Type where
         S.TypeList S.TypeChar -> return $ H.TyCon (D.hsName "String")
         S.TypeList ts -> H.TyList <$> conv ts
 
-instance Conv S.ForCycle where
-    type Hask S.ForCycle = H.Exp
-    conv (S.ForCycle lam argExpr exprRange) = do
-        hsRange <- conv exprRange
-        hsArgExpr <- conv argExpr
-        hsLam <- conv lam
-        return $ betaL
-            [ D.access "foldM"
-            , hsLam
-            , hsArgExpr
-            , hsRange
-            ]
-
-
-instance (Conv a, Hask a ~ H.Exp) => Conv (S.MultiIf a) where
-
-    type Hask (S.MultiIf a) = H.Exp
-    conv (S.MultiIf leafs) = do
-        let convLeaf (expr, statement) = (,) <$> conv expr <*> conv statement
-        leafGens <- mapM convLeaf leafs
-        -- TODO: if the last leaf condition is `True`
-        --       then replace it with `otherwise`
-        return $ D.multiIf leafGens
-
 
 instance Conv S.Statement where
 
     type Hask S.Statement = H.Exp
     conv (S.Execute expr) = conv expr
-    conv (S.ForStatement  forCycle) = conv forCycle
-    conv (S.MultiIfStatement multiIf) = conv multiIf
-    conv (S.LambdaStatement lam) = conv lam
+    conv (S.ForStatement op a b) = do
+        hsOp <- conv op
+        hsA  <- conv a
+        hsB  <- conv b
+        return $ betaL [ D.access "foldM", hsOp, hsA, hsB ]
+
+    conv (S.IfStatement cond act1 act2) = H.If <$> conv cond <*> conv act1 <*> conv act2
+    conv (S.LambdaStatement pat act) = H.Lambda H.noLoc <$> mapM conv [pat] <*> conv act
     conv (S.BindStatement statement result) = let lAp = liftA2 H.App in
         pure (D.access ">>=") `lAp` conv statement `lAp` conv result
 
@@ -127,9 +108,6 @@ instance Conv S.Func where
         return [sig, D.funcDef hsName [] hsStatement]
 
 
-instance (Conv a, Hask a ~ H.Exp) => Conv (S.Lambda a) where
-    type Hask (S.Lambda a) = H.Exp
-    conv (S.Lambda pat act) = H.Lambda H.noLoc <$> mapM conv [pat] <*> conv act
 
 betaL = foldl1 H.App
 
@@ -158,8 +136,6 @@ convexpr (S.Call  (S.OpAccess S.OpSingleton) expr)
 convexpr (S.Call2 (S.OpAccess S.OpPair) expr1 expr2)
     = D.expTuple <$> mapM convexpr [expr1, expr2]
 convexpr (S.Call expr1 expr2) = H.App <$> convexpr expr1 <*> convexpr expr2
-convexpr (S.MultiIfExpression multiIf) = conv multiIf
-convexpr (S.LambdaExpression lam) = conv lam
 
 convlit :: S.Literal -> H.Exp
 convlit = \case
