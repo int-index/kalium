@@ -147,4 +147,5 @@ fixtable = [ (H.QVarOp $ H.UnQual $ H.Symbol "+", (6, LFix))
            , (H.QVarOp $ H.UnQual $ H.Ident "elem", (4, NFix))
            , (H.QVarOp $ H.UnQual $ H.Symbol "&&", (3, RFix))
            , (H.QVarOp $ H.UnQual $ H.Symbol "||", (2, RFix))
+           , (H.QVarOp $ H.UnQual $ H.Symbol ">>=", (1, LFix))
            ]

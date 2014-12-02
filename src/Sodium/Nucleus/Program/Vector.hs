@@ -26,24 +26,15 @@ data Func
     , _funcStatement :: Statement
     } deriving (Eq)
 
-data Body a
-    = Body
-    { _bodyBinds :: [Bind a]
-    , _bodyResult :: a
-    } deriving (Eq)
-
-data Bind a
-    = Bind
-    { _bindPattern :: Pattern
-    , _bindStatement :: a
-    } deriving (Eq)
+follow pat statement result
+    = BindStatement statement (LambdaStatement $ Lambda pat result)
 
 data Statement
     = Execute Expression
     | ForStatement ForCycle
     | MultiIfStatement (MultiIf Statement)
-    | BodyStatement (Body Statement)
     | LambdaStatement (Lambda Statement)
+    | BindStatement Statement Statement
     deriving (Eq)
 
 assign a = Execute (Call (OpAccess OpTaint) a)
@@ -57,9 +48,12 @@ data ForCycle
 
 data Lambda a
     = Lambda
-    { _lamPatterns :: [Pattern]
+    { _lamPattern :: Pattern
     , _lamAction :: a
     } deriving (Eq)
+
+lambda [] a = a
+lambda (p:ps) a = LambdaStatement (Lambda p (lambda ps a))
 
 data MultiIf a
     = MultiIf
@@ -71,7 +65,6 @@ data Expression
     | Call Expression Expression
     | Primary Literal
     | MultiIfExpression (MultiIf Expression)
-    | BodyExpression (Body Expression)
     | LambdaExpression (Lambda Expression)
     deriving (Eq)
 
@@ -102,8 +95,6 @@ data Pattern
 
 makeLenses ''FuncSig
 makeLenses ''Func
-makeLenses ''Bind
-makeLenses ''Body
 makeLenses ''Lambda
 makeLenses ''ForCycle
 makeLenses ''MultiIf

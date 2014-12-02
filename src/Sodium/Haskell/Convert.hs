@@ -70,23 +70,6 @@ instance Conv S.Type where
         S.TypeList S.TypeChar -> return $ H.TyCon (D.hsName "String")
         S.TypeList ts -> H.TyList <$> conv ts
 
-instance Conv (S.Body S.Statement) where
-
-    type Hask (S.Body S.Statement) = H.Exp
-    conv (S.Body statements resultStatement) = do
-        hsStatements <- mapM conv statements
-        hsStatement  <- D.doExecute <$> conv resultStatement
-        return $ case hsStatements ++ [hsStatement] of
-            [H.Qualifier expression] -> expression
-            statements -> H.Do statements
-
-instance Conv (S.Body S.Expression) where
-    type Hask (S.Body S.Expression) = H.Exp
-    conv (S.Body expressions resultExpression) = do
-        hsValueDefs <- mapM conv expressions
-        hsRetValue <- conv resultExpression
-        return $ D.pureLet hsValueDefs hsRetValue
-
 instance Conv S.ForCycle where
     type Hask S.ForCycle = H.Exp
     conv (S.ForCycle lam argExpr exprRange) = do
@@ -112,27 +95,15 @@ instance (Conv a, Hask a ~ H.Exp) => Conv (S.MultiIf a) where
         return $ D.multiIf leafGens
 
 
-instance Conv (S.Bind S.Statement) where
-
-    type Hask (S.Bind S.Statement) = H.Stmt
-    conv (S.Bind S.PWildCard statement) = D.doExecute <$> conv statement
-    conv (S.Bind pat statement) = D.doBind <$> conv pat <*> conv statement
-
-instance Conv (S.Bind S.Expression) where
-
-    type Hask (S.Bind S.Expression) = H.Decl
-    conv (S.Bind pat statement) = D.valueDef <$> conv pat <*> conv statement
-
-
-
 instance Conv S.Statement where
 
     type Hask S.Statement = H.Exp
     conv (S.Execute expr) = conv expr
     conv (S.ForStatement  forCycle) = conv forCycle
     conv (S.MultiIfStatement multiIf) = conv multiIf
-    conv (S.BodyStatement body) = conv body
     conv (S.LambdaStatement lam) = conv lam
+    conv (S.BindStatement statement result) = let lAp = liftA2 H.App in
+        pure (D.access ">>=") `lAp` conv statement `lAp` conv result
 
 
 instance Conv S.Func where
@@ -158,8 +129,7 @@ instance Conv S.Func where
 
 instance (Conv a, Hask a ~ H.Exp) => Conv (S.Lambda a) where
     type Hask (S.Lambda a) = H.Exp
-    conv (S.Lambda [] act) = conv act
-    conv (S.Lambda pats act) = H.Lambda H.noLoc <$> mapM conv pats <*> conv act
+    conv (S.Lambda pat act) = H.Lambda H.noLoc <$> mapM conv [pat] <*> conv act
 
 betaL = foldl1 H.App
 
@@ -189,7 +159,6 @@ convexpr (S.Call2 (S.OpAccess S.OpPair) expr1 expr2)
     = D.expTuple <$> mapM convexpr [expr1, expr2]
 convexpr (S.Call expr1 expr2) = H.App <$> convexpr expr1 <*> convexpr expr2
 convexpr (S.MultiIfExpression multiIf) = conv multiIf
-convexpr (S.BodyExpression body) = conv body
 convexpr (S.LambdaExpression lam) = conv lam
 
 convlit :: S.Literal -> H.Exp

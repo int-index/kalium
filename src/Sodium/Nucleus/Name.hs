@@ -49,7 +49,6 @@ instance Mask Expression where
         Access name -> Access <$> mask name
         Call expr1 expr2 -> Call <$> mask expr1 <*> mask expr2
         MultiIfExpression a -> MultiIfExpression <$> mask a
-        BodyExpression a -> BodyExpression <$> mask a
         LambdaExpression a -> LambdaExpression <$> mask a
 
 instance Mask ForCycle where
@@ -58,7 +57,7 @@ instance Mask ForCycle where
          >=> forRange    mask
 
 instance Mask a => Mask (Lambda a) where
-    mask  =  lamPatterns mask
+    mask  =  lamPattern mask
          >=> lamAction   mask
 
 instance Mask a => Mask (MultiIf a) where
@@ -69,16 +68,8 @@ instance Mask Statement where
         Execute a -> Execute <$> mask a
         ForStatement     a -> ForStatement     <$> mask a
         MultiIfStatement a -> MultiIfStatement <$> mask a
-        BodyStatement    a -> BodyStatement    <$> mask a
         LambdaStatement  a -> LambdaStatement  <$> mask a
-
-instance Mask a => Mask (Body a) where
-    mask  =  bodyBinds  mask
-         >=> bodyResult mask
-
-instance Mask a => Mask (Bind a) where
-    mask  =  bindPattern   mask
-         >=> bindStatement mask
+        BindStatement a1 a2 -> BindStatement <$> mask a1 <*> mask a2
 
 instance Mask Func where
     mask  =  funcSig       mask

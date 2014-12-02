@@ -46,8 +46,8 @@ vectorizeFunc (name, func) = do
           (func & funcSig & funcSigParamTypes)
           (func & funcSig & funcSigType)
     let mkParam (name, ty) = smartPAccess name ty zeroIndex
-        vecFuncLambda = Vec.Lambda (map mkParam params) (Vec.BodyStatement vecBody)
-    return $ Vec.Func vecFuncSig (Vec.LambdaStatement vecFuncLambda)
+        vecFuncLambda = Vec.lambda (map mkParam params) vecBody
+    return $ Vec.Func vecFuncSig vecFuncLambda
 
 mkPatTuple [  ] = Vec.PUnit
 mkPatTuple pats = foldr1 Vec.PTuple pats
@@ -77,7 +77,7 @@ expTuple names = mkExpTuple <$> mapM mkAccess names
 patTuple :: V e t m => [Name] -> t m Vec.Pattern
 patTuple names = mkPatTuple <$> mapM mkPAccess names
 
-vectorizeBody :: (V e t m, Scoping v) => Scope v Body Pattern Atom -> t m ([Name], Vec.Body Vec.Statement)
+vectorizeBody :: (V e t m, Scoping v) => Scope v Body Pattern Atom -> t m ([Name], Vec.Statement)
 vectorizeBody scope = do
     let vars = scope ^. scopeVars
     let Body statement result = scope ^. scopeElem
@@ -94,7 +94,7 @@ updateLocalize names action = do
         return (name, index)
     local ((mempty, M.fromList updated) <>) action
 
-vectorizeScope :: (V e t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m (Vec.Body Vec.Statement))
+vectorizeScope :: (V e t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Statement)
 vectorizeScope scope = do
     let vars = scope ^. scopeVars . to scoping
     local (initIndices Uninitialized vars <>) $ do
@@ -104,7 +104,7 @@ vectorizeScope scope = do
             let vecBodyGen results = flip runReaderT indices $ do
                   pat <- patTuple changed
                   vecResult <- Vec.assign . mkExpTuple <$> mapM vectorizeAtom results
-                  return $ Vec.Body [Vec.Bind pat vecStatement] vecResult
+                  return $ Vec.follow pat vecStatement vecResult
             let changedNonlocal = filter (`M.notMember` vars) changed
             return (changedNonlocal, vecBodyGen)
 
@@ -114,18 +114,20 @@ vectorizeStatement = \case
     Follow st1 st2 -> do
         (changed1, vecStatement1) <- vectorizeStatement st1
         updateLocalize changed1 $ do
-            vecBind1 <- Vec.Bind <$> patTuple changed1 <*> pure vecStatement1
+            vecPat1 <- patTuple changed1
             (changed2, vecStatement2) <- vectorizeStatement st2
             updateLocalize changed2 $ do
-                vecBind2 <- Vec.Bind <$> patTuple changed2 <*> pure vecStatement2
+                vecPat2 <- patTuple changed2
                 let changed = nub $ changed1 ++ changed2
                 results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
-                let vecBody  = Vec.Body [vecBind1, vecBind2] (Vec.assign results)
-                return (changed, Vec.BodyStatement vecBody)
+                let vecBody = Vec.follow vecPat1 vecStatement1
+                            $ Vec.follow vecPat2 vecStatement2
+                            $ Vec.assign results
+                return (changed, vecBody)
     ScopeStatement scope -> do
         (changed, vecBodyGen) <- vectorizeScope scope
         vecBody <- lift $ vecBodyGen (map Access changed)
-        return (changed, Vec.BodyStatement vecBody)
+        return (changed, vecBody)
     Execute (Exec pat name args) -> do
         -- TODO: purity flag in function signature
         let impure = case name of
@@ -148,9 +150,8 @@ vectorizeStatement = \case
             let vecExecute
                   | impure    = Vec.Execute (foldl1 Vec.Call $ Vec.Access (retag name):vecArgs)
                   | otherwise = Vec.assign  (foldl1 Vec.Call $ Vec.Access (retag name):vecArgs)
-                vecBind = Vec.Bind vecPattern vecExecute
-                vecBody = Vec.Body [vecBind] (Vec.assign results)
-            return (changed, Vec.BodyStatement vecBody)
+                vecBody = Vec.follow vecPattern vecExecute (Vec.assign results)
+            return (changed, vecBody)
     ForStatement forCycle -> do
         vecRange <- vectorizeAtom (forCycle ^. forRange)
         let iter_name  = forCycle ^. forName
@@ -162,8 +163,8 @@ vectorizeStatement = \case
             argExp <- expTuple changed
             argPat <- patTuple changed
             iterPat <- mkPAccess iter_name
-            let vecLambda = Vec.Lambda [argPat, iterPat] vecStatement
-            let vecForCycle = Vec.ForCycle (Vec.LambdaStatement vecLambda) argExp vecRange
+            let vecLambda = Vec.lambda [argPat, iterPat] vecStatement
+            let vecForCycle = Vec.ForCycle vecLambda argExp vecRange
             return (changed, Vec.ForStatement vecForCycle)
     IfStatement ifb -> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
@@ -175,8 +176,8 @@ vectorizeStatement = \case
         vecBodyThen <- lift $ vecBodyThenGen accessChanged
         vecBodyElse <- lift $ vecBodyElseGen accessChanged
         let vecMultiIf = Vec.MultiIf
-                [ (vecCond, Vec.BodyStatement vecBodyThen)
-                , (Vec.Primary (Lit STypeBoolean True), Vec.BodyStatement vecBodyElse)
+                [ (vecCond, vecBodyThen)
+                , (Vec.Primary (Lit STypeBoolean True), vecBodyElse)
                 ]
         return $ (changed, Vec.MultiIfStatement vecMultiIf)
 
