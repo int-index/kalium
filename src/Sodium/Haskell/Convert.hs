@@ -132,7 +132,6 @@ instance Conv S.Statement where
     conv (S.ForStatement  forCycle) = conv forCycle
     conv (S.MultiIfStatement multiIf) = conv multiIf
     conv (S.BodyStatement body) = conv body
-    conv (S.Assign expr) = H.App (D.access "return") <$> conv expr
     conv (S.LambdaStatement lam) = conv lam
 
 
@@ -239,6 +238,7 @@ convOp = \case
     S.OpPrintLn  -> "print"
     S.OpConcat   -> "++"
     S.OpSingleton -> "return"
+    S.OpTaint     -> "return"
     S.OpIntToDouble -> "fromIntegral"
     S.OpUndefined -> "undefined"
     S.OpMain -> "main"

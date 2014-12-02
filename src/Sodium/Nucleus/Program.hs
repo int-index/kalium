@@ -70,6 +70,7 @@ data Operator
     | OpFst
     | OpSnd
     | OpSingleton
+    | OpTaint
     | OpConcat
     | OpIntToDouble
     | OpUndefined

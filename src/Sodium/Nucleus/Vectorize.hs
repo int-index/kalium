@@ -103,14 +103,14 @@ vectorizeScope scope = do
             indices <- ask
             let vecBodyGen results = flip runReaderT indices $ do
                   pat <- patTuple changed
-                  vecResult <- Vec.Assign . mkExpTuple <$> mapM vectorizeAtom results
+                  vecResult <- Vec.assign . mkExpTuple <$> mapM vectorizeAtom results
                   return $ Vec.Body [Vec.Bind pat vecStatement] vecResult
             let changedNonlocal = filter (`M.notMember` vars) changed
             return (changedNonlocal, vecBodyGen)
 
 vectorizeStatement :: V e t m => Statement Pattern Atom -> t m ([Name], Vec.Statement)
 vectorizeStatement = \case
-    Pass -> return ([], Vec.Assign $ Vec.Primary (Lit STypeUnit ()))
+    Pass -> return ([], Vec.assign $ Vec.Primary (Lit STypeUnit ()))
     Follow st1 st2 -> do
         (changed1, vecStatement1) <- vectorizeStatement st1
         updateLocalize changed1 $ do
@@ -120,7 +120,7 @@ vectorizeStatement = \case
                 vecBind2 <- Vec.Bind <$> patTuple changed2 <*> pure vecStatement2
                 let changed = nub $ changed1 ++ changed2
                 results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
-                let vecBody  = Vec.Body [vecBind1, vecBind2] (Vec.Assign results)
+                let vecBody  = Vec.Body [vecBind1, vecBind2] (Vec.assign results)
                 return (changed, Vec.BodyStatement vecBody)
     ScopeStatement scope -> do
         (changed, vecBodyGen) <- vectorizeScope scope
@@ -146,9 +146,9 @@ vectorizeStatement = \case
             results <- mkExpTuple <$> mapM vectorizeAtom (map Access changed)
             let vecExecute
                   | impure    = Vec.Execute (foldl1 Vec.Call $ Vec.Access (retag name):vecArgs)
-                  | otherwise = Vec.Assign (foldl1 Vec.Call $ Vec.Access (retag name):vecArgs)
+                  | otherwise = Vec.assign  (foldl1 Vec.Call $ Vec.Access (retag name):vecArgs)
                 vecBind = Vec.Bind vecPattern vecExecute
-                vecBody = Vec.Body [vecBind] (Vec.Assign results)
+                vecBody = Vec.Body [vecBind] (Vec.assign results)
             return (changed, Vec.BodyStatement vecBody)
     ForStatement forCycle -> do
         vecRange <- vectorizeAtom (forCycle ^. forRange)

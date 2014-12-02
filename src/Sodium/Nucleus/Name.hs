@@ -66,7 +66,6 @@ instance Mask a => Mask (MultiIf a) where
 
 instance Mask Statement where
     mask  = \case
-        Assign  a -> Assign  <$> mask a
         Execute a -> Execute <$> mask a
         ForStatement     a -> ForStatement     <$> mask a
         MultiIfStatement a -> MultiIfStatement <$> mask a

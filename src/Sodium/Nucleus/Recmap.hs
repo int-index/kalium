@@ -45,7 +45,6 @@ recmap_children_first rm = onBinds <=< onResult where
 
 recmap_children_second :: RecmapSig Statement
 recmap_children_second rm = \case
-    Assign a  -> return (Assign  a)
     Execute a -> return (Execute a)
     MultiIfStatement a -> MultiIfStatement <$> (multiIfLeafs . traversed . _2) r2 a
     ForStatement     a -> ForStatement <$> forStatement r2 a
@@ -84,7 +83,6 @@ instance RecmapMk Expression where
     recmapper rmExpr' = mempty { recmap_parent_second = rmStatement }
         where rmExpr = recExpr rmExpr'
               rmStatement = \case
-                Assign  a -> Assign  <$> rmExpr a
                 Execute a -> Execute <$> rmExpr a
                 ForStatement     a -> ForStatement <$> rmForCycle a
                 MultiIfStatement a -> MultiIfStatement <$> rmMultiIf a

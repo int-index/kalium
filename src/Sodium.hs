@@ -6,11 +6,6 @@ import Sodium.Nucleus.Scalar.Atomize (atomize')
 import Sodium.Nucleus.Scalar.Valueficate (valueficate)
 import Sodium.Nucleus.Strip (strip)
 import Sodium.Nucleus.Pass.Flatten     (flatten)
-import Sodium.Nucleus.Pass.JoinMultiIf (joinMultiIf)
-import Sodium.Nucleus.Pass.Inline      (inline)
-import Sodium.Nucleus.Pass.FoldMatch   (foldMatch)
-import Sodium.Nucleus.Pass.ExtractBody (extractBody)
-import Sodium.Nucleus.Pass.BindClean   (bindClean)
 import Sodium.Nucleus.Pass.Clean       (clean)
 import Sodium.Nucleus.Pass.Compute     (compute)
 import Sodium.Nucleus.Pass.ArgClean    (argClean)
@@ -52,11 +47,6 @@ pass program = tell [program] >> f program
     where f  =  return . argClean
             <=< return . compute
             <=< return . flatten
-            <=< inline
-            <=< return . foldMatch
-            <=< return . joinMultiIf
-            <=< return . extractBody
-            <=< return . bindClean
             <=< return . clean
 
 closureM :: (Eq a, Monad m) => (a -> m a) -> (a -> m a)

@@ -39,13 +39,14 @@ data Bind a
     } deriving (Eq)
 
 data Statement
-    = Assign Expression
-    | Execute Expression
+    = Execute Expression
     | ForStatement ForCycle
     | MultiIfStatement (MultiIf Statement)
     | BodyStatement (Body Statement)
     | LambdaStatement (Lambda Statement)
     deriving (Eq)
+
+assign a = Execute (Call (OpAccess OpTaint) a)
 
 data ForCycle
     = ForCycle
