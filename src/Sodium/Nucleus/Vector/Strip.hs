@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
-module Sodium.Nucleus.Strip (strip) where
+module Sodium.Nucleus.Vector.Strip (strip) where
 
 import Data.List
 import Data.Ord
@@ -9,8 +9,8 @@ import qualified Data.Map as M
 import Control.Monad.Reader
 import Control.Monad.Writer
 
-import Sodium.Nucleus.Program.Vector
-import Sodium.Nucleus.Name
+import Sodium.Nucleus.Vector.Program
+import Sodium.Nucleus.Vector.Name
 
 -- TODO: apply multiple times for nested namespaces
 strip :: Mask a => [String] -> a -> a

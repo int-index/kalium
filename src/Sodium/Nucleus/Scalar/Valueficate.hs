@@ -15,7 +15,7 @@ class ValueficateSubstitute a where
 
 instance ValueficateSubstitute (Exec Pattern) where
     valueficateSubstitute referenceInfo (Exec ret op args) =
-        let ret' = patTuple (ret:rets)
+        let ret' = foldr1 PTuple (ret:rets)
             rets = case M.lookup op referenceInfo of
                 Nothing -> []
                 Just currentReferenceInfo -> do
@@ -69,8 +69,9 @@ valueficateFunc referenceInfo name
 
           params' = params & map (\(name, (_by, ty)) -> (name, ty))
 
-          ty' = typeTuple (ty : tys)
-          result' = exprTuple (Atom result : map (Atom . Access) results)
+          ty' = foldr1 TypePair (ty : tys)
+          result' = foldr1 (\x y -> Call (NameOp OpPair) [x, y])
+                  $ Atom result : map (Atom . Access) results
 
           (results, tys) = unzip $ do
             (keep, param) <- zip currentReferenceInfo params'
@@ -80,15 +81,6 @@ valueficateFunc referenceInfo name
           statement' = valueficateSubstitute referenceInfo statement
 
       in Func ty' (Scope params' (Scope vars (Body statement' result')))
-
-typeTuple :: [Type] -> Type
-typeTuple = foldr1 TypePair
-
-exprTuple :: [Expression] -> Expression
-exprTuple = foldr1 (\x y -> Call (NameOp OpPair) [x, y])
-
-patTuple :: [Pattern] -> Pattern
-patTuple = foldr1 PTuple
 
 type ReferenceInfo = M.Map Name [Bool]
 

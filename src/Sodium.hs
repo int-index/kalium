@@ -4,13 +4,13 @@ module Sodium (translate) where
 import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.Scalar.Atomize (atomize')
 import Sodium.Nucleus.Scalar.Valueficate (valueficate)
-import Sodium.Nucleus.Strip (strip)
+import Sodium.Nucleus.Vector.Strip (strip)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified Sodium.Pascal.Parse   as P (parse)
 import qualified Sodium.Pascal.Convert as P (convert)
 import qualified Sodium.Haskell.Convert as H (convert, reserved)
 import qualified Sodium.Error as E
-import qualified Sodium.Nucleus.Program.Vector as V
+import qualified Sodium.Nucleus.Vector.Program as V
 
 import Data.Bool
 import Control.Applicative

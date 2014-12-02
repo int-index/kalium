@@ -10,8 +10,8 @@ import Control.Monad.Except
 import Control.Lens hiding (Index)
 import qualified Data.Map as M
 import Sodium.Nucleus.Scalar.Program
-import Sodium.Nucleus.Program.Vector (indexTag, retag)
-import qualified Sodium.Nucleus.Program.Vector as Vec
+import Sodium.Nucleus.Vector.Program (indexTag, retag)
+import qualified Sodium.Nucleus.Vector.Program as Vec
 
 class Error e where
     errorNoAccess :: Name -> [Name] -> e
@@ -42,18 +42,17 @@ vectorizeFunc (name, func) = do
     (_, vecBody)
             <- runReaderT r
             $ initIndices zeroIndex (scoping params)
-    let vecFuncSig = Vec.FuncSig (retag name)
-          (func & funcSig & funcSigParamTypes)
-          (func & funcSig & funcSigType)
+    let FuncSig tyResult tyArgs = funcSig func
+        vecFuncType = foldr1 TypeFunction (tyArgs `snoc` TypeTaint tyResult)
     let mkParam (name, ty) = smartPAccess name ty zeroIndex
         vecFuncLambda = Vec.lambda (map mkParam params) vecBody
-    return $ Vec.Func vecFuncSig vecFuncLambda
+    return $ Vec.Func vecFuncType (retag name) vecFuncLambda
 
 mkPatTuple [  ] = Vec.PUnit
 mkPatTuple pats = foldr1 Vec.PTuple pats
 
 mkExpTuple [  ] = Vec.Atom $ Vec.Primary (Lit STypeUnit ())
-mkExpTuple exps = foldr1 (\a b -> Vec.Atom (Vec.OpAccess OpPair) `Vec.App` a `Vec.App` b) (map Vec.Atom exps)
+mkExpTuple exps = foldr1 (\a b -> Vec.OpAccess OpPair `Vec.App` a `Vec.App` b) (map Vec.Atom exps)
 
 smartPAccess name ty = \case
     Uninitialized -> Vec.PWildCard
@@ -164,7 +163,7 @@ vectorizeStatement = \case
             argPat <- patTuple changed
             iterPat <- mkPAccess iter_name
             let vecLambda = Vec.lambda [argPat, iterPat] vecStatement
-            let vecFor = Vec.Atom (Vec.OpAccess Vec.OpFoldTainted)
+            let vecFor = Vec.OpAccess Vec.OpFoldTainted
                        `Vec.App` vecLambda `Vec.App` argExp
                        `Vec.App` Vec.Atom vecRange
             return (changed, vecFor)
@@ -177,7 +176,7 @@ vectorizeStatement = \case
         let accessChanged = map Access changed
         vecBodyThen <- lift $ vecBodyThenGen accessChanged
         vecBodyElse <- lift $ vecBodyElseGen accessChanged
-        let vecIf = Vec.Atom (Vec.OpAccess Vec.OpIf) `Vec.App` vecBodyElse
+        let vecIf = Vec.OpAccess Vec.OpIf `Vec.App` vecBodyElse
                   `Vec.App` vecBodyThen `Vec.App` Vec.Atom vecCond
         return (changed, vecIf)
 

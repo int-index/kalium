@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Sodium.Nucleus.Program.Vector
-    ( module Sodium.Nucleus.Program.Vector
+module Sodium.Nucleus.Vector.Program
+    ( module Sodium.Nucleus.Vector.Program
     , module Sodium.Nucleus.Program
     ) where
 
@@ -13,21 +13,15 @@ data Program
     { _programFuncs :: [Func]
     } deriving (Eq)
 
-data FuncSig
-    = FuncSig
-    { _funcName :: Name1 IndexTag
-    , _funcParamTypes :: [Type]
-    , _funcRetType :: Type
-    } deriving (Eq)
-
 data Func
     = Func
-    { _funcSig :: FuncSig
+    { _funcType :: Type
+    , _funcName :: Name1 IndexTag
     , _funcExpression :: Expression
     } deriving (Eq)
 
 follow pat statement result = bind statement (Lambda pat result)
-bind a1 a2 = Atom (OpAccess OpBind) `App` a1 `App` a2
+bind a1 a2 = OpAccess OpBind `App` a1 `App` a2
 
 data Expression
     = Atom Atom
@@ -35,7 +29,7 @@ data Expression
     | App Expression Expression
     deriving (Eq)
 
-taint = App (Atom (OpAccess OpTaint))
+taint = App (OpAccess OpTaint)
 
 lambda [] a = a
 lambda (p:ps) a = Lambda p (lambda ps a)
@@ -45,7 +39,7 @@ data Atom
     | Primary Literal
     deriving (Eq)
 
-pattern OpAccess op = Access (NameOp op)
+pattern OpAccess op = Atom (Access (NameOp op))
 
 data IndexTag
     = IndexTag Integer
@@ -68,6 +62,5 @@ data Pattern
     | PUnit
     deriving (Eq)
 
-makeLenses ''FuncSig
 makeLenses ''Func
 makeLenses ''Program

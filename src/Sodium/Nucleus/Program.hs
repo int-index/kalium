@@ -23,6 +23,8 @@ singletons [d|
         | TypeUnit
         | TypeList Type
         | TypePair Type Type
+        | TypeFunction Type Type
+        | TypeTaint Type
         deriving (Eq)
 
              |]
@@ -109,6 +111,8 @@ type family TypeRepr (t :: Type) where
     TypeRepr TypeUnit    = ()
     TypeRepr (TypeList    ts) = [TypeRepr ts]
     TypeRepr (TypePair t1 t2) = (TypeRepr t1, TypeRepr t2)
+    TypeRepr (TypeFunction t1 t2) = Void
+    TypeRepr (TypeTaint t) = Void
 
 type Vars
     = M.Map Name Type

@@ -1,12 +1,12 @@
 {-# LANGUAGE FlexibleInstances #-}
-module Sodium.Nucleus.Name where
+module Sodium.Nucleus.Vector.Name where
 
 import Control.Lens
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Sodium.Nucleus.Program.Vector
+import Sodium.Nucleus.Vector.Program
 
 checkRef :: Mask a => a -> Name1 IndexTag -> Bool
 checkRef a name' = getAny . execWriter
@@ -55,13 +55,9 @@ instance Mask Expression where
         App a1 a2 -> App <$> mask a1 <*> mask a2
 
 instance Mask Func where
-    mask  =  funcSig       mask
+    mask  =  funcType mask
+         >=> funcName mask
          >=> funcExpression mask
-
-instance Mask FuncSig where
-    mask  =  funcName    mask
-         >=> funcParamTypes  mask
-         >=> funcRetType mask
 
 instance Mask Program where
     mask  =  programFuncs mask

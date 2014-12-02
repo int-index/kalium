@@ -3,11 +3,10 @@
 module Sodium.Haskell.Convert (convert, reserved) where
 
 import Data.List (intercalate)
-import Control.Monad
 import Control.Applicative
-import Control.Lens (snoc)
+import Data.Singletons.Void
 -- S for Src, D for Dest
-import qualified Sodium.Nucleus.Program.Vector as S
+import qualified Sodium.Nucleus.Vector.Program as S
 import qualified Sodium.Haskell.Program as D
 import qualified Language.Haskell.Exts        as H
 import qualified Language.Haskell.Exts.SrcLoc as H
@@ -69,6 +68,8 @@ instance Conv S.Type where
                          <$> conv t1 <*> conv t2
         S.TypeList S.TypeChar -> return $ H.TyCon (D.hsName "String")
         S.TypeList ts -> H.TyList <$> conv ts
+        S.TypeFunction t1 t2 -> H.TyFun <$> conv t1 <*> conv t2
+        S.TypeTaint t -> H.TyApp (H.TyCon (D.hsName "IO")) <$> conv t
 
 
 instance Conv S.Expression where
@@ -81,21 +82,16 @@ instance Conv S.Expression where
 
 instance Conv S.Func where
     type Hask S.Func = [H.Decl]
-    conv (S.Func (S.FuncSig (S.NameOp S.OpMain) [] S.TypeUnit) statement) = do
+    conv (S.Func ty (S.NameOp S.OpMain) statement) = do
         hsStatement <- conv statement
-        hsType <- conv S.TypeUnit
+        hsType <- conv ty
         let hsName = H.Ident (convOp S.OpMain)
-        let sig = H.TypeSig H.noLoc [hsName]
-                (H.TyCon (D.hsName "IO") `H.TyApp` hsType)
+        let sig = H.TypeSig H.noLoc [hsName] hsType
         return [sig, D.funcDef hsName [] hsStatement]
-    conv (S.Func (S.FuncSig name paramTypes retType) statement) = do
+    conv (S.Func ty name statement) = do
         hsStatement <- conv statement
         let hsName = H.Ident (transformName name)
-        let tyWrap ty = H.TyCon (D.hsName "IO") `H.TyApp` ty
-        hsType <- foldr1 H.TyFun <$> liftM2
-            (\args res -> args `snoc` tyWrap res)
-            (mapM conv paramTypes)
-            (conv retType)
+        hsType <- conv ty
         let sig = H.TypeSig H.noLoc [hsName] hsType
         return [sig, D.funcDef hsName [] hsStatement]
 
@@ -128,6 +124,8 @@ convlit = \case
     S.Lit (S.STypeList t) xs -> H.List $ map (\x -> convlit (S.Lit t x)) xs
     S.Lit (S.STypePair t1 t2) (x1, x2)
          -> H.Tuple H.Boxed [convlit (S.Lit t1 x1), convlit (S.Lit t2 x2)]
+    S.Lit (S.STypeFunction _ _) a -> absurd a
+    S.Lit (S.STypeTaint _) a -> absurd a
 
 convOp :: S.Operator -> D.Name
 convOp = \case
