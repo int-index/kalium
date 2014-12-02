@@ -50,6 +50,7 @@ instance Mask Expression where
         Call expr1 expr2 -> Call <$> mask expr1 <*> mask expr2
         MultiIfExpression a -> MultiIfExpression <$> mask a
         BodyExpression a -> BodyExpression <$> mask a
+        LambdaExpression a -> LambdaExpression <$> mask a
 
 instance Mask ForCycle where
     mask  =  forStatement mask

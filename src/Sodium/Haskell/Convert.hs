@@ -160,9 +160,7 @@ instance Conv S.Func where
 instance (Conv a, Hask a ~ H.Exp) => Conv (S.Lambda a) where
     type Hask (S.Lambda a) = H.Exp
     conv (S.Lambda [] act) = conv act
-    conv (S.Lambda pats act) = H.Lambda H.noLoc
-        <$> mapM conv pats
-        <*> conv act
+    conv (S.Lambda pats act) = H.Lambda H.noLoc <$> mapM conv pats <*> conv act
 
 betaL = foldl1 H.App
 
@@ -193,6 +191,7 @@ convexpr (S.Call2 (S.OpAccess S.OpPair) expr1 expr2)
 convexpr (S.Call expr1 expr2) = H.App <$> convexpr expr1 <*> convexpr expr2
 convexpr (S.MultiIfExpression multiIf) = conv multiIf
 convexpr (S.BodyExpression body) = conv body
+convexpr (S.LambdaExpression lam) = conv lam
 
 convlit :: S.Literal -> H.Exp
 convlit = \case

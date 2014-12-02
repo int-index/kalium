@@ -71,6 +71,7 @@ data Expression
     | Primary Literal
     | MultiIfExpression (MultiIf Expression)
     | BodyExpression (Body Expression)
+    | LambdaExpression (Lambda Expression)
     deriving (Eq)
 
 pattern OpAccess op = Access (NameOp op)

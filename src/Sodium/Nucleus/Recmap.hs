@@ -94,15 +94,16 @@ instance RecmapMk Expression where
               rmMultiIf = (multiIfLeafs . traversed . _1) rmExpr
 
 recExpr :: Monad' m => LensLike' m Expression Expression
-recExpr f = \case
-    e@(Access  _) -> f e
-    e@(Primary _) -> f e
-    Call expr1 expr2 -> (Call <$> rf expr1 <*> rf expr2) >>= f
+recExpr f = (>>=f) . \case
+    e@(Access  _) -> return e
+    e@(Primary _) -> return e
+    Call expr1 expr2 -> Call <$> rf expr1 <*> rf expr2
     MultiIfExpression multiIf ->
-        (MultiIfExpression <$> (multiIfLeafs . traversed . both) rf multiIf)
-        >>= f
+        MultiIfExpression <$> (multiIfLeafs . traversed . both) rf multiIf
     BodyExpression body ->
-        (BodyExpression <$> ((bodyBinds . traversed . bindStatement) rf >=> bodyResult rf) body)
+        BodyExpression <$> ((bodyBinds . traversed . bindStatement) rf >=> bodyResult rf) body
+    LambdaExpression lam ->
+        LambdaExpression <$> lamAction rf lam
     where rf = recExpr f
 
 -- Be careful! Not a valid setter:
