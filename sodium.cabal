@@ -25,11 +25,6 @@ library
                        Sodium.Nucleus.Scalar.Atomize
                        Sodium.Nucleus.Scalar.Valueficate
                        Sodium.Nucleus.Vectorize
-                       Sodium.Nucleus.Pass.Flatten
-                       Sodium.Nucleus.Pass.Clean
-                       Sodium.Nucleus.Pass.Compute
-                       Sodium.Nucleus.Pass.ArgClean
-                       Sodium.Nucleus.Recmap
                        Sodium.Nucleus.Pattern
                        Sodium.Nucleus.Name
                        Sodium.Nucleus.Strip

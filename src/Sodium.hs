@@ -5,10 +5,6 @@ import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.Scalar.Atomize (atomize')
 import Sodium.Nucleus.Scalar.Valueficate (valueficate)
 import Sodium.Nucleus.Strip (strip)
-import Sodium.Nucleus.Pass.Flatten     (flatten)
-import Sodium.Nucleus.Pass.Clean       (clean)
-import Sodium.Nucleus.Pass.Compute     (compute)
-import Sodium.Nucleus.Pass.ArgClean    (argClean)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified Sodium.Pascal.Parse   as P (parse)
 import qualified Sodium.Pascal.Convert as P (convert)
@@ -44,10 +40,7 @@ optimize program = runWriterT (closureM pass program)
 
 pass :: (Applicative m, MonadWriter TranslationLog m, MonadSupply V.Name m) => V.Program -> m V.Program
 pass program = tell [program] >> f program
-    where f  =  return . argClean
-            <=< return . compute
-            <=< return . flatten
-            <=< return . clean
+    where f  =  return
 
 closureM :: (Eq a, Monad m) => (a -> m a) -> (a -> m a)
 closureM f = go where
