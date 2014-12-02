@@ -26,6 +26,8 @@ library
                        Sodium.Nucleus.Vector.Program
                        Sodium.Nucleus.Vector.Name
                        Sodium.Nucleus.Vector.Strip
+                       Sodium.Nucleus.Vector.Recmap
+                       Sodium.Nucleus.Vector.Match
                        Sodium.Nucleus.Vectorize
 
   build-depends:       base,

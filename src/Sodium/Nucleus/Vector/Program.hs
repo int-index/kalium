@@ -29,6 +29,8 @@ data Expression
     | App Expression Expression
     deriving (Eq)
 
+pattern App2 op a1 a2 = op `App` a1 `App` a2
+
 taint = App (OpAccess OpTaint)
 
 lambda [] a = a
