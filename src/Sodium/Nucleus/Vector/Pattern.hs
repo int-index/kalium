@@ -4,7 +4,7 @@ import qualified Data.Set as S
 
 import Sodium.Nucleus.Vector.Program
 
-patBound :: Pattern -> S.Set (Name1 IndexTag)
+patBound :: Pattern -> S.Set Name
 patBound = \case
     PWildCard -> S.empty
     PUnit -> S.empty

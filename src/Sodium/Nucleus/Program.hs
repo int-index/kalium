@@ -11,7 +11,6 @@ module Sodium.Nucleus.Program where
 import Data.Singletons.Prelude
 import Data.Singletons.TH
 import Data.Type.Equality
-import qualified Data.Map as M
 
 singletons [d|
 
@@ -36,9 +35,6 @@ data Name1 tag
     = NameOp Operator
     | Name1 [String] tag
     deriving (Eq, Ord, Show)
-
-type Name = Name1 ()
-pattern Name ns = Name1 ns ()
 
 data Operator
     = OpAdd
@@ -116,6 +112,3 @@ type family TypeRepr (t :: Type) where
     TypeRepr (TypePair t1 t2) = (TypeRepr t1, TypeRepr t2)
     TypeRepr (TypeFunction t1 t2) = Void
     TypeRepr (TypeTaint t) = Void
-
-type Vars
-    = M.Map Name Type

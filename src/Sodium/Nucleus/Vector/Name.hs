@@ -9,9 +9,9 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Sodium.Nucleus.Vector.Program
 
-class Mentionable a where mentionable :: a -> S.Set (Name1 IndexTag)
-instance Mentionable (S.Set (Name1 IndexTag)) where mentionable = id
-instance Mentionable        (Name1 IndexTag)  where mentionable = S.singleton
+class Mentionable a where mentionable :: a -> S.Set Name
+instance Mentionable (S.Set Name) where mentionable = id
+instance Mentionable        Name  where mentionable = S.singleton
 
 mentions :: (Mask a, Mentionable names) => a -> names -> Bool
 a `mentions` names = getAny . execWriter
@@ -21,7 +21,7 @@ a `mentions` names = getAny . execWriter
             return name
 
 class Mask a where
-    mask :: (Applicative m, Monad m) => a -> ReaderT (Name1 IndexTag -> m (Name1 IndexTag)) m a
+    mask :: (Applicative m, Monad m) => a -> ReaderT (Name -> m Name) m a
 
 instance (Mask a, Mask b) => Mask (a, b) where
     mask = _1 mask >=> _2 mask
@@ -32,7 +32,7 @@ instance (Mask a, Mask b, Mask c) => Mask (a, b, c) where
 instance Mask a => Mask [a] where
     mask = traverse mask
 
-instance Mask (Name1 IndexTag) where
+instance Mask Name where
     mask name = do
         k <- ask
         lift (k name)

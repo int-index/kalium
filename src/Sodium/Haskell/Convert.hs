@@ -44,7 +44,7 @@ keywords = words
       \   module newtype of qualified then type where        "
 
 
-transformName :: S.Name1 S.IndexTag -> D.Name
+transformName :: S.Name -> D.Name
 transformName = \case
     S.NameOp op -> convOp op
     S.Name1 ns tag -> let s = intercalate "'" ns in case tag of
@@ -52,8 +52,8 @@ transformName = \case
         S.ImmutableTag -> s ++ "'" ++ "const"
         S.GlobalTag -> s
 
-instance Conv (S.Name1 S.IndexTag) where
-    type Hask (S.Name1 S.IndexTag) = D.Name
+instance Conv S.Name where
+    type Hask S.Name = D.Name
     conv = return . transformName
 
 instance Conv S.Type where

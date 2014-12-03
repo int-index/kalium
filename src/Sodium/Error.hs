@@ -11,12 +11,12 @@ import qualified Sodium.Nucleus.Scalar.Typecheck as T
 import qualified Sodium.Pascal.Convert as CP
 
 data Error = ParseError String Int Int
-           | NoAccess   N.Name [N.Name]
-           | NoFunction N.Name
+           | NoAccess   String [String]
+           | NoFunction String
            | NoReference
-           | UpdateImmutable N.Name
+           | UpdateImmutable String
            | PasConvError
-           | TypeError N.Name [N.Type]
+           | TypeError String [N.Type]
     deriving (Show)
 
 instance P.Error Error where
@@ -27,13 +27,13 @@ instance P.Error Error where
               column = P.sourceColumn pos
 
 instance V.Error Error where
-    errorNoAccess name names  = NoAccess name names
-    errorUpdateImmutable name = UpdateImmutable name
+    errorNoAccess name names  = NoAccess (show name) (map show names)
+    errorUpdateImmutable name = UpdateImmutable (show name)
 
 instance T.Error Error where
-    errorNoAccess name vars = NoAccess name (M.keys vars)
-    errorNoFunction name    = NoFunction name
-    errorTypeMismatch = TypeError
+    errorNoAccess name vars = NoAccess (show name) (map show $ M.keys vars)
+    errorNoFunction name    = NoFunction (show name)
+    errorTypeMismatch name  = TypeError (show name)
 
 instance CP.Error Error where
     errorTypecheck  = PasConvError

@@ -20,8 +20,8 @@ import Control.Monad.Writer hiding (pass)
 import Control.Monad.Except
 import Control.Monad.Supply
 
-namestack :: [V.Name]
-namestack = map ((\name -> V.Name ["g", name]) . ('g':) . show) [0..]
+namestack :: [V.Name1 ()]
+namestack = map ((\name -> V.Name1 ["g", name] ()) . ('g':) . show) [0..]
 
 translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
 translate src = do
@@ -37,10 +37,10 @@ translate src = do
 
 type TranslationLog = [V.Program]
 
-optimize :: (Applicative m, MonadSupply V.Name m) => V.Program -> m (V.Program, TranslationLog)
+optimize :: (Applicative m, MonadSupply (V.Name1 ()) m) => V.Program -> m (V.Program, TranslationLog)
 optimize program = runWriterT (closureM pass program)
 
-pass :: (Applicative m, MonadWriter TranslationLog m, MonadSupply V.Name m) => V.Program -> m V.Program
+pass :: (Applicative m, MonadWriter TranslationLog m, MonadSupply (V.Name1 ()) m) => V.Program -> m V.Program
 pass program = tell [program] >> f program
     where f  =  return . match . inline
 

@@ -10,7 +10,6 @@ import Control.Monad.Except
 import Control.Lens hiding (Index)
 import qualified Data.Map as M
 import Sodium.Nucleus.Scalar.Program
-import Sodium.Nucleus.Vector.Program (indexTag, retag)
 import qualified Sodium.Nucleus.Vector.Program as Vec
 
 class Error e where
@@ -25,6 +24,14 @@ data Index
     | Immutable
     | Uninitialized
     deriving (Eq, Ord, Show)
+
+indexTag :: Vec.IndexTag -> Name -> Vec.Name
+indexTag Vec.GlobalTag (NameOp op) = NameOp op
+indexTag tag (Name1 ns _) = Name1 ns tag
+indexTag _ _ = error "indexTag: impossible"
+
+retag :: Name -> Vec.Name
+retag = indexTag Vec.GlobalTag
 
 type Indices = M.Map Name Index
 type Types   = M.Map Name Type

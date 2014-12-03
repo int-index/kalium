@@ -13,6 +13,11 @@ import qualified Data.Map as M
 import Sodium.Nucleus.Program
 import Sodium.Util
 
+type Name = Name1 ()
+pattern Name ns = Name1 ns ()
+
+type Vars = M.Map Name Type
+
 class Typing t where
     typing :: t -> Type
 

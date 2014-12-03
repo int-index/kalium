@@ -8,6 +8,8 @@ import Control.Lens.TH
 
 import Sodium.Nucleus.Program
 
+type Name = Name1 IndexTag
+
 data Program
     = Program
     { _programFuncs :: [Func]
@@ -16,7 +18,7 @@ data Program
 data Func
     = Func
     { _funcType :: Type
-    , _funcName :: Name1 IndexTag
+    , _funcName :: Name
     , _funcExpression :: Expression
     } deriving (Eq)
 
@@ -38,7 +40,7 @@ lambda [] a = a
 lambda (p:ps) a = Lambda p (lambda ps a)
 
 data Atom
-    = Access (Name1 IndexTag)
+    = Access Name
     | Primary Literal
     deriving (Eq)
 
@@ -50,17 +52,9 @@ data IndexTag
     | GlobalTag
     deriving (Eq, Ord, Show)
 
-indexTag :: IndexTag -> Name1 () -> Name1 IndexTag
-indexTag GlobalTag (NameOp op) = NameOp op
-indexTag tag (Name1 ns _) = Name1 ns tag
-indexTag _ _ = error "indexTag: impossible"
-
-retag :: Name -> Name1 IndexTag
-retag = indexTag GlobalTag
-
 data Pattern
     = PTuple Pattern Pattern
-    | PAccess (Name1 IndexTag) Type
+    | PAccess Name Type
     | PWildCard
     | PUnit
     deriving (Eq)
