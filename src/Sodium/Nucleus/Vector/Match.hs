@@ -1,17 +1,21 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ViewPatterns #-}
 module Sodium.Nucleus.Vector.Match where
 
 import Control.Lens
 
 import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
+import Sodium.Nucleus.Vector.Pattern
 import Sodium.Nucleus.Vector.Name
 
 match :: Program -> Program
-match = over recmapped matchExpression
+match = over recmapped (matchExpression . lambdaReduce . etaReduce)
 
 matchExpression :: Expression -> Expression
 matchExpression = \case
+
+    App (OpAccess OpId) a -> a
 
     App2 (OpAccess OpBind) (OpAccess OpTaint `App` a) x -> App x a
 
@@ -33,29 +37,44 @@ matchExpression = \case
     App (OpAccess OpIgnore) (App (OpAccess OpTaint) _)
         -> App (OpAccess OpTaint) (Literal STypeUnit ())
 
-    App (OpAccess OpIgnore) e@(App (OpAccess OpIgnore) _) -> e
-
     App2 (OpAccess OpBind) x (OpAccess OpTaint) -> x
 
-    Lambda PWildCard a `App` _ -> a
-
-    Lambda p1 (App f e1) | pessimisticMatch p1 e1 -> f
-
-    Lambda pat a -> Lambda (cleanUsage a pat) a
+    App (OpAccess OpIgnore) e | isTaintedUnit e -> e
+    App (OpAccess OpIgnore) (propagateOpIgnore -> e) -> e
 
     e -> e
 
-cleanUsage :: Mask scope => scope -> Pattern -> Pattern
-cleanUsage a = go where
+-- TODO: typecheck
+isTaintedUnit :: Expression -> Bool
+isTaintedUnit = \case
+    OpAccess OpPutLn  `App` _ -> True
+    OpAccess OpIgnore `App` _ -> True
+    _ -> False
+
+etaReduce = \case
+    Lambda pat (App x a)
+        | preciseMatch pat a
+        , not (x `mentions` patBound pat)
+        -> x
+    e -> e
+
+propagateOpIgnore = \case
+    App2 (OpAccess OpBind) x (Lambda p a)
+        -> App2 (OpAccess OpBind) x (Lambda p (propagateOpIgnore a))
+    App2 (OpAccess OpFmapIgnore) _ a -> propagateOpIgnore a
+    e -> OpAccess OpIgnore `App` e
+
+lambdaReduce = \case
+    Lambda PWildCard a `App` _ -> a
+    Lambda pat a | p <- cleanPattern a pat -> Lambda p a
+    e -> e
+
+cleanPattern :: Mask scope => scope -> Pattern -> Pattern
+cleanPattern a = go where
     go = \case
         PUnit -> PWildCard
-        PTuple p1 p2 -> PTuple (go p1) (go p2)
-        PAccess name _ | not (checkRef a name) -> PWildCard
+        PTuple p1 p2 -> case PTuple (go p1) (go p2) of
+            PTuple PWildCard PWildCard -> PWildCard
+            p -> p
+        PAccess name _ | not (a `mentions` name) -> PWildCard
         p -> p
-
--- TODO: revive pattern-matching
-pessimisticMatch :: Pattern -> Expression -> Bool
-pessimisticMatch (PAccess name1 _) (Atom (Access name2)) | name1 == name2 = True
-pessimisticMatch (PTuple p1 p2) (App2 (OpAccess OpPair) e1 e2)
-    = pessimisticMatch p1 e1 && pessimisticMatch p2 e2
-pessimisticMatch _ _ = False

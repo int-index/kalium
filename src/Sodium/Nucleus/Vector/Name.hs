@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Sodium.Nucleus.Vector.Name where
 
+import qualified Data.Set as S
 import Control.Lens
 import Control.Applicative
 import Control.Monad.State
@@ -8,11 +9,15 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Sodium.Nucleus.Vector.Program
 
-checkRef :: Mask a => a -> Name1 IndexTag -> Bool
-checkRef a name' = getAny . execWriter
+class Mentionable a where mentionable :: a -> S.Set (Name1 IndexTag)
+instance Mentionable (S.Set (Name1 IndexTag)) where mentionable = id
+instance Mentionable        (Name1 IndexTag)  where mentionable = S.singleton
+
+mentions :: (Mask a, Mentionable names) => a -> names -> Bool
+a `mentions` names = getAny . execWriter
                  $ runReaderT (mask a) check
     where check name = do
-            tell $ Any (name == name')
+            tell $ Any (name `S.member` mentionable names)
             return name
 
 class Mask a where

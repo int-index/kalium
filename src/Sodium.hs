@@ -6,6 +6,7 @@ import Sodium.Nucleus.Scalar.Atomize (atomize')
 import Sodium.Nucleus.Scalar.Valueficate (valueficate)
 import Sodium.Nucleus.Vector.Strip (strip)
 import Sodium.Nucleus.Vector.Match (match)
+import Sodium.Nucleus.Vector.Inline (inline)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified Sodium.Pascal.Parse   as P (parse)
 import qualified Sodium.Pascal.Convert as P (convert)
@@ -41,7 +42,7 @@ optimize program = runWriterT (closureM pass program)
 
 pass :: (Applicative m, MonadWriter TranslationLog m, MonadSupply V.Name m) => V.Program -> m V.Program
 pass program = tell [program] >> f program
-    where f  =  return . match
+    where f  =  return . match . inline
 
 closureM :: (Eq a, Monad m) => (a -> m a) -> (a -> m a)
 closureM f = go where

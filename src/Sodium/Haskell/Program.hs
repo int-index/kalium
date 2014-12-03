@@ -57,9 +57,14 @@ doExecute  = H.Qualifier
 data Fixity = LFix | RFix | NFix deriving (Eq)
 data Level = ALevel Integer Fixity | BLevel | HLevel | SLevel
 
+matchExpression (H.Lambda loc pats expr)
+    = H.Lambda loc pats (matchExpression expr)
+
 matchExpression (H.Var op `H.App` expr1 `H.App` expr2)
     | op == H.UnQual (H.Ident "enumFromTo")
         = matchExpression $ expr1 `H.EnumFromTo` expr2
+    | op == H.UnQual (H.Symbol ",")
+        = matchExpression $ H.Tuple H.Boxed [expr1, expr2]
     | isInfix op
         = matchExpression $ H.InfixApp expr1 (H.QVarOp op) expr2
     where isInfix (H.UnQual (H.Ident name)) | name `elem` ["elem", "div", "mod"] = True
