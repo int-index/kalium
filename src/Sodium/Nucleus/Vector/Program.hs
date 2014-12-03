@@ -30,6 +30,7 @@ data Expression
     deriving (Eq)
 
 pattern App2 op a1 a2 = op `App` a1 `App` a2
+pattern Literal ty repr = Atom (Primary (Lit ty repr))
 
 taint = App (OpAccess OpTaint)
 

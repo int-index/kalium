@@ -82,18 +82,18 @@ instance Conv S.Expression where
 
 instance Conv S.Func where
     type Hask S.Func = [H.Decl]
-    conv (S.Func ty (S.NameOp S.OpMain) statement) = do
-        hsStatement <- conv statement
+    conv (S.Func ty (S.NameOp S.OpMain) expression) = do
+        hsExpression <- D.matchExpression <$> conv expression
         hsType <- conv ty
         let hsName = H.Ident (convOp S.OpMain)
         let sig = H.TypeSig H.noLoc [hsName] hsType
-        return [sig, D.funcDef hsName [] hsStatement]
-    conv (S.Func ty name statement) = do
-        hsStatement <- conv statement
+        return [sig, D.funcDef hsName [] hsExpression]
+    conv (S.Func ty name expression) = do
+        hsExpression <- D.matchExpression <$> conv expression
         let hsName = H.Ident (transformName name)
         hsType <- conv ty
         let sig = H.TypeSig H.noLoc [hsName] hsType
-        return [sig, D.funcDef hsName [] hsStatement]
+        return [sig, D.funcDef hsName [] hsExpression]
 
 instance Conv S.Pattern where
     type Hask S.Pattern = H.Pat
@@ -164,6 +164,9 @@ convOp = \case
     S.OpConcat   -> "++"
     S.OpSingleton -> "return"
     S.OpBind      -> ">>="
+    S.OpBindIgnore-> ">>"
+    S.OpFmapIgnore-> "<$"
+    S.OpIgnore    -> "void"
     S.OpTaint     -> "return"
     S.OpIntToDouble -> "fromIntegral"
     S.OpUndefined -> "undefined"

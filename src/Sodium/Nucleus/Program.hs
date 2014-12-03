@@ -76,6 +76,9 @@ data Operator
     | OpSingleton
     | OpTaint
     | OpBind
+    | OpBindIgnore
+    | OpFmapIgnore
+    | OpIgnore
     | OpConcat
     | OpIntToDouble
     | OpUndefined
