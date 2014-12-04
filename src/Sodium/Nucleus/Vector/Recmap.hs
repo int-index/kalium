@@ -14,7 +14,7 @@ recmap outer = around where
     inner = \case
         Atom a -> pure (Atom a)
         Lambda pat a -> liftA2 Lambda (pure pat) (around a)
-        App a1 a2 -> liftA2 App (around a1) (around a2)
+        Beta a1 a2 -> liftA2 Beta (around a1) (around a2)
 
 class Recmappable a where
     recmapped :: (Applicative m, Monad m) => LensLike' m a Expression

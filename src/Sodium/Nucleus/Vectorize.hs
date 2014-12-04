@@ -59,7 +59,7 @@ mkPatTuple [  ] = Vec.PUnit
 mkPatTuple pats = foldr1 Vec.PTuple pats
 
 mkExpTuple [  ] = Vec.Atom $ Vec.Primary (Lit STypeUnit ())
-mkExpTuple exps = foldr1 (\a b -> Vec.OpAccess OpPair `Vec.App` a `Vec.App` b) (map Vec.Atom exps)
+mkExpTuple exps = foldr1 (Vec.AppOp2 Vec.OpPair) (map Vec.Atom exps)
 
 smartPAccess name ty = \case
     Uninitialized -> Vec.PWildCard
@@ -109,14 +109,14 @@ vectorizeScope scope = do
             indices <- ask
             let vecBodyGen results = flip runReaderT indices $ do
                   pat <- patTuple changed
-                  vecResult <- Vec.taint . mkExpTuple <$> mapM vectorizeAtom results
-                  return $ Vec.follow pat vecStatement vecResult
+                  vecResult <- Vec.Taint . mkExpTuple <$> mapM vectorizeAtom results
+                  return $ Vec.Follow pat vecStatement vecResult
             let changedNonlocal = filter (`M.notMember` vars) changed
             return (changedNonlocal, vecBodyGen)
 
 vectorizeStatement :: V e t m => Statement Pattern Atom -> t m ([Name], Vec.Expression)
 vectorizeStatement = \case
-    Pass -> return ([], Vec.taint $ Vec.Atom $ Vec.Primary (Lit STypeUnit ()))
+    Pass -> return ([], Vec.Taint $ Vec.Atom $ Vec.Primary (Lit STypeUnit ()))
     Follow st1 st2 -> do
         (changed1, vecStatement1) <- vectorizeStatement st1
         updateLocalize changed1 $ do
@@ -125,9 +125,9 @@ vectorizeStatement = \case
             updateLocalize changed2 $ do
                 vecPat2 <- patTuple changed2
                 let changed = nub $ changed1 ++ changed2
-                results <- Vec.taint . mkExpTuple <$> mapM vectorizeAtom (map Access changed)
-                let vecBody = Vec.follow vecPat1 vecStatement1
-                            $ Vec.follow vecPat2 vecStatement2
+                results <- Vec.Taint . mkExpTuple <$> mapM vectorizeAtom (map Access changed)
+                let vecBody = Vec.Follow vecPat1 vecStatement1
+                            $ Vec.Follow vecPat2 vecStatement2
                             $ results
                 return (changed, vecBody)
     ScopeStatement scope -> do
@@ -152,11 +152,11 @@ vectorizeStatement = \case
         let changed = patFlatten pat
         updateLocalize changed $ do
             vecPattern <- vectorizePattern pat
-            results <- Vec.taint . mkExpTuple <$> mapM vectorizeAtom (map Access changed)
-            let vecTaint = if impure then id else Vec.taint
-                vecCall = foldl1 Vec.App $ map Vec.Atom$ Vec.Access (retag name):vecArgs
+            results <- Vec.Taint . mkExpTuple <$> mapM vectorizeAtom (map Access changed)
+            let vecTaint = if impure then id else Vec.Taint
+                vecCall = foldl1 Vec.Beta $ map Vec.Atom $ Vec.Access (retag name):vecArgs
                 vecExecute = vecTaint vecCall
-                vecBody = Vec.follow vecPattern vecExecute results
+                vecBody = Vec.Follow vecPattern vecExecute results
             return (changed, vecBody)
     ForStatement forCycle -> do
         vecRange <- vectorizeAtom (forCycle ^. forRange)
@@ -170,9 +170,7 @@ vectorizeStatement = \case
             argPat <- patTuple changed
             iterPat <- mkPAccess iter_name
             let vecLambda = Vec.lambda [argPat, iterPat] vecStatement
-            let vecFor = Vec.OpAccess Vec.OpFoldTainted
-                       `Vec.App` vecLambda `Vec.App` argExp
-                       `Vec.App` Vec.Atom vecRange
+            let vecFor = Vec.AppOp3 Vec.OpFoldTainted vecLambda argExp (Vec.Atom vecRange)
             return (changed, vecFor)
     IfStatement ifb -> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
@@ -183,8 +181,7 @@ vectorizeStatement = \case
         let accessChanged = map Access changed
         vecBodyThen <- lift $ vecBodyThenGen accessChanged
         vecBodyElse <- lift $ vecBodyElseGen accessChanged
-        let vecIf = Vec.OpAccess Vec.OpIf `Vec.App` vecBodyElse
-                  `Vec.App` vecBodyThen `Vec.App` Vec.Atom vecCond
+        let vecIf = Vec.AppOp3 Vec.OpIf vecBodyElse vecBodyThen (Vec.Atom vecCond)
         return (changed, vecIf)
 
 vectorizeAtom :: V e t m => Atom -> t m Vec.Atom

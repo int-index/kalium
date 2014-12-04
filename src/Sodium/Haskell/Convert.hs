@@ -77,7 +77,7 @@ instance Conv S.Expression where
     type Hask S.Expression = H.Exp
     conv (S.Atom expr) = conv expr
     conv (S.Lambda pat act) = H.Lambda H.noLoc <$> mapM conv [pat] <*> conv act
-    conv (S.App a1 a2) = H.App <$> conv a1 <*> conv a2
+    conv (S.Beta a1 a2) = H.App <$> conv a1 <*> conv a2
 
 
 instance Conv S.Func where

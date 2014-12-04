@@ -57,7 +57,7 @@ instance Mask Expression where
     mask  = \case
         Atom a -> Atom <$> mask a
         Lambda pat a -> Lambda <$> mask pat <*> mask a
-        App a1 a2 -> App <$> mask a1 <*> mask a2
+        Beta a1 a2 -> Beta <$> mask a1 <*> mask a2
 
 instance Mask Func where
     mask  =  funcType mask

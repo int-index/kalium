@@ -15,58 +15,45 @@ match = over recmapped (matchExpression . lambdaReduce . etaReduce)
 matchExpression :: Expression -> Expression
 matchExpression = \case
 
-    App (OpAccess OpId) a -> a
+    AppOp1 OpId a -> a
 
-    App2 (OpAccess OpBind) (OpAccess OpTaint `App` a) x -> App x a
+    Bind (Taint a) x -> App1 x a
+    Bind x (OpAccess OpTaint) -> x
 
-    App2 (OpAccess OpBind) x (Lambda PWildCard a)
-        -> App2 (OpAccess OpBindIgnore) x a
+    Follow PWildCard x a -> AppOp2 OpBindIgnore x a
+    AppOp2 OpBindIgnore x (Taint a) -> AppOp2 OpFmapIgnore a x
 
-    App2 (OpAccess OpBindIgnore) x (OpAccess OpTaint `App` a)
-        -> App2 (OpAccess OpFmapIgnore) a x
+    AppOp2 OpFmapIgnore LitUnit x -> Ignore x
+    AppOp2 OpFmapIgnore a (Taint  _) -> Taint a
+    AppOp2 OpFmapIgnore a (Ignore x) -> AppOp2 OpFmapIgnore a x
 
-    App2 (OpAccess OpFmapIgnore) (Literal STypeUnit ()) x
-        -> App (OpAccess OpIgnore) x
-
-    App2 (OpAccess OpFmapIgnore) a (App (OpAccess OpTaint) _)
-        -> App (OpAccess OpTaint) a
-
-    App2 (OpAccess OpFmapIgnore) a (App (OpAccess OpIgnore) x)
-        -> App2 (OpAccess OpFmapIgnore) a x
-
-    App (OpAccess OpIgnore) (App (OpAccess OpTaint) _)
-        -> App (OpAccess OpTaint) (Literal STypeUnit ())
-
-    App2 (OpAccess OpBind) x (OpAccess OpTaint) -> x
-
-    App (OpAccess OpIgnore) e | isTaintedUnit e -> e
-    App (OpAccess OpIgnore) (propagateOpIgnore -> e) -> e
+    Ignore (Taint _) -> Taint LitUnit
+    Ignore e | isTaintedUnit e -> e
+    Ignore (propagateOpIgnore -> e) -> e
 
     e -> e
 
 -- TODO: typecheck
 isTaintedUnit :: Expression -> Bool
 isTaintedUnit = \case
-    OpAccess OpPutLn  `App` _ -> True
-    OpAccess OpIgnore `App` _ -> True
+    AppOp1 OpPutLn  _ -> True
+    AppOp1 OpIgnore _ -> True
     _ -> False
 
 etaReduce = \case
-    Lambda pat (App x a)
-        | preciseMatch pat a
-        , not (x `mentions` patBound pat)
-        -> x
+    Eta p x a | preciseMatch p a
+              , not (x `mentions` patBound p) -> x
     e -> e
 
 propagateOpIgnore = \case
-    App2 (OpAccess OpBind) x (Lambda p a)
-        -> App2 (OpAccess OpBind) x (Lambda p (propagateOpIgnore a))
-    App2 (OpAccess OpFmapIgnore) _ a -> propagateOpIgnore a
-    e -> OpAccess OpIgnore `App` e
+    Follow p x a -> Follow p x (propagateOpIgnore a)
+    AppOp2 OpFmapIgnore _ a -> propagateOpIgnore a
+    Lambda p a `Beta` x -> Lambda p (propagateOpIgnore a) `Beta` x
+    e -> Ignore e
 
 lambdaReduce = \case
-    Lambda PWildCard a `App` _ -> a
-    Lambda pat a | p <- cleanPattern a pat -> Lambda p a
+    Lambda PWildCard a `Beta` _ -> a
+    Lambda p a -> Lambda (cleanPattern a p) a
     e -> e
 
 cleanPattern :: Mask scope => scope -> Pattern -> Pattern
