@@ -11,27 +11,24 @@ import qualified Data.List as L
 import Data.Foldable
 import Sodium.Nucleus.Scalar.Program
 
-class LiftLiteral a where
-    literal :: a -> Literal
+class LiftExpression a where
+    expression :: a -> Expression
 
-instance LiftLiteral Literal where
-    literal = id
-instance LiftLiteral Integer  where literal = Lit STypeInteger
-instance LiftLiteral Rational where literal = Lit STypeDouble
-instance LiftLiteral Bool     where literal = Lit STypeBoolean
-instance LiftLiteral Char     where literal = Lit STypeChar
-instance LiftLiteral String   where literal = Lit (STypeList STypeChar)
-instance LiftLiteral ()       where literal = Lit STypeUnit
+instance LiftExpression Atom    where expression = Atom
+instance LiftExpression Literal where expression = expression . Primary
+instance LiftExpression Name    where expression = expression . Access
 
-class LiftAtom a where
-    atom :: a -> Atom
+instance LiftExpression () where expression () = Call (NameOp OpUnit) []
+instance LiftExpression Bool where
+    expression = \case
+        True  -> Call (NameOp OpTrue)  []
+        False -> Call (NameOp OpFalse) []
 
-instance LiftAtom Atom where atom = id
-instance LiftAtom Name where atom = Access
-instance LiftLiteral a => LiftAtom a where atom = Primary . literal
+instance LiftExpression Integer  where expression = expression . Lit STypeInteger
+instance LiftExpression Rational where expression = expression . Lit STypeDouble
+instance LiftExpression Char     where expression = expression . Lit STypeChar
+instance LiftExpression String   where expression = expression . Lit (STypeList STypeChar)
 
-expression :: LiftAtom a => a -> Expression
-expression = Atom . atom
 
 class LiftStatement f where
     statement :: f a p -> Statement a p

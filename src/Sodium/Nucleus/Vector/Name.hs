@@ -48,16 +48,12 @@ instance Mask Pattern where
         PWildCard -> return PWildCard
         PUnit     -> return PUnit
 
-instance Mask Atom where
-    mask  =  \case
-        Primary lit -> return (Primary lit)
-        Access name -> Access <$> mask name
-
 instance Mask Expression where
     mask  = \case
-        Atom a -> Atom <$> mask a
         Lambda pat a -> Lambda <$> mask pat <*> mask a
         Beta a1 a2 -> Beta <$> mask a1 <*> mask a2
+        Primary lit -> return (Primary lit)
+        Access name -> Access <$> mask name
 
 instance Mask Func where
     mask  =  funcType mask

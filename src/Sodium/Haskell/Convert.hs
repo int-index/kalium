@@ -76,9 +76,10 @@ instance Conv S.Type where
 instance Conv S.Expression where
 
     type Hask S.Expression = H.Exp
-    conv (S.Atom expr) = conv expr
     conv (S.Lambda pat act) = H.Lambda H.noLoc <$> traverse conv [pat] <*> conv act
     conv (S.Beta a1 a2) = H.App <$> conv a1 <*> conv a2
+    conv (S.Primary lit) = return (convlit lit)
+    conv (S.Access name) = D.access <$> conv name
 
 
 instance Conv S.Func where
@@ -107,26 +108,18 @@ instance Conv S.Pattern where
         return $ annotate (H.PVar (H.Ident hsName))
     conv (S.PTuple pat1 pat2) = H.PTuple H.Boxed <$> traverse conv [pat1, pat2]
 
-
-instance Conv S.Atom where
-
-    type Hask S.Atom = H.Exp
-    conv (S.Primary lit) = return (convlit lit)
-    conv (S.Access name) = D.access <$> conv name
-
 convlit :: S.Literal -> H.Exp
 convlit = \case
     S.Lit S.STypeInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
     S.Lit S.STypeDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
     S.Lit S.STypeChar    c -> H.Lit $ H.Char c
-    S.Lit S.STypeBoolean a -> H.Con $ H.UnQual $ H.Ident (if a then "True" else "False")
-    S.Lit S.STypeUnit   () -> H.Con $ H.Special H.UnitCon
     S.Lit (S.STypeList S.STypeChar) cs -> H.Lit $ H.String cs
     S.Lit (S.STypeList t) xs -> H.List $ map (\x -> convlit (S.Lit t x)) xs
-    S.Lit (S.STypePair t1 t2) (x1, x2)
-         -> H.Tuple H.Boxed [convlit (S.Lit t1 x1), convlit (S.Lit t2 x2)]
     S.Lit (S.STypeFunction _ _) a -> absurd a
     S.Lit (S.STypeTaint _) a -> absurd a
+    S.Lit S.STypeUnit a -> absurd a
+    S.Lit (S.STypePair _ _) a -> absurd a
+    S.Lit S.STypeBoolean a -> absurd a
 
 convOp :: S.Operator -> D.Name
 convOp = \case
@@ -149,12 +142,15 @@ convOp = \case
     S.OpLess     -> "<"
     S.OpEquals   -> "=="
     S.OpXor      -> "/="
+    S.OpTrue     -> "True"
+    S.OpFalse    -> "False"
     S.OpAnd      -> "&&"
     S.OpOr       -> "||"
     S.OpNot      -> "not"
     S.OpElem     -> "elem"
     S.OpRange    -> "enumFromTo"
     S.OpId       -> "id"
+    S.OpUnit     -> "()"
     S.OpPair     -> ","
     S.OpFst      -> "fst"
     S.OpSnd      -> "snd"

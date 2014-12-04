@@ -14,9 +14,9 @@ patBound = \case
 preciseMatch :: Pattern -> Expression -> Bool
 preciseMatch = \case
     PWildCard -> const False
-    PUnit -> (==) (Literal STypeUnit ())
+    PUnit -> (==) LitUnit
     PAccess name1 _ -> \case
-        Atom (Access name2) | name1 == name2 -> True
+        Access name2 | name1 == name2 -> True
         _ -> False
     PTuple p1 p2 -> \case
         App2 (OpAccess OpPair) e1 e2 -> preciseMatch p1 e1 && preciseMatch p2 e2

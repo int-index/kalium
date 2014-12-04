@@ -59,8 +59,8 @@ vectorizeFunc (name, func) = do
 mkPatTuple [  ] = Vec.PUnit
 mkPatTuple pats = foldr1 Vec.PTuple pats
 
-mkExpTuple [  ] = Vec.Atom $ Vec.Primary (Lit STypeUnit ())
-mkExpTuple exps = foldr1 (Vec.AppOp2 Vec.OpPair) (map Vec.Atom exps)
+mkExpTuple [  ] = Vec.LitUnit
+mkExpTuple exps = foldr1 (Vec.AppOp2 Vec.OpPair) exps
 
 smartPAccess name ty = \case
     Uninitialized -> Vec.PWildCard
@@ -75,7 +75,7 @@ smartAccess name = \case
 mkPAccess :: V e t m => Name -> t m Vec.Pattern
 mkPAccess name = smartPAccess name <$> lookupType name <*> lookupIndex name
 
-mkAccess :: V e t m => Name -> t m Vec.Atom
+mkAccess :: V e t m => Name -> t m Vec.Expression
 mkAccess name = smartAccess name <$> lookupIndex name
 
 expTuple :: V e t m => [Name] -> t m Vec.Expression
@@ -117,7 +117,7 @@ vectorizeScope scope = do
 
 vectorizeStatement :: V e t m => Statement Pattern Atom -> t m ([Name], Vec.Expression)
 vectorizeStatement = \case
-    Pass -> return ([], Vec.Taint $ Vec.Atom $ Vec.Primary (Lit STypeUnit ()))
+    Pass -> return ([], Vec.Taint Vec.LitUnit)
     Follow st1 st2 -> do
         (changed1, vecStatement1) <- vectorizeStatement st1
         updateLocalize changed1 $ do
@@ -155,7 +155,7 @@ vectorizeStatement = \case
             vecPattern <- vectorizePattern pat
             results <- Vec.Taint . mkExpTuple <$> traverse vectorizeAtom (map Access changed)
             let vecTaint = if impure then id else Vec.Taint
-                vecCall = foldl1 Vec.Beta $ map Vec.Atom $ Vec.Access (retag name):vecArgs
+                vecCall = foldl1 Vec.Beta $ Vec.Access (retag name):vecArgs
                 vecExecute = vecTaint vecCall
                 vecBody = Vec.Follow vecPattern vecExecute results
             return (changed, vecBody)
@@ -171,7 +171,7 @@ vectorizeStatement = \case
             argPat <- patTuple changed
             iterPat <- mkPAccess iter_name
             let vecLambda = Vec.lambda [argPat, iterPat] vecStatement
-            let vecFor = Vec.AppOp3 Vec.OpFoldTainted vecLambda argExp (Vec.Atom vecRange)
+            let vecFor = Vec.AppOp3 Vec.OpFoldTainted vecLambda argExp vecRange
             return (changed, vecFor)
     IfStatement ifb -> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
@@ -182,10 +182,10 @@ vectorizeStatement = \case
         let accessChanged = map Access changed
         vecBodyThen <- lift $ vecBodyThenGen accessChanged
         vecBodyElse <- lift $ vecBodyElseGen accessChanged
-        let vecIf = Vec.AppOp3 Vec.OpIf vecBodyElse vecBodyThen (Vec.Atom vecCond)
+        let vecIf = Vec.AppOp3 Vec.OpIf vecBodyElse vecBodyThen vecCond
         return (changed, vecIf)
 
-vectorizeAtom :: V e t m => Atom -> t m Vec.Atom
+vectorizeAtom :: V e t m => Atom -> t m Vec.Expression
 vectorizeAtom = \case
     Primary a -> return (Vec.Primary a)
     Access name -> mkAccess name

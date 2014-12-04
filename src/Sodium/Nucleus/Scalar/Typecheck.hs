@@ -75,6 +75,8 @@ builtinOpType op args = case op of
     OpOr       -> argMatch2Same >>= require (==TypeBoolean)
     OpNot      -> argMatch1 >>= require (==TypeBoolean)
     OpXor      -> argMatch2Same >>= require (==TypeBoolean)
+    OpTrue     -> return TypeBoolean
+    OpFalse    -> return TypeBoolean
     OpRange    -> TypeList <$> argMatch2Same
     OpElem     -> do
         (ty, tys) <- argMatch2
@@ -87,6 +89,7 @@ builtinOpType op args = case op of
     OpReadLn   -> return TypeUnit -- TODO: type inference?
     OpPutLn    -> argMatch1 >>= require (==TypeList TypeChar) >> return TypeUnit
     OpGetLn    -> return (TypeList TypeChar)
+    OpUnit     -> return TypeUnit
     OpId       -> argMatch1
     OpPair     -> uncurry TypePair <$> argMatch2
     OpFst      -> fst <$> argMatch2

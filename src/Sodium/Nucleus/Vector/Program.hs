@@ -24,15 +24,16 @@ data Func
     } deriving (Eq)
 
 data Expression
-    = Atom Atom
+    = Access Name
+    | Primary Literal
     | Lambda Pattern Expression
     | Beta Expression Expression
     deriving (Eq)
 
-pattern OpAccess op = Atom (Access (NameOp op))
-pattern Literal ty repr = Atom (Primary (Lit ty repr))
+pattern OpAccess op = Access (NameOp op)
+pattern Literal ty repr = Primary (Lit ty repr)
 
-pattern LitUnit = Literal STypeUnit ()
+pattern LitUnit = OpAccess OpUnit
 
 pattern App1 op a        = op `Beta` a
 pattern App2 op a1 a2    = op `Beta` a1 `Beta` a2
@@ -50,11 +51,6 @@ pattern Bind   a1 a2 = AppOp2 OpBind   a1 a2
 pattern Follow p x a = Bind x (Lambda p a)
 
 lambda = flip (foldr Lambda)
-
-data Atom
-    = Access Name
-    | Primary Literal
-    deriving (Eq)
 
 data IndexTag
     = IndexTag Integer

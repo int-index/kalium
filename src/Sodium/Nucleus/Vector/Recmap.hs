@@ -12,7 +12,8 @@ recmap :: (Applicative m, Monad m) => LensLike' m Expression Expression
 recmap outer = around where
     around = outer <=< inner
     inner = \case
-        Atom a -> pure (Atom a)
+        Primary a -> pure (Primary a)
+        Access  a -> pure (Access  a)
         Lambda pat a -> liftA2 Lambda (pure pat) (around a)
         Beta a1 a2 -> liftA2 Beta (around a1) (around a2)
 
