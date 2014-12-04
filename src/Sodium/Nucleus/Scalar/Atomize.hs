@@ -44,7 +44,7 @@ instance (Atomize (obj pat), Scoping vars) => Atomize (Scope vars obj pat) where
 instance Atomize (Statement Pattern) where
 
     atomize (Execute (Exec mname op exprs)) = atomizeStatement
-        $ Exec mname op <$> mapM atomizeExpression exprs
+        $ Exec mname op <$> traverse atomizeExpression exprs
 
     atomize (ForStatement (ForCycle name range body)) = atomizeStatement
         $ ForCycle name <$> atomizeExpression range <*> atomize body
@@ -68,7 +68,7 @@ atomizeExpression :: (TypeEnv e m, MonadSupply Name m) => Expression
 atomizeExpression = \case
     Atom atom -> return atom
     e@(Call op args) -> do
-        eArgs <- mapM atomizeExpression args
+        eArgs <- traverse atomizeExpression args
         name  <- supply
         ty <- typecheck e
         let vardecl = (name, ty)

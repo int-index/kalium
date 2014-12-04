@@ -32,18 +32,19 @@ library
                        Sodium.Nucleus.Vector.Inline
                        Sodium.Nucleus.Vectorize
 
-  build-depends:       base,
-                       transformers,
-                       mtl,
-                       containers,
-                       unordered-containers,
-                       array,
-                       lens,
-                       profunctors,
-                       singletons,
-                       monad-supply,
-                       haskell-src-exts == 1.16.*,
-                       parsec
+  build-depends:       base
+               ,       transformers
+               ,       mtl
+               ,       containers
+               ,       unordered-containers
+               ,       array
+               ,       lens
+               ,       profunctors
+               ,       singletons
+               ,       monad-supply
+               ,       haskell-src-exts == 1.16.*
+               ,       parsec
+
   ghc-options:         -W -O2
   hs-source-dirs:      src
   default-language:    Haskell2010
@@ -57,9 +58,10 @@ library
 
 executable sodium-tool
   main-is:             Main.hs
-  build-depends:       base,
-                       mtl,
-                       sodium
+  build-depends:       base
+               ,       mtl
+               ,       optparse-applicative
+               ,       sodium
   ghc-options:         -W -O2 -threaded "-with-rtsopts=-N"
   hs-source-dirs:      src/sodium-tool
   default-language:    Haskell2010
@@ -67,16 +69,16 @@ executable sodium-tool
 
 test-suite test
   main-is:             Test.hs
-  build-depends:       base,
-                       lens,
-                       mtl,
-                       bytestring,
-                       process,
-                       temporary,
-                       directory,
-                       tasty,
-                       tasty-hunit,
-                       sodium
+  build-depends:       base
+               ,       lens
+               ,       mtl
+               ,       bytestring
+               ,       process
+               ,       temporary
+               ,       directory
+               ,       tasty
+               ,       tasty-hunit
+               ,       sodium
   type:                exitcode-stdio-1.0
   hs-source-dirs:      testing
   ghc-options:         -W

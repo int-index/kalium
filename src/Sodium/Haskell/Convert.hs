@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Sodium.Haskell.Convert (convert, reserved) where
 
+import Data.Traversable
 import Data.List (intercalate)
 import Control.Applicative
 import Data.Singletons.Void
@@ -22,7 +23,7 @@ class Conv s where
 instance Conv S.Program where
     type Hask S.Program = H.Module
     conv (S.Program funcs) = do
-        funcDefs <- concat <$> mapM conv funcs
+        funcDefs <- concat <$> traverse conv funcs
         return $ H.Module H.noLoc
             (H.ModuleName "Main")
             (extensions ["LambdaCase", "TupleSections", "MultiWayIf", "ScopedTypeVariables"])
@@ -76,7 +77,7 @@ instance Conv S.Expression where
 
     type Hask S.Expression = H.Exp
     conv (S.Atom expr) = conv expr
-    conv (S.Lambda pat act) = H.Lambda H.noLoc <$> mapM conv [pat] <*> conv act
+    conv (S.Lambda pat act) = H.Lambda H.noLoc <$> traverse conv [pat] <*> conv act
     conv (S.Beta a1 a2) = H.App <$> conv a1 <*> conv a2
 
 
@@ -104,7 +105,7 @@ instance Conv S.Pattern where
         hsType <- conv ty
         let annotate pat = H.PatTypeSig H.noLoc pat hsType
         return $ annotate (H.PVar (H.Ident hsName))
-    conv (S.PTuple pat1 pat2) = H.PTuple H.Boxed <$> mapM conv [pat1, pat2]
+    conv (S.PTuple pat1 pat2) = H.PTuple H.Boxed <$> traverse conv [pat1, pat2]
 
 
 instance Conv S.Atom where

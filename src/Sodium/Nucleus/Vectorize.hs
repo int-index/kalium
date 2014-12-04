@@ -4,6 +4,7 @@ module Sodium.Nucleus.Vectorize (vectorize, Error(..)) where
 
 import Data.List
 import Data.Monoid
+import Data.Traversable
 import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.Except
@@ -38,7 +39,7 @@ type Types   = M.Map Name Type
 
 vectorize :: E e m => Program Type Pattern Atom -> m Vec.Program
 vectorize program = do
-    vecFuncs <- mapM vectorizeFunc (program ^. programFuncs & M.toList)
+    vecFuncs <- traverse vectorizeFunc (program ^. programFuncs & M.toList)
     return $ Vec.Program vecFuncs
 
 vectorizeFunc :: E e m => (Name, Func Type Pattern Atom) -> m Vec.Func
@@ -78,10 +79,10 @@ mkAccess :: V e t m => Name -> t m Vec.Atom
 mkAccess name = smartAccess name <$> lookupIndex name
 
 expTuple :: V e t m => [Name] -> t m Vec.Expression
-expTuple names = mkExpTuple <$> mapM mkAccess names
+expTuple names = mkExpTuple <$> traverse mkAccess names
 
 patTuple :: V e t m => [Name] -> t m Vec.Pattern
-patTuple names = mkPatTuple <$> mapM mkPAccess names
+patTuple names = mkPatTuple <$> traverse mkPAccess names
 
 vectorizeBody :: (V e t m, Scoping v) => Scope v Body Pattern Atom -> t m ([Name], Vec.Expression)
 vectorizeBody scope = do
@@ -92,7 +93,7 @@ vectorizeBody scope = do
     return (changed, vecBody)
 
 updateLocalize names action = do
-    updated <- forM names $ \name -> do
+    updated <- for names $ \name -> do
         index <- lookupIndex name >>= \case
             Index n -> return (Index $ succ n)
             Uninitialized -> return (Index 0)
@@ -109,7 +110,7 @@ vectorizeScope scope = do
             indices <- ask
             let vecBodyGen results = flip runReaderT indices $ do
                   pat <- patTuple changed
-                  vecResult <- Vec.Taint . mkExpTuple <$> mapM vectorizeAtom results
+                  vecResult <- Vec.Taint . mkExpTuple <$> traverse vectorizeAtom results
                   return $ Vec.Follow pat vecStatement vecResult
             let changedNonlocal = filter (`M.notMember` vars) changed
             return (changedNonlocal, vecBodyGen)
@@ -125,7 +126,7 @@ vectorizeStatement = \case
             updateLocalize changed2 $ do
                 vecPat2 <- patTuple changed2
                 let changed = nub $ changed1 ++ changed2
-                results <- Vec.Taint . mkExpTuple <$> mapM vectorizeAtom (map Access changed)
+                results <- Vec.Taint . mkExpTuple <$> traverse vectorizeAtom (map Access changed)
                 let vecBody = Vec.Follow vecPat1 vecStatement1
                             $ Vec.Follow vecPat2 vecStatement2
                             $ results
@@ -143,7 +144,7 @@ vectorizeStatement = \case
               NameOp OpPutLn -> True
               Name1 _ _ -> True
               _ -> False
-        vecArgs <- mapM vectorizeAtom args
+        vecArgs <- traverse vectorizeAtom args
         let patFlatten = \case
               PWildCard -> []
               PUnit -> []
@@ -152,7 +153,7 @@ vectorizeStatement = \case
         let changed = patFlatten pat
         updateLocalize changed $ do
             vecPattern <- vectorizePattern pat
-            results <- Vec.Taint . mkExpTuple <$> mapM vectorizeAtom (map Access changed)
+            results <- Vec.Taint . mkExpTuple <$> traverse vectorizeAtom (map Access changed)
             let vecTaint = if impure then id else Vec.Taint
                 vecCall = foldl1 Vec.Beta $ map Vec.Atom $ Vec.Access (retag name):vecArgs
                 vecExecute = vecTaint vecCall
