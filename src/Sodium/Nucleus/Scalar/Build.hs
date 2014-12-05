@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}

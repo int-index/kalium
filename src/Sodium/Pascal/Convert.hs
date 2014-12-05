@@ -6,6 +6,7 @@
 module Sodium.Pascal.Convert (convert, Error(..)) where
 
 import qualified Data.Map as M
+import Data.Monoid
 import Data.Traversable
 
 import Control.Applicative
@@ -27,27 +28,58 @@ declareLenses [d|
         , tsVariables :: M.Map S.Name S.Type
         } deriving (Eq)
 
+    data ConvScope = ConvScope
+        { csTypes :: TypeScope
+        , csNames :: M.Map (Bool, S.Name) D.Name
+        } deriving (Eq)
+
                 |]
+
+instance Monoid TypeScope where
+    mempty = TypeScope mempty mempty
+    ts1 `mappend` ts2 = TypeScope
+        (ts1 ^. tsFunctions <> ts2 ^. tsFunctions)
+        (ts1 ^. tsVariables <> ts2 ^. tsVariables)
+
+instance Monoid ConvScope where
+    mempty = ConvScope mempty mempty
+    cs1 `mappend` cs2 = ConvScope
+        (cs1 ^. csTypes <> cs2 ^. csTypes)
+        (cs1 ^. csNames <> cs2 ^. csNames)
 
 class Error e where
     errorTypecheck  :: e
     errorNoAccess   :: e
     errorNoFunction :: e
 
-convert :: (Applicative m, MonadSupply D.Name m, MonadError e m, Error e)
-        => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
-convert program = runReaderT (conv program) (TypeScope M.empty M.empty)
+type Erroneous e m = (MonadError e m, Error e)
 
-nameV name = D.Name ["v", name]
-nameF name = D.Name ["f", name]
+convert :: (Applicative m, MonadSupply D.Name m, Erroneous e m)
+        => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
+convert program = runReaderT (conv program) mempty
+
+--nameV name = return $ D.NameGen 42 ("v_" ++ name)
+nameV name = lookupName (False, name)
+nameF name = lookupName (True, name)
+
+lookupName :: (Applicative m, MonadReader ConvScope m, Erroneous e m)
+           => (Bool, S.Name) -> m D.Name
+lookupName k = do
+    mname <- views csNames (M.lookup k)
+    maybe (throwError errorNoAccess) return mname
 
 class Conv s d | s -> d where
-    conv :: (Applicative m, MonadSupply D.Name m, MonadError e m, Error e)
-         => s -> ReaderT TypeScope m d
+    conv :: (Applicative m, MonadSupply D.Name m, Erroneous e m)
+         => s -> ReaderT ConvScope m d
 
 instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
-    conv (S.Program funcs vars body)
-        = local (tsFunctions %~ M.union funcSigs) $ do
+    conv (S.Program funcs vars body) = do
+        (M.unions -> funcNames) <- for funcs $ \(S.Func name _ _ _) -> do
+            funcName <- supply
+            return $ M.singleton (True, name) funcName
+        local ( (csTypes . tsFunctions %~ M.union funcSigs)
+              . (csNames %~ M.union funcNames)
+              ) $ do
             clMain <- do
                 clBody <- convScope vars
                     $ D.Body <$> conv body <*> pure (D.expression ())
@@ -58,43 +90,53 @@ instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
         where funcSigs = M.unions (map funcSigOf funcs)
               funcSigOf (S.Func name funcSig _ _) = M.singleton name funcSig
 
-convScope vardecls inner
-        = D.Scope
-       <$> (D.scoping <$> traverse conv (M.toList vardecls))
-       <*> local (tsVariables %~ M.union vardecls) inner
+convScope vardecls inner = do
+    (M.unions -> varNames, scopeVars)
+        <- unzip <$> traverse convVardecl (M.toList vardecls)
+    scopeElem <- local ( (csTypes . tsVariables %~ M.union vardecls)
+                       . (csNames %~ M.union varNames)
+                       ) inner
+    return $ D.Scope (D.scoping scopeVars) scopeElem
+       where convVardecl (name, pasType) = do
+                varName <- supply
+                ty <- conv pasType
+                return (M.singleton (False, name) varName, (varName, ty))
 
-convScope' paramdecls inner
-        = D.Scope
-       <$> traverse conv paramdecls
-       <*> local (tsVariables %~ M.union vardecls) inner
+convScope' paramdecls inner = do
+    (M.unions -> paramNames, scopeVars)
+        <- unzip <$> traverse convParamdecl paramdecls
+    scopeElem <- local ( (csTypes . tsVariables %~ M.union vardecls)
+                       . (csNames %~ M.union paramNames)
+                       ) inner
+    return $ D.Scope scopeVars scopeElem
        where paramDeclToTup (S.ParamDecl name (_, ty)) = (name, ty)
              vardecls = M.fromList $ map paramDeclToTup paramdecls
+             convParamdecl (S.ParamDecl name (r, pasType)) = do
+                paramName <- supply
+                r' <- conv r
+                ty <- conv pasType
+                return (M.singleton (False, name) paramName, (paramName, (r', ty)))
 
 instance Conv S.Body (D.Statement D.Pattern D.Expression) where
     conv statements = D.group <$> traverse conv statements
 
 instance Conv S.Func (D.Name, D.Func D.ByType D.Pattern D.Expression) where
-    conv (S.Func name (S.FuncSig params pasType) vars body) = do
-        (retExpr, retType, retVars) <- case pasType of
-            Nothing -> return (D.expression (), D.TypeUnit, M.empty)
-            Just ty -> do
-                let retName = nameV name
-                retType <- conv ty
-                return (D.expression retName, retType, M.singleton name ty)
-        clScope <- convScope' params
-                 $ convScope (M.union vars retVars)
-                 $ D.Body <$> conv body <*> pure retExpr
-        let fname = nameF name
-        return $ (fname, D.Func retType clScope)
-
-instance Conv (S.Name, S.Type) (D.Name, D.Type) where
-    conv (name, pasType)
-         = (,) <$> pure (nameV name) <*> conv pasType
-
-instance Conv S.ParamDecl (D.Name, D.ByType) where
-    conv (S.ParamDecl name (r, pasType))
-        = (,) <$> pure (nameV name) <*> ((,) <$> conv r <*> conv pasType)
-
+    conv (S.Func name (S.FuncSig params pasType) vars body) = case pasType of
+        Nothing -> do
+            clScope <- convScope' params
+                     $ convScope  vars
+                     $ D.Body <$> conv body <*> pure (D.expression ())
+            fname <- nameF name
+            return $ (fname, D.Func D.TypeUnit clScope)
+        Just ty -> do
+            let retVars = M.singleton name ty
+            clScope <- convScope' params
+                     $ convScope (M.union vars retVars)
+                     $ D.Body <$> conv body <*> (D.Atom . D.Access <$> nameV name)
+            retType <- conv ty
+            fname <- nameF name
+            return (fname, D.Func retType clScope)
+    
 instance Conv S.By D.By where
     conv S.ByValue     = pure D.ByValue
     conv S.ByReference = pure D.ByReference
@@ -112,7 +154,7 @@ instance Conv S.Type D.Type where
 binary op a b = D.Call op [] [a,b]
 
 convReadLn [e@(S.Access name')] = do
-    let name = nameV name'
+    name <- nameV name'
     typecheck e >>= \case
         S.TypeString -> return $ D.Exec (D.PAccess name) (D.NameOp D.OpGetLn) [] []
         ty' -> do
@@ -141,13 +183,13 @@ typeOfLiteral = \case
     S.LitChar _ -> S.TypeChar
     S.LitStr  _ -> S.TypeString
 
-typeOfAccess :: (Applicative m, MonadReader TypeScope m, MonadError e m, Error e)
+typeOfAccess :: (Applicative m, MonadReader ConvScope m, Erroneous e m)
              => S.Name -> m S.Type
 typeOfAccess name = do
-    mtype <- asks (M.lookup name . view tsVariables)
+    mtype <- views (csTypes.tsVariables) (M.lookup name)
     maybe (throwError errorNoAccess) return mtype
 
-typecasts :: (Applicative m, MonadReader TypeScope m, MonadError e m, Error e)
+typecasts :: (Applicative m, MonadReader ConvScope m, Erroneous e m)
           => S.Expression -> m [S.Expression]
 typecasts expr@(S.Primary lit) = return $ typecasting (typeOfLiteral lit) expr
 typecasts expr@(S.Access name) = do
@@ -172,13 +214,13 @@ typecheck expr = do
     mty <- typecheck' expr
     maybe (throwError errorTypecheck) return mty
 
-typecheck' :: (Applicative m, MonadReader TypeScope m, MonadError e m, Error e)
+typecheck' :: (Applicative m, MonadReader ConvScope m, Erroneous e m)
           => S.Expression -> m (Maybe S.Type)
 typecheck' = runMaybeT . \case
     S.Primary lit -> return (typeOfLiteral lit)
     S.Access name -> typeOfAccess name
     S.Call (Right name) _ -> do -- TODO: check argument types
-        mfuncsig <- asks (M.lookup name . view tsFunctions)
+        mfuncsig <- views (csTypes.tsFunctions) (M.lookup name)
         case mfuncsig of
             Nothing -> throwError errorNoFunction
             Just (S.FuncSig _ mtype) -> case mtype of
@@ -222,18 +264,18 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
     conv = \case
         S.BodyStatement body -> D.statement <$> conv body
         S.Assign name' expr' -> do
-            let name = nameV name'
+            name <- nameV name'
             tyW <- typecheck (S.Access name')
             expr <- typecastConv tyW expr'
             return $ D.assign name expr
         S.Execute "readln"  exprs -> D.statement <$> convReadLn  exprs
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn exprs
-        S.Execute name exprs
-             -> fmap D.statement
-             $  D.Exec D.PWildCard (nameF name) []
-            <$> traverse conv exprs
+        S.Execute name' exprs' -> do
+            name <- nameF name'
+            exprs <- traverse conv exprs'
+            return $ D.statement $ D.Exec D.PWildCard name [] exprs
         S.ForCycle name fromExpr toExpr statement -> do
-            let clName = nameV name
+            clName <- nameV name
             clFromExpr <- conv fromExpr
             clToExpr   <- conv toExpr
             let clRange = binary (D.NameOp D.OpRange) clFromExpr clToExpr
@@ -273,11 +315,11 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
 instance Conv S.Expression D.Expression where
     -- TODO: use typecastConv everywhere
     conv = \case
-        S.Access name -> return $ D.expression (nameV name)
+        S.Access name -> D.expression <$> nameV name
         S.Call name' exprs -> do
             name <- case name' of
                 Left op -> conv op
-                Right name -> pure (nameF name)
+                Right name -> nameF name
             D.Call name [] <$> traverse conv exprs
         S.Primary lit -> conv lit
 

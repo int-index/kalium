@@ -1,5 +1,4 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE GADTs #-}
 module Sodium.Nucleus.Vector.Program
     ( module Sodium.Nucleus.Vector.Program
     , module Sodium.Nucleus.Program
@@ -9,7 +8,7 @@ import Control.Lens.TH
 
 import Sodium.Nucleus.Program
 
-type Name = Name1 IndexTag
+type Name = Name1 (Maybe Integer)
 
 data Program
     = Program
@@ -49,12 +48,6 @@ pattern Bind   a1 a2 = AppOp2 OpBind   a1 a2
 pattern Follow p x a = Bind x (Lambda p a)
 
 lambda = flip (foldr Lambda)
-
-data IndexTag
-    = IndexTag Integer
-    | ImmutableTag
-    | GlobalTag
-    deriving (Eq, Ord, Show)
 
 data Pattern
     = PTuple Pattern Pattern

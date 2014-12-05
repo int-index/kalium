@@ -3,7 +3,6 @@
 module Sodium.Haskell.Convert (convert, reserved) where
 
 import Data.Traversable
-import Data.List (intercalate)
 import Control.Applicative
 -- S for Src, D for Dest
 import qualified Sodium.Nucleus.Vector.Program as S
@@ -47,10 +46,7 @@ keywords = words
 transformName :: S.Name -> D.Name
 transformName = \case
     S.NameOp op -> convOp op
-    S.Name1 ns tag -> let s = intercalate "'" ns in case tag of
-        S.IndexTag n -> s ++ "'" ++ show n
-        S.ImmutableTag -> s ++ "'" ++ "const"
-        S.GlobalTag -> s
+    S.NameGen n tag -> [show n, maybe "" show tag] >>= ("_"++)
 
 instance Conv S.Name where
     type Hask S.Name = D.Name

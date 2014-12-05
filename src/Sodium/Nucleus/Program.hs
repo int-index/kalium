@@ -14,7 +14,7 @@ data Type
 
 data Name1 tag
     = NameOp Operator
-    | Name1 [String] tag
+    | NameGen Integer tag
     deriving (Eq, Ord, Show)
 
 data Operator

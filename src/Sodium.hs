@@ -4,13 +4,12 @@ module Sodium (translate) where
 import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.Scalar.Atomize (atomize')
 import Sodium.Nucleus.Scalar.Valueficate (valueficate)
-import Sodium.Nucleus.Vector.Strip (strip)
 import Sodium.Nucleus.Vector.Match (match)
 import Sodium.Nucleus.Vector.Inline (inline)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified Sodium.Pascal.Parse   as P (parse)
 import qualified Sodium.Pascal.Convert as P (convert)
-import qualified Sodium.Haskell.Convert as H (convert, reserved)
+import qualified Sodium.Haskell.Convert as H (convert)
 import qualified Sodium.Error as E
 import qualified Sodium.Nucleus.Vector.Program as V
 
@@ -21,7 +20,7 @@ import Control.Monad.Except
 import Control.Monad.Supply
 
 namestack :: [V.Name1 ()]
-namestack = map ((\name -> V.Name1 ["g", name] ()) . ('g':) . show) [0..]
+namestack = map (\n -> V.NameGen n ()) [0..]
 
 translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
 translate src = do
@@ -32,15 +31,15 @@ translate src = do
         >>= atomize' . valueficate
         >>= vectorize
         >>= optimize
-    let dest = prettyPrint $ H.convert $ strip H.reserved optimal
+    let dest = prettyPrint (H.convert optimal)
     return (map (prettyPrint . H.convert) log, dest)
 
 type TranslationLog = [V.Program]
 
-optimize :: (Applicative m, MonadSupply (V.Name1 ()) m) => V.Program -> m (V.Program, TranslationLog)
+optimize :: (Applicative m, Monad m) => V.Program -> m (V.Program, TranslationLog)
 optimize program = runWriterT (closureM pass program)
 
-pass :: (Applicative m, MonadWriter TranslationLog m, MonadSupply (V.Name1 ()) m) => V.Program -> m V.Program
+pass :: (Applicative m, MonadWriter TranslationLog m) => V.Program -> m V.Program
 pass program = tell [program] >> f program
     where f  =  return . match . inline
 

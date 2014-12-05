@@ -1,5 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ViewPatterns #-}
 module Sodium.Nucleus.Vectorize (vectorize, Error(..)) where
 
 import Data.List
@@ -13,29 +13,41 @@ import qualified Data.Map as M
 import Sodium.Nucleus.Scalar.Program
 import qualified Sodium.Nucleus.Vector.Program as Vec
 
-class Error e where
-    errorNoAccess :: Name -> [Name] -> e
-    errorUpdateImmutable :: Name -> e
-
-type E e m = (Applicative m, Error e, MonadError e m)
-type V e t m = (MonadTrans t, MonadReader (Types, Indices) (t m), E e m, E e (t m))
-
 data Index
     = Index Integer
     | Immutable
     | Uninitialized
     deriving (Eq, Ord, Show)
 
-indexTag :: Vec.IndexTag -> Name -> Vec.Name
-indexTag Vec.GlobalTag (NameOp op) = NameOp op
-indexTag tag (Name1 ns _) = Name1 ns tag
+declareLenses [d|
+
+    data VectorizeScope = VectorizeScope
+        { vsTypes   :: M.Map Name Type
+        , vsIndices :: M.Map Name Index
+        } deriving (Eq)
+
+                |]
+
+instance Monoid VectorizeScope where
+    mempty = VectorizeScope mempty mempty
+    vs1 `mappend` vs2 = VectorizeScope
+        (vs1 ^. vsTypes   <> vs2 ^. vsTypes)
+        (vs1 ^. vsIndices <> vs2 ^. vsIndices)
+
+class Error e where
+    errorNoAccess :: Name -> [Name] -> e
+    errorUpdateImmutable :: Name -> e
+
+type E e m = (Applicative m, Error e, MonadError e m)
+type V e t m = (MonadTrans t, MonadReader VectorizeScope (t m), E e m, E e (t m))
+
+indexTag :: Maybe Integer -> Name -> Vec.Name
+indexTag Nothing (NameOp op) = NameOp op
+indexTag tag (NameGen n ()) = NameGen n tag
 indexTag _ _ = error "indexTag: impossible"
 
 retag :: Name -> Vec.Name
-retag = indexTag Vec.GlobalTag
-
-type Indices = M.Map Name Index
-type Types   = M.Map Name Type
+retag = indexTag Nothing
 
 vectorize :: E e m => Program Type Pattern Atom -> m Vec.Program
 vectorize program = do
@@ -64,13 +76,13 @@ mkExpTuple exps = foldr1 (Vec.AppOp2 Vec.OpPair) exps
 
 smartPAccess name ty = \case
     Uninitialized -> Vec.PWildCard
-    Index index   -> Vec.PAccess (Vec.IndexTag index `indexTag` name) ty
-    Immutable     -> Vec.PAccess (Vec.ImmutableTag   `indexTag` name) ty
+    Index index   -> Vec.PAccess (Just index  `indexTag` name) ty
+    Immutable     -> Vec.PAccess (Nothing     `indexTag` name) ty
 
 smartAccess name = \case
     Uninitialized -> Vec.Access (NameOp OpUndefined)
-    Index index   -> Vec.Access (Vec.IndexTag index `indexTag` name)
-    Immutable     -> Vec.Access (Vec.ImmutableTag   `indexTag` name)
+    Index index   -> Vec.Access (Just index `indexTag` name)
+    Immutable     -> Vec.Access (Nothing    `indexTag` name)
 
 mkPAccess :: V e t m => Name -> t m Vec.Pattern
 mkPAccess name = smartPAccess name <$> lookupType name <*> lookupIndex name
@@ -99,7 +111,7 @@ updateLocalize names action = do
             Uninitialized -> return (Index 0)
             Immutable -> throwError (errorUpdateImmutable name)
         return (name, index)
-    local ((mempty, M.fromList updated) <>) action
+    local (vsIndices %~ mappend (M.fromList updated)) action
 
 vectorizeScope :: (V e t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Expression)
 vectorizeScope scope = do
@@ -142,7 +154,7 @@ vectorizeStatement = \case
               NameOp OpGetLn      -> True
               NameOp OpPrintLn    -> True
               NameOp OpPutLn -> True
-              Name1 _ _ -> True
+              NameGen _ _ -> True
               _ -> False
         vecArgs <- traverse vectorizeAtom args
         let patFlatten = \case
@@ -164,8 +176,7 @@ vectorizeStatement = \case
         let iter_name  = forCycle ^. forName
             iter_index = Immutable
         iter_type <- lookupType iter_name
-        local ( (M.singleton iter_name iter_type
-               , M.singleton iter_name iter_index) <>) $ do
+        local (initIndices iter_index (M.singleton iter_name iter_type) <>) $ do
             (changed, vecStatement) <- vectorizeStatement (forCycle ^. forStatement)
             argExp <- expTuple changed
             argPat <- patTuple changed
@@ -198,16 +209,16 @@ vectorizePattern = \case
     PTuple p1 p2 -> Vec.PTuple <$> vectorizePattern p1 <*> vectorizePattern p2
 
 lookupIndex :: V e t m => Name -> t m Index
-lookupIndex = lookupX snd
+lookupIndex = lookupX (view vsIndices)
 
 lookupType :: V e t m => Name -> t m Type
-lookupType = lookupX fst
+lookupType = lookupX (view vsTypes)
 
-lookupX :: V e t m => ((Types, Indices) -> M.Map Name x) -> Name -> t m x
+lookupX :: V e t m => (VectorizeScope -> M.Map Name x) -> Name -> t m x
 lookupX f name = do
     xs <- asks f
     M.lookup name xs
        & maybe (throwError $ errorNoAccess name (M.keys xs)) return
 
-initIndices :: Index -> M.Map Name Type -> (Types, Indices)
-initIndices n types = (types, M.map (const n) types)
+initIndices :: Index -> M.Map Name Type -> VectorizeScope
+initIndices n types = VectorizeScope types (M.map (const n) types)

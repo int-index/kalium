@@ -1,5 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE ViewPatterns #-}
 module Sodium.Nucleus.Vector.Match where
 
 import Control.Lens

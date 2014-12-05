@@ -25,7 +25,6 @@ library
                        Sodium.Nucleus.Scalar.Valueficate
                        Sodium.Nucleus.Vector.Program
                        Sodium.Nucleus.Vector.Name
-                       Sodium.Nucleus.Vector.Strip
                        Sodium.Nucleus.Vector.Recmap
                        Sodium.Nucleus.Vector.Pattern
                        Sodium.Nucleus.Vector.Match
@@ -47,13 +46,14 @@ library
   ghc-options:         -W -O2
   hs-source-dirs:      src
   default-language:    Haskell2010
-  default-extensions:  LambdaCase,
-                       PatternSynonyms,
-                       TupleSections,
-                       ScopedTypeVariables,
-                       ConstraintKinds,
-                       RankNTypes,
-                       MultiParamTypeClasses
+  default-extensions:  LambdaCase
+                    ,  PatternSynonyms
+                    ,  ViewPatterns
+                    ,  TupleSections
+                    ,  ScopedTypeVariables
+                    ,  ConstraintKinds
+                    ,  RankNTypes
+                    ,  MultiParamTypeClasses
 
 executable sodium-tool
   main-is:             Main.hs

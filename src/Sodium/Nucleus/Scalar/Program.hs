@@ -14,7 +14,6 @@ import Sodium.Nucleus.Program
 import Sodium.Util
 
 type Name = Name1 ()
-pattern Name ns = Name1 ns ()
 
 type Vars = M.Map Name Type
 
