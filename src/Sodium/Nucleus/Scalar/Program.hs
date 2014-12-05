@@ -70,6 +70,7 @@ data Pattern
 data Exec pat expr = Exec
     { _execRet :: pat
     , _execOp :: Name
+    , _execTyArgs :: [Type]
     , _execArgs :: [expr]
     }
 
@@ -93,7 +94,7 @@ data Scope vars obj pat expr = Scope
 
 data Expression
     = Atom Atom
-    | Call Name [Expression]
+    | Call Name [Type] [Expression]
 
 data Atom
     = Access Name

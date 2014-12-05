@@ -14,7 +14,7 @@ class ValueficateSubstitute a where
     valueficateSubstitute :: ReferenceInfo -> a Atom -> a Expression
 
 instance ValueficateSubstitute (Exec Pattern) where
-    valueficateSubstitute referenceInfo (Exec ret op args) =
+    valueficateSubstitute referenceInfo (Exec ret op tyArgs args) =
         let ret' = foldr1 PTuple (ret:rets)
             rets = case M.lookup op referenceInfo of
                 Nothing -> []
@@ -24,7 +24,7 @@ instance ValueficateSubstitute (Exec Pattern) where
                     return $ case arg of
                         Access name -> PAccess name
                         Primary _ -> error "non-variables by-ref"
-        in Exec ret' op (map Atom args)
+        in Exec ret' op tyArgs (map Atom args)
 
 instance ValueficateSubstitute (Statement Pattern) where
     valueficateSubstitute referenceInfo = \case
@@ -70,7 +70,7 @@ valueficateFunc referenceInfo name
           params' = params & map (\(name, (_by, ty)) -> (name, ty))
 
           ty' = foldr1 TypePair (ty : tys)
-          result' = foldr1 (\x y -> Call (NameOp OpPair) [x, y])
+          result' = foldr1 (\x y -> Call (NameOp OpPair) [] [x, y])
                   $ Atom result : map (Atom . Access) results
 
           (results, tys) = unzip $ do

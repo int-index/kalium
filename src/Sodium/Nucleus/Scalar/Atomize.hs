@@ -43,8 +43,8 @@ instance (Atomize (obj pat), Scoping vars) => Atomize (Scope vars obj pat) where
 
 instance Atomize (Statement Pattern) where
 
-    atomize (Execute (Exec mname op exprs)) = atomizeStatement
-        $ Exec mname op <$> traverse atomizeExpression exprs
+    atomize (Execute (Exec mname op tyArgs exprs)) = atomizeStatement
+        $ Exec mname op tyArgs <$> traverse atomizeExpression exprs
 
     atomize (ForStatement (ForCycle name range body)) = atomizeStatement
         $ ForCycle name <$> atomizeExpression range <*> atomize body
@@ -67,10 +67,10 @@ atomizeExpression :: (TypeEnv e m, MonadSupply Name m) => Expression
                   -> WriterT (Pairs Name Type, [Statement Pattern Atom]) m Atom
 atomizeExpression = \case
     Atom atom -> return atom
-    e@(Call op args) -> do
+    e@(Call op tyArgs args) -> do
         eArgs <- traverse atomizeExpression args
         name  <- supply
         ty <- typecheck e
         let vardecl = (name, ty)
-        tell ([vardecl], [Execute $ Exec (PAccess name) op eArgs])
+        tell ([vardecl], [Execute $ Exec (PAccess name) op tyArgs eArgs])
         return (Access name)

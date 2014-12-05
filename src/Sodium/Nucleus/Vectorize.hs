@@ -135,7 +135,7 @@ vectorizeStatement = \case
         (changed, vecBodyGen) <- vectorizeScope scope
         vecBody <- lift $ vecBodyGen (map Access changed)
         return (changed, vecBody)
-    Execute (Exec pat name args) -> do
+    Execute (Exec pat name _tyArgs args) -> do
         -- TODO: purity flag in function signature
         let impure = case name of
               NameOp OpReadLn  -> True

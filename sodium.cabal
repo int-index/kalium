@@ -40,7 +40,6 @@ library
                ,       array
                ,       lens
                ,       profunctors
-               ,       singletons
                ,       monad-supply
                ,       haskell-src-exts == 1.16.*
                ,       parsec

@@ -5,7 +5,6 @@ module Sodium.Haskell.Convert (convert, reserved) where
 import Data.Traversable
 import Data.List (intercalate)
 import Control.Applicative
-import Data.Singletons.Void
 -- S for Src, D for Dest
 import qualified Sodium.Nucleus.Vector.Program as S
 import qualified Sodium.Haskell.Program as D
@@ -110,16 +109,9 @@ instance Conv S.Pattern where
 
 convlit :: S.Literal -> H.Exp
 convlit = \case
-    S.Lit S.STypeInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
-    S.Lit S.STypeDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
-    S.Lit S.STypeChar    c -> H.Lit $ H.Char c
-    S.Lit (S.STypeList S.STypeChar) cs -> H.Lit $ H.String cs
-    S.Lit (S.STypeList t) xs -> H.List $ map (\x -> convlit (S.Lit t x)) xs
-    S.Lit (S.STypeFunction _ _) a -> absurd a
-    S.Lit (S.STypeTaint _) a -> absurd a
-    S.Lit S.STypeUnit a -> absurd a
-    S.Lit (S.STypePair _ _) a -> absurd a
-    S.Lit S.STypeBoolean a -> absurd a
+    S.LitInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
+    S.LitDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
+    S.LitChar    c -> H.Lit $ H.Char c
 
 convOp :: S.Operator -> D.Name
 convOp = \case
@@ -159,6 +151,8 @@ convOp = \case
     S.OpReadLn   -> "readLn"
     S.OpPrintLn  -> "print"
     S.OpConcat   -> "++"
+    S.OpNil      -> "[]"
+    S.OpCons     -> ":"
     S.OpSingleton -> "return"
     S.OpBind      -> ">>="
     S.OpBindIgnore-> ">>"

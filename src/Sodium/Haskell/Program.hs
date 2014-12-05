@@ -57,6 +57,9 @@ doExecute  = H.Qualifier
 data Fixity = LFix | RFix | NFix deriving (Eq)
 data Level = ALevel Integer Fixity | BLevel | HLevel | SLevel
 
+matchExpression (H.Var (H.UnQual (H.Symbol "()")))
+    = H.Con $ H.Special H.UnitCon
+
 matchExpression (H.Lambda loc pats expr)
     = H.Lambda loc pats (matchExpression expr)
 

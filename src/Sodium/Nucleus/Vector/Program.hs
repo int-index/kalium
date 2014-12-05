@@ -31,8 +31,6 @@ data Expression
     deriving (Eq)
 
 pattern OpAccess op = Access (NameOp op)
-pattern Literal ty repr = Primary (Lit ty repr)
-
 pattern LitUnit = OpAccess OpUnit
 
 pattern App1 op a        = op `Beta` a

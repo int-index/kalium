@@ -109,14 +109,15 @@ instance Conv S.Type D.Type where
         S.TypeArray t -> D.TypeList <$> conv t
         S.TypeCustom _  -> error "Custom types are not implemented"
 
-binary op a b = D.Call op [a,b]
+binary op a b = D.Call op [] [a,b]
 
 convReadLn [e@(S.Access name')] = do
     let name = nameV name'
-    op <- typecheck e <&> \case
-        S.TypeString -> D.NameOp D.OpGetLn
-        _            -> D.NameOp D.OpReadLn
-    return $ D.Exec (D.PAccess name) op []
+    typecheck e >>= \case
+        S.TypeString -> return $ D.Exec (D.PAccess name) (D.NameOp D.OpGetLn) [] []
+        ty' -> do
+            ty <- conv ty'
+            return $ D.Exec (D.PAccess name) (D.NameOp D.OpReadLn) [ty] []
 convReadLn _ = error "IOMagic supports only single-value read operations"
 
 convWriteLn exprs = do
@@ -124,13 +125,13 @@ convWriteLn exprs = do
           ty <- typecheck expr
           let wrap = case ty of
                 S.TypeString -> id
-                S.TypeChar -> \e -> D.Call (D.NameOp D.OpSingleton) [e]
-                _ -> \e -> D.Call (D.NameOp D.OpShow) [e]
+                S.TypeChar -> \e -> D.Call (D.NameOp D.OpSingleton) [] [e]
+                _ -> \e -> D.Call (D.NameOp D.OpShow) [] [e]
           wrap <$> conv expr
     arg <- traverse convArg exprs <&> \case
         [] -> D.expression ""
         args -> foldl1 (binary (D.NameOp D.OpConcat)) args
-    return $ D.Exec D.PUnit (D.NameOp D.OpPutLn) [arg]
+    return $ D.Exec D.PUnit (D.NameOp D.OpPutLn) [] [arg]
 
 typeOfLiteral :: S.Literal -> S.Type
 typeOfLiteral = \case
@@ -229,7 +230,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn exprs
         S.Execute name exprs
              -> fmap D.statement
-             $  D.Exec D.PWildCard (nameF name)
+             $  D.Exec D.PWildCard (nameF name) []
             <$> traverse conv exprs
         S.ForCycle name fromExpr toExpr statement -> do
             let clName = nameV name
@@ -277,7 +278,7 @@ instance Conv S.Expression D.Expression where
             name <- case name' of
                 Left op -> conv op
                 Right name -> pure (nameF name)
-            D.Call name <$> traverse conv exprs
+            D.Call name [] <$> traverse conv exprs
         S.Primary lit -> conv lit
 
 instance Conv S.Literal D.Expression where

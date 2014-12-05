@@ -55,13 +55,13 @@ lookupFuncSig name = do
 
 instance Typecheck Expression where
     typecheck (Atom atom) = typecheck atom
-    typecheck (Call name args)
+    typecheck (Call name tyArgs args)
         | NameOp op <- name = do
-            mapM typecheck args >>= builtinOpType op
+            mapM typecheck args >>= builtinOpType op tyArgs
         | otherwise = funcSigType <$> lookupFuncSig name
 
-builtinOpType :: TypeEnv e m => Operator -> [Type] -> m Type
-builtinOpType op args = case op of
+builtinOpType :: TypeEnv e m => Operator -> [Type] -> [Type] -> m Type
+builtinOpType op tyArgs args = case op of
     OpAdd      -> argMatch2Same >>= require isNumeric
     OpSubtract -> argMatch2Same >>= require isNumeric
     OpMultiply -> argMatch2Same >>= require isNumeric
@@ -86,7 +86,7 @@ builtinOpType op args = case op of
     OpShow     -> return (TypeList TypeChar)
     OpNegate   -> argMatch1 >>= require isNumeric
     OpPrintLn  -> argMatch1 >> return TypeUnit
-    OpReadLn   -> return TypeUnit -- TODO: type inference?
+    OpReadLn   -> return (tyArgs !! 0)
     OpPutLn    -> argMatch1 >>= require (==TypeList TypeChar) >> return TypeUnit
     OpGetLn    -> return (TypeList TypeChar)
     OpUnit     -> return TypeUnit
@@ -94,6 +94,12 @@ builtinOpType op args = case op of
     OpPair     -> uncurry TypePair <$> argMatch2
     OpFst      -> fst <$> argMatch2
     OpSnd      -> snd <$> argMatch2
+    OpNil      -> return $ TypeList (tyArgs !! 0)
+    OpCons     -> do
+        (ty, tys) <- argMatch2
+        if tys == TypeList ty
+            then return tys
+            else panic
     OpSingleton-> TypeList <$> argMatch1
     OpConcat   -> argMatch2Same >>= require isList
     OpIntToDouble -> argMatch1 >>= require (==TypeInteger) >> return TypeDouble
