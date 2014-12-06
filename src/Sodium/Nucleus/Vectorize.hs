@@ -39,7 +39,7 @@ class Error e where
     errorUpdateImmutable :: Name -> e
 
 type E e m = (Applicative m, Error e, MonadError e m)
-type V e t m = (MonadTrans t, MonadReader VectorizeScope (t m), E e m, E e (t m))
+type V e m = (MonadReader VectorizeScope m, E e m)
 
 indexTag :: Maybe Integer -> Name -> Vec.Name
 indexTag Nothing (NameOp op) = NameOp op
@@ -84,25 +84,23 @@ smartAccess name = \case
     Index index   -> Vec.Access (Just index `indexTag` name)
     Immutable     -> Vec.Access (Nothing    `indexTag` name)
 
-mkPAccess :: V e t m => Name -> t m Vec.Pattern
+mkPAccess :: V e m => Name -> m Vec.Pattern
 mkPAccess name = smartPAccess name <$> lookupType name <*> lookupIndex name
 
-mkAccess :: V e t m => Name -> t m Vec.Expression
+mkAccess :: V e m => Name -> m Vec.Expression
 mkAccess name = smartAccess name <$> lookupIndex name
 
-expTuple :: V e t m => [Name] -> t m Vec.Expression
+expTuple :: V e m => [Name] -> m Vec.Expression
 expTuple names = mkExpTuple <$> traverse mkAccess names
 
-patTuple :: V e t m => [Name] -> t m Vec.Pattern
+patTuple :: V e m => [Name] -> m Vec.Pattern
 patTuple names = mkPatTuple <$> traverse mkPAccess names
 
-vectorizeBody :: (V e t m, Scoping v) => Scope v Body Pattern Atom -> t m ([Name], Vec.Expression)
+vectorizeBody :: (V e m, Scoping v) => Scope v Body Pattern Atom -> m ([Name], Vec.Expression)
 vectorizeBody scope = do
     let vars = scope ^. scopeVars
     let Body statement result = scope ^. scopeElem
-    (changed, vecBodyGen) <- vectorizeScope (Scope vars statement)
-    vecBody <- lift $ vecBodyGen [result]
-    return (changed, vecBody)
+    vectorizeScope (Scope vars statement) (const [result])
 
 updateLocalize names action = do
     updated <- for names $ \name -> do
@@ -113,21 +111,27 @@ updateLocalize names action = do
         return (name, index)
     local (vsIndices %~ mappend (M.fromList updated)) action
 
-vectorizeScope :: (V e t m, Scoping v) => Scope v Statement Pattern Atom -> t m ([Name], [Atom] -> m Vec.Expression)
-vectorizeScope scope = do
-    let vars = scope ^. scopeVars . to scoping
-    local (initIndices Uninitialized vars <>) $ do
-        (changed, vecStatement) <- vectorizeStatement (scope ^. scopeElem)
-        updateLocalize changed $ do
-            indices <- ask
-            let vecBodyGen results = flip runReaderT indices $ do
-                  pat <- patTuple changed
-                  vecResult <- Vec.Taint . mkExpTuple <$> traverse vectorizeAtom results
-                  return $ Vec.Follow pat vecStatement vecResult
-            let changedNonlocal = filter (`M.notMember` vars) changed
-            return (changedNonlocal, vecBodyGen)
+vectorizeResults :: V e m => [Atom] -> m Vec.Expression
+vectorizeResults results = Vec.Taint . mkExpTuple <$> traverse vectorizeAtom results
 
-vectorizeStatement :: V e t m => Statement Pattern Atom -> t m ([Name], Vec.Expression)
+vectorizeScope :: (V e m, Scoping v) => Scope v Statement Pattern Atom -> ([Name] -> [Atom]) -> m ([Name], Vec.Expression)
+vectorizeScope (Scope (scoping -> vars) statement) resulting = do
+    local (initIndices Uninitialized vars <>) $ do
+        (changed, vecStatement) <- vectorizeStatement statement
+        updateLocalize changed $ do
+            let changedNonlocal = filter (`M.notMember` vars) changed
+            pat <- patTuple changed
+            vecResult <- vectorizeResults (resulting changedNonlocal)
+            let obj = Vec.Follow pat vecStatement vecResult
+            return (changedNonlocal, obj)
+
+vectorizeAgainst changed vecStatement results = do
+    updateLocalize changed $ do
+        pat <- patTuple changed
+        vecResult <- vectorizeResults (map Access results)
+        return $ Vec.Follow pat vecStatement vecResult
+
+vectorizeStatement :: V e m => Statement Pattern Atom -> m ([Name], Vec.Expression)
 vectorizeStatement = \case
     Pass -> return ([], Vec.Taint Vec.LitUnit)
     Follow st1 st2 -> do
@@ -138,15 +142,12 @@ vectorizeStatement = \case
             updateLocalize changed2 $ do
                 vecPat2 <- patTuple changed2
                 let changed = nub $ changed1 ++ changed2
-                results <- Vec.Taint . mkExpTuple <$> traverse vectorizeAtom (map Access changed)
+                results <- vectorizeResults (map Access changed)
                 let vecBody = Vec.Follow vecPat1 vecStatement1
                             $ Vec.Follow vecPat2 vecStatement2
                             $ results
                 return (changed, vecBody)
-    ScopeStatement scope -> do
-        (changed, vecBodyGen) <- vectorizeScope scope
-        vecBody <- lift $ vecBodyGen (map Access changed)
-        return (changed, vecBody)
+    ScopeStatement scope -> vectorizeScope scope (map Access)
     Execute (Exec pat name _tyArgs args) -> do
         -- TODO: purity flag in function signature
         let impure = case name of
@@ -165,7 +166,7 @@ vectorizeStatement = \case
         let changed = patFlatten pat
         updateLocalize changed $ do
             vecPattern <- vectorizePattern pat
-            results <- Vec.Taint . mkExpTuple <$> traverse vectorizeAtom (map Access changed)
+            results <- vectorizeResults (map Access changed)
             let vecTaint = if impure then id else Vec.Taint
                 vecCall = foldl1 Vec.Beta $ Vec.Access (retag name):vecArgs
                 vecExecute = vecTaint vecCall
@@ -186,35 +187,33 @@ vectorizeStatement = \case
             return (changed, vecFor)
     IfStatement ifb -> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
-        let noscope = Scope (M.empty :: M.Map Name Type)
-        (changedThen, vecBodyThenGen) <- vectorizeScope (ifb ^. ifThen & noscope)
-        (changedElse, vecBodyElseGen) <- vectorizeScope (ifb ^. ifElse & noscope)
+        (changedThen, vecStatementThen) <- vectorizeStatement (ifb ^. ifThen)
+        (changedElse, vecStatementElse) <- vectorizeStatement (ifb ^. ifElse)
         let changed = nub $ changedThen ++ changedElse
-        let accessChanged = map Access changed
-        vecBodyThen <- lift $ vecBodyThenGen accessChanged
-        vecBodyElse <- lift $ vecBodyElseGen accessChanged
+        vecBodyThen <- vectorizeAgainst changedThen vecStatementThen changed
+        vecBodyElse <- vectorizeAgainst changedElse vecStatementElse changed
         let vecIf = Vec.AppOp3 Vec.OpIf vecBodyElse vecBodyThen vecCond
         return (changed, vecIf)
 
-vectorizeAtom :: V e t m => Atom -> t m Vec.Expression
+vectorizeAtom :: V e m => Atom -> m Vec.Expression
 vectorizeAtom = \case
     Primary a -> return (Vec.Primary a)
     Access name -> mkAccess name
 
-vectorizePattern :: V e t m => Pattern -> t m Vec.Pattern
+vectorizePattern :: V e m => Pattern -> m Vec.Pattern
 vectorizePattern = \case
     PUnit -> return Vec.PUnit
     PWildCard -> return Vec.PWildCard
     PAccess name -> mkPAccess name
     PTuple p1 p2 -> Vec.PTuple <$> vectorizePattern p1 <*> vectorizePattern p2
 
-lookupIndex :: V e t m => Name -> t m Index
+lookupIndex :: V e m => Name -> m Index
 lookupIndex = lookupX (view vsIndices)
 
-lookupType :: V e t m => Name -> t m Type
+lookupType :: V e m => Name -> m Type
 lookupType = lookupX (view vsTypes)
 
-lookupX :: V e t m => (VectorizeScope -> M.Map Name x) -> Name -> t m x
+lookupX :: V e m => (VectorizeScope -> M.Map Name x) -> Name -> m x
 lookupX f name = do
     xs <- asks f
     M.lookup name xs
