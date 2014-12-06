@@ -6,6 +6,7 @@ import Sodium.Nucleus.Scalar.Atomize (atomize')
 import Sodium.Nucleus.Scalar.Valueficate (valueficate)
 import Sodium.Nucleus.Vector.Match (match)
 import Sodium.Nucleus.Vector.Inline (inline)
+import Sodium.Nucleus.Vector.Sanity (sanity_nameUniqueness)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified Sodium.Pascal.Parse   as P (parse)
 import qualified Sodium.Pascal.Convert as P (convert)
@@ -22,6 +23,10 @@ import Control.Monad.Supply
 namestack :: [Integer]
 namestack = [0..]
 
+sanity_check name f x
+    | f x = return x
+    | otherwise = throwError (E.Insane name)
+
 translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
 translate src = do
     pas <- P.parse src
@@ -30,6 +35,7 @@ translate src = do
         >>= atomize'
         >>= atomize' . valueficate
         >>= vectorize
+        >>= sanity_check "Name uniqueness" sanity_nameUniqueness
         >>= optimize
     let dest = prettyPrint (H.convert optimal)
     return (map (prettyPrint . H.convert) log, dest)

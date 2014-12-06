@@ -17,6 +17,7 @@ data Error = ParseError String Int Int
            | UpdateImmutable String
            | PasConvError
            | TypeError String [N.Type]
+           | Insane String
     deriving (Show)
 
 instance P.Error Error where
@@ -29,6 +30,7 @@ instance P.Error Error where
 instance V.Error Error where
     errorNoAccess name names  = NoAccess (show name) (map show names)
     errorUpdateImmutable name = UpdateImmutable (show name)
+    errorInsane = Insane
 
 instance T.Error Error where
     errorNoAccess name vars = NoAccess (show name) (map show $ M.keys vars)

@@ -40,6 +40,7 @@ instance Monoid VectorizeScope where
 class Error e where
     errorNoAccess :: Name -> [Name] -> e
     errorUpdateImmutable :: Name -> e
+    errorInsane :: String -> e
 
 type E e m = (Applicative m, Error e, MonadError e m, MonadSupply Integer m)
 type V e m = (MonadReader VectorizeScope m, E e m)
@@ -190,13 +191,18 @@ vectorizeStatement = \case
         iter_type <- lookupType iter_name
         iterScope <- initIndices iter_index (M.singleton iter_name iter_type)
         local (iterScope <>) $ do
-            (changed, vecStatement) <- vectorizeStatement (forCycle ^. forStatement)
+            -- dry run to see what changes
+            (changed, _) <- vectorizeStatement (forCycle ^. forStatement)
             argExp <- expTuple changed
-            argPat <- patTuple changed
-            iterPat <- mkPAccess iter_name
-            let vecLambda = Vec.lambda [argPat, iterPat] vecStatement
-            let vecFor = Vec.AppOp3 Vec.OpFoldTainted vecLambda argExp vecRange
-            return (changed, vecFor)
+            updateLocalize changed $ do
+                (changed', vecStatement) <- vectorizeStatement (forCycle ^. forStatement)
+                when (changed /= changed') $
+                    throwError (errorInsane "changed == changed'")
+                argPat <- patTuple changed
+                iterPat <- mkPAccess iter_name
+                let vecLambda = Vec.lambda [argPat, iterPat] vecStatement
+                let vecFor = Vec.AppOp3 Vec.OpFoldTainted vecLambda argExp vecRange
+                return (changed, vecFor)
     IfStatement ifb -> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
         (changedThen, vecStatementThen) <- vectorizeStatement (ifb ^. ifThen)
