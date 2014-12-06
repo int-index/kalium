@@ -46,7 +46,7 @@ keywords = words
 transformName :: S.Name -> D.Name
 transformName = \case
     S.NameOp op -> convOp op
-    S.NameGen n tag -> [show n, maybe "" show tag] >>= ("_"++)
+    S.NameGen n -> "_" ++ show n
 
 instance Conv S.Name where
     type Hask S.Name = D.Name

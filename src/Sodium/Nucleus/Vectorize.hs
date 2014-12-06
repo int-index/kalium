@@ -8,6 +8,7 @@ import Data.Traversable
 import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.Except
+import Control.Monad.Supply
 import Control.Lens hiding (Index)
 import qualified Data.Map as M
 import Sodium.Nucleus.Scalar.Program
@@ -24,49 +25,46 @@ declareLenses [d|
     data VectorizeScope = VectorizeScope
         { vsTypes   :: M.Map Name Type
         , vsIndices :: M.Map Name Index
+        , vsNames   :: M.Map (Name, Index) (Maybe Vec.Name)
         } deriving (Eq)
 
                 |]
 
 instance Monoid VectorizeScope where
-    mempty = VectorizeScope mempty mempty
+    mempty = VectorizeScope mempty mempty mempty
     vs1 `mappend` vs2 = VectorizeScope
         (vs1 ^. vsTypes   <> vs2 ^. vsTypes)
         (vs1 ^. vsIndices <> vs2 ^. vsIndices)
+        (vs1 ^. vsNames   <> vs2 ^. vsNames)
 
 class Error e where
     errorNoAccess :: Name -> [Name] -> e
     errorUpdateImmutable :: Name -> e
 
-type E e m = (Applicative m, Error e, MonadError e m)
+type E e m = (Applicative m, Error e, MonadError e m, MonadSupply Integer m)
 type V e m = (MonadReader VectorizeScope m, E e m)
-
-indexTag :: Maybe Integer -> Name -> Vec.Name
-indexTag Nothing (NameOp op) = NameOp op
-indexTag tag (NameGen n ()) = NameGen n tag
-indexTag _ _ = error "indexTag: impossible"
-
-retag :: Name -> Vec.Name
-retag = indexTag Nothing
 
 vectorize :: E e m => Program Type Pattern Atom -> m Vec.Program
 vectorize program = do
-    vecFuncs <- traverse vectorizeFunc (program ^. programFuncs & M.toList)
-    return $ Vec.Program vecFuncs
+    (mconcat -> names') <- for (program ^. programFuncs . to M.keys)
+            $ \name -> M.singleton (name, Immutable) <$> (Just . Vec.NameGen <$> supply)
+    flip runReaderT (VectorizeScope mempty mempty names') $ do
+        vecFuncs <- traverse (uncurry vectorizeFunc) (program ^. programFuncs & M.toList)
+        return $ Vec.Program vecFuncs
 
-vectorizeFunc :: E e m => (Name, Func Type Pattern Atom) -> m Vec.Func
-vectorizeFunc (name, func) = do
-    let params = func ^. funcScope . scopeVars
-    let r = vectorizeBody (func ^. funcScope . scopeElem)
+vectorizeFunc :: V e m => Name -> Func Type Pattern Atom -> m Vec.Func
+vectorizeFunc name func = do
     let zeroIndex = Index 0
-    (_, vecBody)
-            <- runReaderT r
-            $ initIndices zeroIndex (scoping params)
-    let FuncSig tyResult tyArgs = funcSig func
-        vecFuncType = foldr1 TypeFunction (tyArgs `snoc` TypeTaint tyResult)
-    let mkParam (name, ty) = smartPAccess name ty zeroIndex
-        vecFuncLambda = Vec.lambda (map mkParam params) vecBody
-    return $ Vec.Func vecFuncType (retag name) vecFuncLambda
+    let params = func ^. funcScope . scopeVars
+    name' <- getFuncName name
+    initialScope <- initIndices zeroIndex (scoping params)
+    local (initialScope <>) $ do
+        (_, vecBody) <- vectorizeBody (func ^. funcScope . scopeElem)
+        let FuncSig tyResult tyArgs = funcSig func
+            vecFuncType = foldr1 TypeFunction (tyArgs `snoc` TypeTaint tyResult)
+        vecParams <- traverse mkPAccess (map fst params)
+        let vecFuncLambda = Vec.lambda vecParams vecBody
+        return $ Vec.Func vecFuncType name' vecFuncLambda
 
 mkPatTuple [  ] = Vec.PUnit
 mkPatTuple pats = foldr1 Vec.PTuple pats
@@ -74,21 +72,22 @@ mkPatTuple pats = foldr1 Vec.PTuple pats
 mkExpTuple [  ] = Vec.LitUnit
 mkExpTuple exps = foldr1 (Vec.AppOp2 Vec.OpPair) exps
 
-smartPAccess name ty = \case
-    Uninitialized -> Vec.PWildCard
-    Index index   -> Vec.PAccess (Just index  `indexTag` name) ty
-    Immutable     -> Vec.PAccess (Nothing     `indexTag` name) ty
+tryPAccess _  Nothing     = Vec.PWildCard
+tryPAccess ty (Just name) = Vec.PAccess name ty
 
-smartAccess name = \case
-    Uninitialized -> Vec.Access (NameOp OpUndefined)
-    Index index   -> Vec.Access (Just index `indexTag` name)
-    Immutable     -> Vec.Access (Nothing    `indexTag` name)
+tryAccess Nothing     = Vec.Access (Vec.NameOp OpUndefined)
+tryAccess (Just name) = Vec.Access name
 
 mkPAccess :: V e m => Name -> m Vec.Pattern
-mkPAccess name = smartPAccess name <$> lookupType name <*> lookupIndex name
+mkPAccess name = do
+    index <- lookupIndex name
+    ty    <- lookupType  name
+    tryPAccess ty <$> lookupName name index
 
 mkAccess :: V e m => Name -> m Vec.Expression
-mkAccess name = smartAccess name <$> lookupIndex name
+mkAccess name = do
+    index <- lookupIndex name
+    tryAccess <$> lookupName name index
 
 expTuple :: V e m => [Name] -> m Vec.Expression
 expTuple names = mkExpTuple <$> traverse mkAccess names
@@ -103,20 +102,27 @@ vectorizeBody scope = do
     vectorizeScope (Scope vars statement) (const [result])
 
 updateLocalize names action = do
-    updated <- for names $ \name -> do
-        index <- lookupIndex name >>= \case
-            Index n -> return (Index $ succ n)
-            Uninitialized -> return (Index 0)
+    (unzip -> (names', updated)) <- for names $ \name -> do
+        (index, name') <- lookupIndex name >>= \case
+            Index n -> do
+                name' <- Just . Vec.NameGen <$> supply
+                return (Index $ succ n, name')
+            Uninitialized -> do
+                name' <- Just . Vec.NameGen <$> supply
+                return (Index 0, name')
             Immutable -> throwError (errorUpdateImmutable name)
-        return (name, index)
-    local (vsIndices %~ mappend (M.fromList updated)) action
+        return (((name, index), name'), (name, index))
+    local ( (vsIndices %~ mappend (M.fromList updated))
+          . (vsNames   %~ mappend (M.fromList names'))
+          ) action
 
 vectorizeResults :: V e m => [Atom] -> m Vec.Expression
 vectorizeResults results = Vec.Taint . mkExpTuple <$> traverse vectorizeAtom results
 
 vectorizeScope :: (V e m, Scoping v) => Scope v Statement Pattern Atom -> ([Name] -> [Atom]) -> m ([Name], Vec.Expression)
 vectorizeScope (Scope (scoping -> vars) statement) resulting = do
-    local (initIndices Uninitialized vars <>) $ do
+    localScope <- initIndices Uninitialized vars
+    local (localScope <>) $ do
         (changed, vecStatement) <- vectorizeStatement statement
         updateLocalize changed $ do
             let changedNonlocal = filter (`M.notMember` vars) changed
@@ -125,11 +131,15 @@ vectorizeScope (Scope (scoping -> vars) statement) resulting = do
             let obj = Vec.Follow pat vecStatement vecResult
             return (changedNonlocal, obj)
 
-vectorizeAgainst changed vecStatement results = do
-    updateLocalize changed $ do
-        pat <- patTuple changed
-        vecResult <- vectorizeResults (map Access results)
-        return $ Vec.Follow pat vecStatement vecResult
+vectorizeAgainst changed (map Access -> results)
+    = updateLocalize changed
+    $ Vec.Lambda <$> patTuple changed <*> vectorizeResults results
+
+getFuncName name = case name of
+    NameOp op -> return (Vec.NameOp op)
+    NameGen _ -> do
+        Just name' <- lookupName name Immutable
+        return name'
 
 vectorizeStatement :: V e m => Statement Pattern Atom -> m ([Name], Vec.Expression)
 vectorizeStatement = \case
@@ -155,7 +165,7 @@ vectorizeStatement = \case
               NameOp OpGetLn      -> True
               NameOp OpPrintLn    -> True
               NameOp OpPutLn -> True
-              NameGen _ _ -> True
+              NameGen _ -> True
               _ -> False
         vecArgs <- traverse vectorizeAtom args
         let patFlatten = \case
@@ -167,8 +177,9 @@ vectorizeStatement = \case
         updateLocalize changed $ do
             vecPattern <- vectorizePattern pat
             results <- vectorizeResults (map Access changed)
+            name' <- getFuncName name
             let vecTaint = if impure then id else Vec.Taint
-                vecCall = foldl1 Vec.Beta $ Vec.Access (retag name):vecArgs
+                vecCall = foldl1 Vec.Beta (Vec.Access name' : vecArgs)
                 vecExecute = vecTaint vecCall
                 vecBody = Vec.Follow vecPattern vecExecute results
             return (changed, vecBody)
@@ -177,7 +188,8 @@ vectorizeStatement = \case
         let iter_name  = forCycle ^. forName
             iter_index = Immutable
         iter_type <- lookupType iter_name
-        local (initIndices iter_index (M.singleton iter_name iter_type) <>) $ do
+        iterScope <- initIndices iter_index (M.singleton iter_name iter_type)
+        local (iterScope <>) $ do
             (changed, vecStatement) <- vectorizeStatement (forCycle ^. forStatement)
             argExp <- expTuple changed
             argPat <- patTuple changed
@@ -190,8 +202,8 @@ vectorizeStatement = \case
         (changedThen, vecStatementThen) <- vectorizeStatement (ifb ^. ifThen)
         (changedElse, vecStatementElse) <- vectorizeStatement (ifb ^. ifElse)
         let changed = nub $ changedThen ++ changedElse
-        vecBodyThen <- vectorizeAgainst changedThen vecStatementThen changed
-        vecBodyElse <- vectorizeAgainst changedElse vecStatementElse changed
+        vecBodyThen <- Vec.Bind vecStatementThen <$> vectorizeAgainst changedThen changed
+        vecBodyElse <- Vec.Bind vecStatementElse <$> vectorizeAgainst changedElse changed
         let vecIf = Vec.AppOp3 Vec.OpIf vecBodyElse vecBodyThen vecCond
         return (changed, vecIf)
 
@@ -213,11 +225,25 @@ lookupIndex = lookupX (view vsIndices)
 lookupType :: V e m => Name -> m Type
 lookupType = lookupX (view vsTypes)
 
+lookupName :: V e m => Name -> Index -> m (Maybe Vec.Name)
+lookupName name index =
+    views vsNames (M.lookup (name, index))
+       >>= maybe (throwError $ errorNoAccess name []) return
+
 lookupX :: V e m => (VectorizeScope -> M.Map Name x) -> Name -> m x
 lookupX f name = do
     xs <- asks f
     M.lookup name xs
        & maybe (throwError $ errorNoAccess name (M.keys xs)) return
 
-initIndices :: Index -> M.Map Name Type -> VectorizeScope
-initIndices n types = VectorizeScope types (M.map (const n) types)
+initIndices :: E e m => Index -> M.Map Name Type -> m VectorizeScope
+initIndices n types = do
+    scopes <- for (M.toList types) $ \(name, ty) -> do
+        name' <- case n of
+            Uninitialized -> return Nothing
+            _ -> Just . Vec.NameGen <$> supply
+        return $ VectorizeScope
+            (M.singleton name ty)
+            (M.singleton name n)
+            (M.singleton (name, n) name')
+    return (mconcat scopes)

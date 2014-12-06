@@ -12,11 +12,6 @@ data Type
     | TypeTaint Type
     deriving (Eq, Ord, Show)
 
-data Name1 tag
-    = NameOp Operator
-    | NameGen Integer tag
-    deriving (Eq, Ord, Show)
-
 data Operator
     = OpAdd
     | OpSubtract

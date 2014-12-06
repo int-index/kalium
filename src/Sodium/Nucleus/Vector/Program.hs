@@ -8,7 +8,9 @@ import Control.Lens.TH
 
 import Sodium.Nucleus.Program
 
-type Name = Name1 (Maybe Integer)
+data Name = NameOp  Operator
+          | NameGen Integer
+    deriving (Eq, Ord, Show)
 
 data Program
     = Program

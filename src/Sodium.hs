@@ -19,8 +19,8 @@ import Control.Monad.Writer hiding (pass)
 import Control.Monad.Except
 import Control.Monad.Supply
 
-namestack :: [V.Name1 ()]
-namestack = map (\n -> V.NameGen n ()) [0..]
+namestack :: [Integer]
+namestack = [0..]
 
 translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
 translate src = do

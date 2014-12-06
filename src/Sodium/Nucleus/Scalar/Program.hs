@@ -13,7 +13,9 @@ import qualified Data.Map as M
 import Sodium.Nucleus.Program
 import Sodium.Util
 
-type Name = Name1 ()
+data Name = NameOp  Operator
+          | NameGen Integer
+    deriving (Eq, Ord, Show)
 
 type Vars = M.Map Name Type
 

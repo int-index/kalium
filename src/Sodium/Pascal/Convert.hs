@@ -54,7 +54,7 @@ class Error e where
 
 type Erroneous e m = (MonadError e m, Error e)
 
-convert :: (Applicative m, MonadSupply D.Name m, Erroneous e m)
+convert :: (Applicative m, MonadSupply Integer m, Erroneous e m)
         => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
 convert program = runReaderT (conv program) mempty
 
@@ -69,13 +69,13 @@ lookupName k = do
     maybe (throwError errorNoAccess) return mname
 
 class Conv s d | s -> d where
-    conv :: (Applicative m, MonadSupply D.Name m, Erroneous e m)
+    conv :: (Applicative m, MonadSupply Integer m, Erroneous e m)
          => s -> ReaderT ConvScope m d
 
 instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
     conv (S.Program funcs vars body) = do
         (M.unions -> funcNames) <- for funcs $ \(S.Func name _ _ _) -> do
-            funcName <- supply
+            funcName <- D.NameGen <$> supply
             return $ M.singleton (True, name) funcName
         local ( (csTypes . tsFunctions %~ M.union funcSigs)
               . (csNames %~ M.union funcNames)
@@ -98,7 +98,7 @@ convScope vardecls inner = do
                        ) inner
     return $ D.Scope (D.scoping scopeVars) scopeElem
        where convVardecl (name, pasType) = do
-                varName <- supply
+                varName <- D.NameGen <$> supply
                 ty <- conv pasType
                 return (M.singleton (False, name) varName, (varName, ty))
 
@@ -112,7 +112,7 @@ convScope' paramdecls inner = do
        where paramDeclToTup (S.ParamDecl name (_, ty)) = (name, ty)
              vardecls = M.fromList $ map paramDeclToTup paramdecls
              convParamdecl (S.ParamDecl name (r, pasType)) = do
-                paramName <- supply
+                paramName <- D.NameGen <$> supply
                 r' <- conv r
                 ty <- conv pasType
                 return (M.singleton (False, name) paramName, (paramName, (r', ty)))
@@ -291,7 +291,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
         S.CaseBranch expr leafs mBodyElse -> do
             clType <- typecheck expr >>= conv
             clExpr <- conv expr
-            clName <- supply
+            clName <- D.NameGen <$> supply
             let clCaseExpr = D.expression clName
             let instRange = \case
                     Right (exprFrom, exprTo)
