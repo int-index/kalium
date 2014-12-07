@@ -24,6 +24,7 @@ matchExpression = \case
     AppOp2 OpFmapIgnore LitUnit x -> Ignore x
     AppOp2 OpFmapIgnore a (Taint  _) -> Taint a
     AppOp2 OpFmapIgnore a (Ignore x) -> AppOp2 OpFmapIgnore a x
+    AppOp2 OpFmapIgnore c (propagateOpFmapIgnore c -> e) -> e
 
     Ignore (Taint _) -> Taint LitUnit
     Ignore e | isTaintedUnit e -> e
@@ -36,6 +37,7 @@ isTaintedUnit :: Expression -> Bool
 isTaintedUnit = \case
     AppOp1 OpPutLn  _ -> True
     AppOp1 OpIgnore _ -> True
+    AppOp3 OpIf xElse xThen _ -> isTaintedUnit xElse && isTaintedUnit xThen
     _ -> False
 
 etaReduce = \case
@@ -48,6 +50,12 @@ propagateOpIgnore = \case
     AppOp2 OpFmapIgnore _ a -> propagateOpIgnore a
     Lambda p a `Beta` x -> Lambda p (propagateOpIgnore a) `Beta` x
     e -> Ignore e
+
+propagateOpFmapIgnore c = \case
+    Follow p x a -> Follow p x (propagateOpFmapIgnore c a)
+    AppOp2 OpFmapIgnore _ a -> propagateOpFmapIgnore c a
+    Lambda p a `Beta` x -> Lambda p (propagateOpFmapIgnore c a) `Beta` x
+    e -> AppOp2 OpFmapIgnore c e
 
 lambdaReduce = \case
     Lambda PWildCard a `Beta` _ -> a

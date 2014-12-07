@@ -1,6 +1,8 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Sodium.Nucleus.Vector.Pattern where
 
 import qualified Data.Set as S
+import Control.Monad.Writer
 
 import Sodium.Nucleus.Vector.Program
 
@@ -10,6 +12,26 @@ patBound = \case
     PUnit -> S.empty
     PAccess name _ -> S.singleton name
     PTuple p1 p2 -> patBound p1 `S.union` patBound p2
+
+patRemoveUnits :: MonadWriter (S.Set Name) m => Pattern -> m Pattern
+patRemoveUnits = \case
+    PWildCard -> return PWildCard
+    PUnit -> return PWildCard
+    PAccess name TypeUnit -> do
+        tell (S.singleton name)
+        return PWildCard
+    p@(PAccess _ _) -> return p
+    PTuple p1 p2 -> liftM2 PTuple (patRemoveUnits p1) (patRemoveUnits p2)
+
+patType :: Pattern -> Maybe Type
+patType = \case
+    PWildCard -> Nothing
+    PUnit -> return TypeUnit
+    PAccess _ ty -> return ty
+    PTuple p1 p2 -> liftM2 TypePair (patType p1) (patType p2)
+
+patIsAccess (PAccess _ _) = True
+patIsAccess _ = False
 
 preciseMatch :: Pattern -> Expression -> Bool
 preciseMatch = \case

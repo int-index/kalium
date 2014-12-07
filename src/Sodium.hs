@@ -42,12 +42,12 @@ translate src = do
 
 type TranslationLog = [V.Program]
 
-optimize :: (Applicative m, Monad m) => V.Program -> m (V.Program, TranslationLog)
+optimize :: (Applicative m, Monad m, MonadSupply Integer m) => V.Program -> m (V.Program, TranslationLog)
 optimize program = runWriterT (closureM pass program)
 
-pass :: (Applicative m, MonadWriter TranslationLog m) => V.Program -> m V.Program
+pass :: (Applicative m, MonadWriter TranslationLog m, MonadSupply Integer m) => V.Program -> m V.Program
 pass program = tell [program] >> f program
-    where f  =  return . match . inline
+    where f  =  return . match >=> inline
 
 closureM :: (Eq a, Monad m) => (a -> m a) -> (a -> m a)
 closureM f = go where
