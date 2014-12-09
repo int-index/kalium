@@ -15,8 +15,8 @@ library
                        Sodium.Pascal.Parse
                        Sodium.Pascal.Tokenize
                        Sodium.Pascal.Convert
-                       Sodium.Haskell.Program
                        Sodium.Haskell.Convert
+                       Sodium.Haskell.Sugar
                        Sodium.Nucleus.Program
                        Sodium.Nucleus.Scalar.Program
                        Sodium.Nucleus.Scalar.Build

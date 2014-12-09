@@ -10,11 +10,12 @@ import Sodium.Nucleus.Vector.Sanity (sanity_nameUniqueness)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified Sodium.Pascal.Parse   as P (parse)
 import qualified Sodium.Pascal.Convert as P (convert)
+import qualified Sodium.Haskell.Sugar   as H (sugarcoat)
 import qualified Sodium.Haskell.Convert as H (convert)
 import qualified Sodium.Error as E
 import qualified Sodium.Nucleus.Vector.Program as V
+import Sodium.Util (closureM)
 
-import Data.Bool
 import Control.Applicative
 import Control.Monad.Writer hiding (pass)
 import Control.Monad.Except
@@ -37,8 +38,8 @@ translate src = do
         >>= vectorize
         >>= sanity_check "Name uniqueness" sanity_nameUniqueness
         >>= optimize
-    let dest = prettyPrint (H.convert optimal)
-    return (map (prettyPrint . H.convert) log, dest)
+    sweet <- H.sugarcoat (H.convert optimal)
+    return (map (prettyPrint . H.convert) log, prettyPrint sweet)
 
 type TranslationLog = [V.Program]
 
@@ -48,7 +49,3 @@ optimize program = runWriterT (closureM pass program)
 pass :: (Applicative m, MonadWriter TranslationLog m, MonadSupply Integer m) => V.Program -> m V.Program
 pass program = tell [program] >> f program
     where f  =  return . match >=> inline
-
-closureM :: (Eq a, Monad m) => (a -> m a) -> (a -> m a)
-closureM f = go where
-    go x = f x >>= \y -> bool (go y) (return x) (x == y)
