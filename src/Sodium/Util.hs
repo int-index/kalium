@@ -15,3 +15,7 @@ tryApply f a = maybe a id (f a)
 closureM :: (Eq a, Monad m) => (a -> m a) -> (a -> m a)
 closureM f = go where
     go x = f x >>= \y -> bool (go y) (return x) (x == y)
+
+uniform :: Eq a => [a] -> Maybe a
+uniform (x:xs) | all (==x) xs = Just x
+uniform _ = Nothing
