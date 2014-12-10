@@ -65,17 +65,17 @@ etaReduce = \case
 propagateOpIgnore = \case
     Follow p x a -> Follow p x (propagateOpIgnore a)
     AppOp2 OpFmapIgnore _ a -> propagateOpIgnore a
-    Lambda p a `Beta` x -> Lambda p (propagateOpIgnore a) `Beta` x
+    Into p x a -> Into p x (propagateOpIgnore a)
     e -> Ignore e
 
 propagateOpFmapIgnore c = \case
     Follow p x a -> Follow p x (propagateOpFmapIgnore c a)
     AppOp2 OpFmapIgnore _ a -> propagateOpFmapIgnore c a
-    Lambda p a `Beta` x -> Lambda p (propagateOpFmapIgnore c a) `Beta` x
+    Into p x a -> Into p x (propagateOpFmapIgnore c a)
     e -> AppOp2 OpFmapIgnore c e
 
 lambdaReduce = \case
-    Lambda PWildCard a `Beta` _ -> a
+    Into PWildCard _ a -> a
     Lambda p a -> Lambda (cleanPattern a p) a
     e -> e
 

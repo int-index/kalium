@@ -16,14 +16,14 @@ bindClean = over recmapped bindCleanExpression
 bindCleanExpression :: Expression -> Expression
 bindCleanExpression = \case
     Follow p x a | Just e <- asum $ map (taintSubst x a) (patClean p) -> e
-    Lambda p a `Beta` x | Just e <- asum $ map (pureSubst x a) (patClean p) -> e
+    Into   p x a | Just e <- asum $ map (pureSubst  x a) (patClean p) -> e
     e -> e
 
 taintSubst :: Expression -> Expression -> (Pattern, Attempt) -> Maybe Expression
 taintSubst x a (p, c) = taintAttempt c x <&> \x' -> Follow p x' a
 
 pureSubst :: Expression -> Expression -> (Pattern, Attempt) -> Maybe Expression
-pureSubst x a (p, c) = pureAttempt c x <&> \x' -> Lambda p a `Beta` x'
+pureSubst x a (p, c) = pureAttempt c x <&> \x' -> Into p x' a
 
 type Con = forall a . (a,a) -> (a,a)
 

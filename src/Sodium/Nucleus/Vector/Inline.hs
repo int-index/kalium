@@ -16,7 +16,7 @@ inline :: (Applicative m, MonadSupply Integer m) => Program -> m Program
 inline = recmapped inlineExpression
 
 inlineExpression :: (Applicative m, MonadSupply Integer m) => Expression -> m Expression
-inlineExpression (Lambda p a `Beta` x) | not excessive, not dangling = return b
+inlineExpression (Into p x a) | not excessive, not dangling = return b
     where (b, count) = runWriter (recmapped w a)
           w = replace $ \case
             e | preciseMatch p e -> Just x
