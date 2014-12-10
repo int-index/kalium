@@ -11,12 +11,9 @@ import Sodium.Nucleus.Vector.Name
 import Sodium.Nucleus.Vector.Attempt
 import Sodium.Util
 
-contexts :: MonadWriter [Expression] m => Expression -> (Expression -> Bool)
-         -> Expression -> m Expression
-contexts replacement fits (Beta cxt e) | fits e = do
-    tell [cxt]
-    return replacement
-contexts _ _ e = return e
+contexts :: MonadWriter [Expression] m => Attempt -> Expression -> m Expression
+contexts fits (Beta cxt e) | Just e' <- fits e = tell [cxt] >> return e'
+contexts _ e = return e
 
 context :: (Applicative m, MonadSupply Integer m) => Name -> Expression
         -> (Name -> Expression -> Maybe Expression -> m a) -> m a
@@ -24,10 +21,9 @@ context name a cont = do
     name' <- NameGen <$> supply
     let (b, cxts) = runWriter (recmapped w a)
         dangling = b `mentions` name
-        w = contexts (Access name') fits
-        fits = \case
-            Access name' -> name == name'
-            _ -> False
+        w = contexts $ \case
+            Access name'' | name == name'' -> Just (Access name')
+            _ -> Nothing
     case uniform cxts of
         Just ctx | not dangling -> cont name' b (Just ctx)
         _ -> cont name' b Nothing
