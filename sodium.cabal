@@ -29,6 +29,7 @@ library
                        Sodium.Nucleus.Vector.Pattern
                        Sodium.Nucleus.Vector.Match
                        Sodium.Nucleus.Vector.Inline
+                       Sodium.Nucleus.Vector.BindClean
                        Sodium.Nucleus.Vector.Sanity
                        Sodium.Nucleus.Vectorize
 

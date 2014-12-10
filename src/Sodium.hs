@@ -6,6 +6,7 @@ import Sodium.Nucleus.Scalar.Atomize (atomize')
 import Sodium.Nucleus.Scalar.Valueficate (valueficate)
 import Sodium.Nucleus.Vector.Match (match)
 import Sodium.Nucleus.Vector.Inline (inline)
+import Sodium.Nucleus.Vector.BindClean (bindClean)
 import Sodium.Nucleus.Vector.Sanity (sanity_nameUniqueness)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified Sodium.Pascal.Parse   as P (parse)
@@ -48,4 +49,4 @@ optimize program = runWriterT (closureM pass program)
 
 pass :: (Applicative m, MonadWriter TranslationLog m, MonadSupply Integer m) => V.Program -> m V.Program
 pass program = tell [program] >> f program
-    where f  =  return . match >=> inline
+    where f  =  return . match >=> inline >=> return . bindClean

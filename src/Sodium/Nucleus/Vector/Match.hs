@@ -30,6 +30,9 @@ matchExpression = \case
     Ignore e | isTaintedUnit e -> e
     Ignore (propagateOpIgnore -> e) -> e
 
+    AppOp1 OpFst (AppOp2 OpPair a _) -> a
+    AppOp1 OpSnd (AppOp2 OpPair _ a) -> a
+
     e -> e
 
 -- TODO: typecheck
