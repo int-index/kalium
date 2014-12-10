@@ -10,6 +10,9 @@ import Sodium.Nucleus.Vector.Name
 match :: Program -> Program
 match = over recmapped (matchExpression . lambdaReduce . etaReduce)
 
+pattern LitZero = Primary (LitInteger 0)
+pattern LitOne  = Primary (LitInteger 1)
+
 matchExpression :: Expression -> Expression
 matchExpression = \case
 
@@ -33,12 +36,23 @@ matchExpression = \case
     AppOp1 OpFst (AppOp2 OpPair a _) -> a
     AppOp1 OpSnd (AppOp2 OpPair _ a) -> a
 
+    AppOp1 OpPutLn (AppOp1 OpShow a) -> AppOp1 OpPrintLn a
+
+    AppOp3 OpFoldTainted (Lambda2 p1 p2 (Taint a)) x1 x2
+        -> Taint (AppOp3 OpFold (Lambda2 p1 p2 a) x1 x2)
+
+    AppOp3 OpFold (OpAccess OpMultiply) LitOne x -> AppOp1 OpProduct x
+    AppOp3 OpFold (OpAccess OpAdd) LitZero x -> AppOp1 OpSum x
+    AppOp3 OpFold (OpAccess OpAnd) (OpAccess OpTrue) x -> AppOp1 OpAnd' x
+    AppOp3 OpFold (OpAccess OpOr) (OpAccess OpFalse) x -> AppOp1 OpOr' x
+
     e -> e
 
 -- TODO: typecheck
 isTaintedUnit :: Expression -> Bool
 isTaintedUnit = \case
     AppOp1 OpPutLn  _ -> True
+    AppOp1 OpPrintLn _ -> True
     AppOp1 OpIgnore _ -> True
     AppOp3 OpIf xElse xThen _ -> isTaintedUnit xElse && isTaintedUnit xThen
     _ -> False

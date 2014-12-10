@@ -42,6 +42,8 @@ pattern AppOp1 op a        = App1 (OpAccess op) a
 pattern AppOp2 op a1 a2    = App2 (OpAccess op) a1 a2
 pattern AppOp3 op a1 a2 a3 = App3 (OpAccess op) a1 a2 a3
 
+pattern Lambda2 p1 p2 a = Lambda p1 (Lambda p2 a)
+
 pattern Eta p x a = Lambda p (Beta x a)
 
 pattern Ignore a     = AppOp1 OpIgnore a

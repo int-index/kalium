@@ -62,6 +62,7 @@ instance Sugar Exp where
         exp@Con{} -> return exp
         exp@Lit{} -> return exp
         List exps -> List <$> sugar exps
+        EnumFromTo exp1 exp2 -> EnumFromTo <$> sugar exp1 <*> sugar exp2
         Tuple boxed exps -> Tuple boxed <$> sugar exps
         Paren exp  -> Paren <$> sugar exp
         App x y -> App <$> sugar x <*> sugar y
@@ -83,7 +84,9 @@ expMatchInfix = \case
     App2 (Con op) x y -> case op of
         Special (TupleCon boxed _) -> Tuple boxed [x, y]
         _ -> Paren (InfixApp (Paren x) (QConOp op) (Paren y))
-    App2 (Var op) x y -> Paren (InfixApp (Paren x) (QVarOp op) (Paren y))
+    App2 (Var op) x y -> case op of
+        UnQual (Ident "enumFromTo") -> EnumFromTo x y
+        _ -> Paren (InfixApp (Paren x) (QVarOp op) (Paren y))
     exp -> exp
 
 expStripParen aggressive = \case
