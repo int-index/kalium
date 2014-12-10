@@ -46,6 +46,15 @@ matchExpression = \case
     AppOp3 OpFold (OpAccess OpAnd) (OpAccess OpTrue) x -> AppOp1 OpAnd' x
     AppOp3 OpFold (OpAccess OpOr) (OpAccess OpFalse) x -> AppOp1 OpOr' x
 
+    AppOp3 OpIf xElse xThen cond
+        | AppOp1 opElse aElse <- xElse
+        , AppOp1 opThen aThen <- xThen
+        , opElse == opThen
+        -- some type-preserving functions:
+        , opElse `elem` [OpPutLn, OpTaint]
+        -- TODO: typecheck (typeof aElse == typeof aThen)
+        -> AppOp1 opElse (AppOp3 OpIf aElse aThen cond)
+
     e -> e
 
 -- TODO: typecheck
