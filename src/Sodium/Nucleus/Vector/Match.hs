@@ -6,9 +6,10 @@ import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Pattern
 import Sodium.Nucleus.Vector.Name
+import Sodium.Nucleus.Vector.Attempt
 
 match :: Program -> Program
-match = over recmapped (matchExpression . lambdaReduce . etaReduce)
+match = over recmapped (matchExpression . lambdaReduce . etaReduce . pairReduce)
 
 pattern LitZero = Primary (LitInteger 0)
 pattern LitOne  = Primary (LitInteger 1)
@@ -33,9 +34,6 @@ matchExpression = \case
     Ignore e | isTaintedUnit e -> e
     Ignore (propagateOpIgnore -> e) -> e
 
-    AppOp1 OpFst (AppOp2 OpPair a _) -> a
-    AppOp1 OpSnd (AppOp2 OpPair _ a) -> a
-
     AppOp1 OpPutLn (AppOp1 OpShow a) -> AppOp1 OpPrintLn a
 
     AppOp3 OpFoldTainted (Lambda2 p1 p2 (Taint a)) x1 x2
@@ -56,6 +54,19 @@ matchExpression = \case
         -> AppOp1 opElse (AppOp3 OpIf aElse aThen cond)
 
     e -> e
+
+pairReduce :: Expression -> Expression
+pairReduce = \case
+    AppOp1 OpFst (pureAttempt fstAttempt -> Just a) -> a
+    AppOp1 OpSnd (pureAttempt sndAttempt -> Just a) -> a
+    e -> e
+  where
+    fstAttempt = \case
+        AppOp2 OpPair a _ -> Just a
+        _ -> Nothing
+    sndAttempt = \case
+        AppOp2 OpPair _ a -> Just a
+        _ -> Nothing
 
 -- TODO: typecheck
 isTaintedUnit :: Expression -> Bool
@@ -85,6 +96,7 @@ propagateOpFmapIgnore c = \case
 
 lambdaReduce = \case
     Into PWildCard _ a -> a
+    Into p x (Taint a) -> Taint (Into p x a)
     Lambda p a -> Lambda (cleanPattern a p) a
     e -> e
 
