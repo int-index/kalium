@@ -1,10 +1,8 @@
 module Sodium.Nucleus.Vector.BindClean where
 
 import Control.Applicative
-import Control.Monad
 import Control.Lens
 import Data.Foldable
-import Data.Tuple
 import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Attempt
@@ -29,18 +27,17 @@ type Con = forall a . (a,a) -> (a,a)
 
 patClean :: Pattern -> Pairs Pattern Attempt
 patClean p@PWildCard = return (p, \_ -> return LitUnit)
-patClean (PTuple pat1 pat2) = go id OpFst `mplus` go swap OpSnd where
-    go :: Con -> Operator -> Pairs Pattern Attempt
-    go con op = patClean p2 >>= wrap where
-        (p1, p2) = con (pat1, pat2)
-        wrap (PWildCard, _) = do
-            let cln expr = return (AppOp1 op expr)
-            return (p1, cln)
-        wrap (p0, cln') = do
-            let cln (AppOp2 OpPair expr1 expr2) = do
-                  let (act1, act2) = con (pure, cln')
-                  AppOp2 OpPair <$> act1 expr1 <*> act2 expr2
-                cln _ = Nothing
-            return (PTuple `uncurry` con (p1, p0), cln)
-
+patClean (PTuple PWildCard p) = return (p, Just . AppOp1 OpSnd)
+patClean (PTuple p PWildCard) = return (p, Just . AppOp1 OpFst)
+patClean (PTuple p1 p2) = fstClean ++ sndClean where
+    fstClean = do
+        (p, c) <- patClean p1
+        let cln (AppOp2 OpPair e1 e2) = AppOp2 OpPair <$> c e1 <*> pure e2
+            cln _ = Nothing
+        return (PTuple p p2, cln)
+    sndClean = do
+        (p, c) <- patClean p2
+        let cln (AppOp2 OpPair e1 e2) = AppOp2 OpPair <$> pure e1 <*> c e2
+            cln _ = Nothing
+        return (PTuple p1 p, cln)
 patClean _ = []

@@ -12,7 +12,7 @@ taintAttempt c = fix $ \go -> \case
     Into p x a -> Into p x <$> go a
     AppOp3 OpIf xElse xThen cond
         -> AppOp3 OpIf <$> go xElse <*> go xThen <*> pure cond
-    Taint a -> Taint <$> c a
+    Taint a -> Taint <$> pureAttempt c a
     _ -> Nothing
 
 pureAttempt :: Attempt -> Attempt
