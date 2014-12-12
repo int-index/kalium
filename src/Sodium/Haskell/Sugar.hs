@@ -5,6 +5,7 @@ import Control.Applicative
 import Control.Lens
 
 import Language.Haskell.Exts
+import Language.Haskell.Exts.SrcLoc (noLoc)
 import Sodium.Util (closureM)
 
 sugarcoat :: (Applicative m, Monad m) => Module -> m Module
@@ -40,6 +41,7 @@ instance Sugar Binds where
 
 instance Sugar Rhs where
     sugar = \case
+        UnGuardedRhs (MultiIf rhss) -> sugar (GuardedRhss rhss)
         UnGuardedRhs exp -> UnGuardedRhs <$> (expStripParen True <$> sugar exp)
         GuardedRhss rhss -> GuardedRhss  <$> sugar rhss
 
@@ -55,6 +57,7 @@ instance Sugar Stmt where
         RecStmt stmts -> RecStmt <$> sugar stmts
 
 pattern App2 op x y = op `App` x `App` y
+pattern App3 op x y z = op `App` x `App` y `App` z
 
 instance Sugar Exp where
     sugar = fmap expMatch . \case
@@ -62,6 +65,8 @@ instance Sugar Exp where
         exp@Con{} -> return exp
         exp@Lit{} -> return exp
         List exps -> List <$> sugar exps
+        MultiIf rhss -> MultiIf <$> sugar rhss
+        If exp1 exp2 exp3 -> If <$> sugar exp1 <*> sugar exp2 <*> sugar exp3
         EnumFromTo exp1 exp2 -> EnumFromTo <$> sugar exp1 <*> sugar exp2
         Tuple boxed exps -> Tuple boxed <$> sugar exps
         Paren exp  -> Paren <$> sugar exp
@@ -75,18 +80,37 @@ instance Sugar Exp where
 expMatch
     = expStripParen False
     . expMatchInfix
+    . expMatchIf
     . expJoinLambda
     . expJoinList
     . expAppSection
     . expDoMatch
 
+isInfix op = op /= UnQual (Ident "bool")
+
+expMatchIf = \case
+    App3 (Var op) x y z | UnQual (Ident "bool") <- op -> If z y x
+    exp | (leafs, final) <- extractMultiIf exp
+        , length leafs > 1
+        -> let
+            finalCond = Var (UnQual (Ident "otherwise"))
+            leafRhs (expCond, expThen) = GuardedRhs noLoc [Qualifier expCond] expThen
+           in MultiIf $ map leafRhs (leafs `snoc` (finalCond, final))
+    exp -> exp
+
+extractMultiIf :: Exp -> ([(Exp, Exp)], Exp)
+extractMultiIf = \case
+    If expCond expThen expElse -> over _1 ((expCond, expThen):) (extractMultiIf expElse)
+    exp -> ([], exp)
+
 expMatchInfix = \case
     App2 (Con op) x y -> case op of
         Special (TupleCon boxed _) -> Tuple boxed [x, y]
         _ -> Paren (InfixApp (Paren x) (QConOp op) (Paren y))
-    App2 (Var op) x y -> case op of
-        UnQual (Ident "enumFromTo") -> EnumFromTo x y
-        _ -> Paren (InfixApp (Paren x) (QVarOp op) (Paren y))
+    App2 (Var op) x y | UnQual (Ident "enumFromTo") <- op
+        -> EnumFromTo x y
+    App2 (Var op) x y | isInfix op
+        -> Paren (InfixApp (Paren x) (QVarOp op) (Paren y))
     exp -> exp
 
 expStripParen aggressive = \case
