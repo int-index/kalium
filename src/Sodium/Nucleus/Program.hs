@@ -48,6 +48,7 @@ data Operator
     | OpPair
     | OpFst
     | OpSnd
+    | OpSwap
     | OpNil
     | OpCons
     | OpSingleton

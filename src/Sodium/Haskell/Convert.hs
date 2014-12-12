@@ -130,6 +130,7 @@ convOp = \case
     S.OpId       -> H.Var (H.UnQual (H.Ident "id"))
     S.OpFst      -> H.Var (H.UnQual (H.Ident "fst"))
     S.OpSnd      -> H.Var (H.UnQual (H.Ident "snd"))
+    S.OpSwap     -> H.Var (H.UnQual (H.Ident "swap"))
     S.OpPutLn    -> H.Var (H.UnQual (H.Ident "putStrLn"))
     S.OpGetLn    -> H.Var (H.UnQual (H.Ident "getLine"))
     S.OpReadLn   -> H.Var (H.UnQual (H.Ident "readLn"))

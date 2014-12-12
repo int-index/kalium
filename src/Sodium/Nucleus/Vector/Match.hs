@@ -127,6 +127,9 @@ doubleOp2 = \case
 
 pairReduce :: Expression -> Expression
 pairReduce = \case
+    Lambda (PTuple p1 p2) (pureAttempt (swapApp p1 p2) -> Just a)
+        -> Lambda (PTuple p2 p1) a
+    AppOp1 OpSwap (pureAttempt swapAttempt -> Just a) -> a
     AppOp1 OpFst (pureAttempt fstAttempt -> Just a) -> a
     AppOp1 OpSnd (pureAttempt sndAttempt -> Just a) -> a
     e -> e
@@ -136,6 +139,15 @@ pairReduce = \case
         _ -> Nothing
     sndAttempt = \case
         AppOp2 OpPair _ a -> Just a
+        _ -> Nothing
+    swapAttempt = \case
+        AppOp2 OpPair a b -> Just (AppOp2 OpPair b a)
+        _ -> Nothing
+    swapApp p1 p2 = \case
+        e@(AppOp2 OpPair a1 a2)
+            | preciseMatch p1 a2
+            , preciseMatch p2 a1
+            -> Just (AppOp1 OpSwap e)
         _ -> Nothing
 
 -- TODO: typecheck
