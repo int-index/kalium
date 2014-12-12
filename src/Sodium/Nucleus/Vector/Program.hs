@@ -10,7 +10,7 @@ import Sodium.Nucleus.Program
 
 data Name = NameOp  Operator
           | NameGen Integer
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord)
 
 data Program
     = Program
@@ -63,3 +63,25 @@ data Pattern
 
 makeLenses ''Func
 makeLenses ''Program
+
+-- DEBUG INSTANCES
+
+instance Show Name where
+    show = \case
+        NameOp op -> show op
+        NameGen n -> "_" ++ show n
+
+instance Show Expression where
+    show = \case
+        AppOp2 OpPair x y -> "(" ++ show x ++ "," ++ show y ++ ")"
+        Access name -> show name
+        Primary lit -> show lit
+        Lambda p a -> "(λ" ++ show p ++ "." ++ show a ++ ")"
+        Beta a b -> show a ++ "(" ++ show b ++ ")"
+
+instance Show Pattern where
+    show = \case
+        PUnit -> "()"
+        PWildCard -> "_"
+        PAccess name _ -> show name
+        PTuple p1 p2 -> "(" ++ show p1 ++ "," ++ show p2 ++ ")"

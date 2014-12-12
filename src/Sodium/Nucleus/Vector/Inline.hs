@@ -2,6 +2,7 @@
 module Sodium.Nucleus.Vector.Inline where
 
 import qualified Data.Set as S
+import Data.Traversable
 import Control.Applicative
 import Control.Monad.Writer
 import Control.Monad.Supply
@@ -11,12 +12,13 @@ import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Pattern
 import Sodium.Nucleus.Vector.Name
 import Sodium.Nucleus.Vector.Attempt
+import Sodium.Nucleus.Vector.Cost
+import Sodium.Util
 
-inline :: (Applicative m, MonadSupply Integer m) => Program -> m Program
-inline = recmapped inlineExpression
+inline :: (Applicative m, MonadSupply Integer m, Recmappable a) => a -> m a
+inline = recmapped (reorderPattern <=< mergePattern . inlineExpression)
 
-inlineExpression :: (Applicative m, MonadSupply Integer m) => Expression -> m Expression
-inlineExpression (Into p x a) | not excessive, not dangling = return b
+inlineExpression (Into p x a) | not excessive, not dangling = b
     where (b, count) = runWriter (recmapped w a)
           w = replace $ \case
             e | preciseMatch p e -> Just x
@@ -33,8 +35,10 @@ inlineExpression (Lambda p a)
           w = replace $ \case
             Access name | name `S.member` names -> Just (OpAccess OpUnit)
             _ -> Nothing
-      in return (Lambda p' b)
-inlineExpression e@(Lambda p a)
+      in (Lambda p' b)
+inlineExpression e = e
+
+mergePattern e@(Lambda p a)
     | Just ty <- patType p
     , not (patIsAccess p)
     = do
@@ -45,9 +49,40 @@ inlineExpression e@(Lambda p a)
             (b, _) = runWriter (recmapped w a)
             dangling = b `mentions` patBound p
         return (if dangling then e else Lambda (PAccess name ty) b)
-inlineExpression e = return e
+mergePattern e = return e
+
+reorderPattern e | Follow p x a <- e = do
+    reorders <- for (reorder p x) $ \(p', x') -> do
+        Follow p' <$> recmapped (mergePattern . inlineExpression) x' <*> pure a
+    return (lesser e reorders)
+reorderPattern e = return e
 
 replace :: MonadWriter (Sum Integer) m => Attempt -> Expression -> m Expression
 replace fits e
     | Just e' <- fits e = tell (Sum 1) >> return e'
     | otherwise = return e
+
+reorderings :: Expression -> Pairs (Pattern -> Maybe Pattern) Expression
+reorderings = \case
+    AppOp2 OpPair x y -> do
+        (fx, x') <- reorderings x
+        (fy, y') <- reorderings y
+        let r1 = (pairMatch id   fx fy, AppOp2 OpPair x' y')
+            r2 = (pairMatch flip fx fy, AppOp2 OpPair y' x')
+        [r1, r2]
+    e -> [(Just, e)]
+  where
+    pairMatch k fx fy = \case
+        PTuple x y -> k PTuple <$> fx x <*> fy y
+        _ -> Nothing
+
+reorder :: Pattern -> Expression -> Pairs Pattern Expression
+reorder p (Taint a) = do
+    (f, b) <- reorderings a
+    case f p of
+        Nothing -> []
+        Just p' -> [(p', Taint b)]
+reorder p (Follow p_ x_ a) = do
+    (p', b) <- reorder p a
+    return (p', Follow p_ x_ b)
+reorder _ _ = []
