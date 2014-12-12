@@ -30,10 +30,12 @@ library
                        Sodium.Nucleus.Vector.Match
                        Sodium.Nucleus.Vector.Inline
                        Sodium.Nucleus.Vector.BindClean
+                       Sodium.Nucleus.Vector.ArgClean
                        Sodium.Nucleus.Vector.Attempt
                        Sodium.Nucleus.Vector.Context
                        Sodium.Nucleus.Vector.Cost
                        Sodium.Nucleus.Vector.Sanity
+                       Sodium.Nucleus.Vector.Show
                        Sodium.Nucleus.Vectorize
 
   build-depends:       base

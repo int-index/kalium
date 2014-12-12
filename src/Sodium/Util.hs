@@ -19,3 +19,10 @@ closureM f = go where
 uniform :: Eq a => [a] -> Maybe a
 uniform (x:xs) | all (==x) xs = Just x
 uniform _ = Nothing
+
+zipFilter :: [Bool] -> [a] -> Maybe [a]
+zipFilter (keep:keeps) (a:as)
+    | keep = (a:) `fmap` zipFilter keeps as
+    | otherwise = zipFilter keeps as
+zipFilter [] [] = Just []
+zipFilter _ _ = Nothing
