@@ -90,18 +90,15 @@ isInfix op = op /= UnQual (Ident "bool")
 
 expMatchIf = \case
     App3 (Var op) x y z | UnQual (Ident "bool") <- op -> If z y x
-    exp | (leafs, final) <- extractMultiIf exp
-        , length leafs > 1
-        -> let
-            finalCond = Var (UnQual (Ident "otherwise"))
-            leafRhs (expCond, expThen) = GuardedRhs noLoc [Qualifier expCond] expThen
-           in MultiIf $ map leafRhs (leafs `snoc` (finalCond, final))
+    If expCond expThen expElse
+        | MultiIf rhss <- expElse
+            -> MultiIf (GuardedRhs noLoc [Qualifier expCond] expThen : rhss)
+        | If expCond' expThen' expElse' <- expElse
+            -> MultiIf [ GuardedRhs noLoc [Qualifier expCond ] expThen
+                       , GuardedRhs noLoc [Qualifier expCond'] expThen'
+                       , GuardedRhs noLoc [Qualifier trueCond] expElse'
+                       ] where trueCond = Var (UnQual (Ident "otherwise"))
     exp -> exp
-
-extractMultiIf :: Exp -> ([(Exp, Exp)], Exp)
-extractMultiIf = \case
-    If expCond expThen expElse -> over _1 ((expCond, expThen):) (extractMultiIf expElse)
-    exp -> ([], exp)
 
 expMatchInfix = \case
     App2 (Con op) x y -> case op of
