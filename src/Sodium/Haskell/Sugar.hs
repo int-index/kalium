@@ -4,7 +4,7 @@ module Sodium.Haskell.Sugar where
 import Control.Applicative
 import Control.Lens
 
-import Language.Haskell.Exts
+import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.SrcLoc (noLoc)
 import Sodium.Util (closureM)
 
@@ -111,7 +111,22 @@ expMatchInfix = \case
     exp -> exp
 
 expStripParen aggressive = \case
-    Paren exp | (aggressive || expIsAtomic exp) -> exp
+    Paren exp | (aggressive || expLevel exp == ParensAtom) -> exp
+    InfixApp (Paren (InfixApp l_lhs l_op l_rhs)) op rhs
+        | (Leftfix, l_n) <- whatfix l_op
+        , (Leftfix,   n) <- whatfix   op
+        , l_n == n
+        -> InfixApp (InfixApp l_lhs l_op l_rhs) op rhs
+
+    InfixApp lhs op rhs | (fx, n) <- whatfix op
+        -> InfixApp
+            (expStripParen' (fx, n) lhs)
+            op
+            (expStripParen' (fx, n) rhs)
+    exp -> exp
+
+expStripParen' (fx, n) = \case
+    Paren exp | expLevel exp `lesserLevel` ParensInfix fx n -> exp
     exp -> exp
 
 expJoinLambda = \case
@@ -144,10 +159,44 @@ expDoMatch = \case
             stmt -> [stmt]
     exp -> exp
 
-expIsAtomic = \case
-    Paren{} -> True
-    Var{} -> True
-    Con{} -> True
-    Lit{} -> True
-    List{} -> True
-    _ -> False
+data Fixity = Nonfix | Leftfix | Rightfix
+    deriving (Eq)
+
+data ParensLevel
+    = ParensAtom
+    | ParensInfix Fixity Int
+    | ParensUniverse
+    deriving (Eq)
+
+lesserLevel :: ParensLevel -> ParensLevel -> Bool
+lesserLevel l ParensUniverse = l /= ParensUniverse
+lesserLevel ParensAtom     l = l /= ParensAtom
+lesserLevel (ParensInfix _ n1) (ParensInfix _ n2) = n1 > n2
+lesserLevel _ _ = False
+
+expLevel :: Exp -> ParensLevel
+expLevel = \case
+    Paren{} -> ParensAtom
+    Var{} -> ParensAtom
+    Con{} -> ParensAtom
+    Lit{} -> ParensAtom
+    List{} -> ParensAtom
+    InfixApp _ op _ -> ParensInfix `uncurry` whatfix op
+    _ -> ParensUniverse
+
+whatfix op = maybe (Leftfix, 9) id (lookup op fixtable)
+fixtable = [ (QVarOp $ UnQual $ Symbol "+", (Leftfix, 6))
+           , (QVarOp $ UnQual $ Symbol "-", (Leftfix, 6))
+           , (QVarOp $ UnQual $ Symbol "*", (Leftfix, 7))
+           , (QVarOp $ UnQual $ Symbol "/", (Leftfix, 7))
+           , (QVarOp $ UnQual $ Ident "div", (Leftfix, 7))
+           , (QVarOp $ UnQual $ Ident "mod", (Leftfix, 7))
+           , (QVarOp $ UnQual $ Symbol "++", (Rightfix, 5))
+           , (QVarOp $ UnQual $ Symbol "==", (Nonfix, 4))
+           , (QVarOp $ UnQual $ Symbol "/=", (Nonfix, 4))
+           , (QVarOp $ UnQual $ Symbol "<",  (Nonfix, 4))
+           , (QVarOp $ UnQual $ Symbol ">",  (Nonfix, 4))
+           , (QVarOp $ UnQual $ Ident "elem", (Nonfix, 4))
+           , (QVarOp $ UnQual $ Symbol "&&", (Rightfix, 3))
+           , (QVarOp $ UnQual $ Symbol "||", (Rightfix, 2))
+           ]
