@@ -2,14 +2,15 @@
 module Sodium.Haskell.Sugar where
 
 import Control.Applicative
+import Control.Monad.Identity
 import Control.Lens
 
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.SrcLoc (noLoc)
 import Sodium.Util (closureM)
 
-sugarcoat :: (Applicative m, Monad m) => Module -> m Module
-sugarcoat = closureM sugar
+sugarcoat :: Module -> Module
+sugarcoat = runIdentity . closureM sugar
 
 class Sugar a where
     sugar :: (Applicative m, Monad m) => a -> m a

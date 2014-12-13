@@ -16,7 +16,10 @@ import Sodium.Nucleus.Vector.Cost
 import Sodium.Util
 
 inline :: (Applicative m, MonadSupply Integer m, Recmappable a) => a -> m a
-inline = recmapped (reorderPattern <=< mergePattern . inlineExpression)
+inline = recmapped (mergePattern . inlineExpression)
+
+reorder :: (Applicative m, MonadSupply Integer m, Recmappable a) => a -> m a
+reorder = recmapped reorderPattern
 
 inlineExpression (Into p x a) | not excessive, not dangling = b
     where (b, count) = runWriter (recmapped w a)
@@ -52,9 +55,9 @@ mergePattern e@(Lambda p a)
 mergePattern e = return e
 
 reorderPattern e | Follow p x a <- e = do
-    reorders <- for (reorder p x) $ \(p', x') -> do
-        Follow p' <$> recmapped (mergePattern . inlineExpression) x' <*> pure a
-    return (lesser e reorders)
+    rs <- for (reorders p x) $ \(p', x') -> do
+        Follow p' <$> inline x' <*> pure a
+    return (lesser e rs)
 reorderPattern e = return e
 
 replace :: MonadWriter (Sum Integer) m => Attempt -> Expression -> m Expression
@@ -76,13 +79,13 @@ reorderings = \case
         PTuple x y -> k PTuple <$> fx x <*> fy y
         _ -> Nothing
 
-reorder :: Pattern -> Expression -> Pairs Pattern Expression
-reorder p (Taint a) = do
+reorders :: Pattern -> Expression -> Pairs Pattern Expression
+reorders p (Taint a) = do
     (f, b) <- reorderings a
     case f p of
         Nothing -> []
         Just p' -> [(p', Taint b)]
-reorder p (Follow p_ x_ a) = do
-    (p', b) <- reorder p a
+reorders p (Follow p_ x_ a) = do
+    (p', b) <- reorders p a
     return (p', Follow p_ x_ b)
-reorder _ _ = []
+reorders _ _ = []

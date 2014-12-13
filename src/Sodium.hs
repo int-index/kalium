@@ -5,7 +5,7 @@ import Sodium.Nucleus.Vectorize   (vectorize)
 import Sodium.Nucleus.Scalar.Atomize (atomize')
 import Sodium.Nucleus.Scalar.Valueficate (valueficate)
 import Sodium.Nucleus.Vector.Match (match)
-import Sodium.Nucleus.Vector.Inline (inline)
+import Sodium.Nucleus.Vector.Inline (inline, reorder)
 import Sodium.Nucleus.Vector.ArgClean (argClean)
 import Sodium.Nucleus.Vector.BindClean (bindClean)
 import Sodium.Nucleus.Vector.Context (extractCtx)
@@ -41,7 +41,7 @@ translate src = do
         >>= vectorize
         >>= sanity_check "Name uniqueness" sanity_nameUniqueness
         >>= optimize
-    sweet <- H.sugarcoat (H.convert optimal)
+    let sweet = H.sugarcoat (H.convert optimal)
     return (map (prettyPrint . H.convert) log, prettyPrint sweet)
 
 type TranslationLog = [V.Program]
@@ -49,8 +49,11 @@ type TranslationLog = [V.Program]
 optimize :: (Applicative m, Monad m, MonadSupply Integer m) => V.Program -> m (V.Program, TranslationLog)
 optimize program = runWriterT (closureM pass program)
 
+logging :: MonadWriter [a] m => (a -> m a) -> (a -> m a)
+logging f x = tell [x] >> f x
+
 pass :: (Applicative m, MonadWriter TranslationLog m, MonadSupply Integer m) => V.Program -> m V.Program
-pass program = tell [program] >> f program
+pass = closureM (logging f) >=> logging reorder
     where f  =  return . match
             >=> inline
             >=> return . bindClean
