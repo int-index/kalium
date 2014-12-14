@@ -26,7 +26,8 @@ every expression is atomic, whereas in the non-atomic one some are not.
 \begin {description}
 
 \item [Program] is a set of functions, every function is uniquely identified by
-its name.
+its name. There should be a \texttt{main} function that is the entry point of a
+program.
 
 \item [Function] is the main unit of abstraction. It represents an action
 parametrized by values. This action also has a result --- the return value of
@@ -99,6 +100,22 @@ that allows easy analysis and manipulation.
 
 \end {description}
 
+\subsection { Name System }
+
+Functions and variables have unique names. There are two kinds of names:
+
+\begin {description}
+
+\item [Built-in] name has a special meaning. It may represent a built-in
+entity or a user-defined entity with special semantics (such as the
+\texttt{main} function).
+
+\item [Numeric] name is a unique number that allows to unambiguously identify an
+entity. The code that generates a scalar representation is responsible for
+ensuring global uniqueness of all numeric names. No name shadowing is allowed.
+
+\end {description}
+
 \subsection { Scoping Rules }
 
 A scope captures the scoping relation between two structures. The first one
@@ -109,19 +126,12 @@ declarations should be derivable from the first structure.
 
 Parameter list creates a scope where a variable per parameter is introduced.
 Inside there's another scope, created by local variables, that contains the
-body. Thus, parameters are shadowed by local variables, and the the body has
-access to both of them.
+body. Their nesting order has no implications on semantics, since name shadowing
+is forbidden.
 
 \subsubsection { Scoping in a Statement }
 
 Statement \emph{scope} creates a scope. The variables it introduces do not exist
-outside the statement, and inside the statement they can shadow the existing
-ones. The value of an introduced variable is undefined.
-
-\subsubsection { Name Shadowing }
-
-When a scope introduces a variable with a name that was already introduced, it
-is called name shadowing. The new variable is used instead the old one inside
-the scope. They both exist independently, but the old variable is not visible.
+outside the statement. The value of an introduced variable is undefined.
 
 \end {document}
