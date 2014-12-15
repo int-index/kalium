@@ -124,6 +124,11 @@ expStripParen aggressive = \case
             (expStripParen' (fx, n) lhs)
             op
             (expStripParen' (fx, n) rhs)
+    Do stmts ->
+        let strip = \case
+              Qualifier (Paren exp) -> Qualifier exp
+              stmt -> stmt
+        in Do (map strip stmts)
     exp -> exp
 
 expStripParen' (fx, n) = \case
@@ -165,6 +170,7 @@ data Fixity = Nonfix | Leftfix | Rightfix
 
 data ParensLevel
     = ParensAtom
+    | ParensApp
     | ParensInfix Fixity Int
     | ParensUniverse
     deriving (Eq)
@@ -172,6 +178,7 @@ data ParensLevel
 lesserLevel :: ParensLevel -> ParensLevel -> Bool
 lesserLevel l ParensUniverse = l /= ParensUniverse
 lesserLevel ParensAtom     l = l /= ParensAtom
+lesserLevel ParensApp ParensInfix{} = True
 lesserLevel (ParensInfix _ n1) (ParensInfix _ n2) = n1 > n2
 lesserLevel _ _ = False
 
@@ -182,6 +189,7 @@ expLevel = \case
     Con{} -> ParensAtom
     Lit{} -> ParensAtom
     List{} -> ParensAtom
+    App{} -> ParensApp
     InfixApp _ op _ -> ParensInfix `uncurry` whatfix op
     _ -> ParensUniverse
 
