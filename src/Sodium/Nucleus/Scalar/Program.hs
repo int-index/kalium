@@ -2,15 +2,11 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-module Sodium.Nucleus.Scalar.Program
-    ( module Sodium.Nucleus.Scalar.Program
-    , module Sodium.Nucleus.Program
-    ) where
+module Sodium.Nucleus.Scalar.Program where
 
 import Control.Lens
 import qualified Data.Map as M
 
-import Sodium.Nucleus.Program
 import Sodium.Util
 
 data NameSpecial
@@ -53,6 +49,22 @@ data NameSpecial
 data Name = NameSpecial NameSpecial
           | NameGen Integer
     deriving (Eq, Ord, Show)
+
+data Type
+    = TypeInteger
+    | TypeDouble
+    | TypeBoolean
+    | TypeChar
+    | TypeUnit
+    | TypeList Type
+    | TypePair Type Type
+    deriving (Eq, Ord, Show)
+
+data Literal
+    = LitInteger Integer
+    | LitDouble  Rational
+    | LitChar    Char
+    deriving (Eq, Show)
 
 type Vars = M.Map Name Type
 

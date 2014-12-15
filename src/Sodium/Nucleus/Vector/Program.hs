@@ -1,12 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Sodium.Nucleus.Vector.Program
-    ( module Sodium.Nucleus.Vector.Program
-    , module Sodium.Nucleus.Program
-    ) where
+module Sodium.Nucleus.Vector.Program where
 
 import Control.Lens.TH
-
-import Sodium.Nucleus.Program
 
 data NameSpecial
     = OpAdd
@@ -62,6 +57,24 @@ data NameSpecial
 data Name = NameSpecial NameSpecial
           | NameGen Integer
     deriving (Eq, Ord)
+
+data Type
+    = TypeInteger
+    | TypeDouble
+    | TypeBoolean
+    | TypeChar
+    | TypeUnit
+    | TypeList Type
+    | TypePair Type Type
+    | TypeFunction Type Type
+    | TypeTaint Type
+    deriving (Eq, Ord, Show)
+
+data Literal
+    = LitInteger Integer
+    | LitDouble  Rational
+    | LitChar    Char
+    deriving (Eq, Show)
 
 data Program
     = Program

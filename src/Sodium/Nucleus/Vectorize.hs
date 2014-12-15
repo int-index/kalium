@@ -61,8 +61,8 @@ vectorizeFunc name func = do
     initialScope <- initIndices zeroIndex (scoping params)
     local (initialScope <>) $ do
         (_, vecBody) <- vectorizeBody (func ^. funcScope . scopeElem)
-        let FuncSig tyResult tyArgs = funcSig func
-            vecFuncType = foldr1 TypeFunction (tyArgs `snoc` TypeTaint tyResult)
+        let FuncSig (vectorizeType -> tyResult) (map vectorizeType -> tyArgs) = funcSig func
+            vecFuncType = foldr1 Vec.TypeFunction (tyArgs `snoc` Vec.TypeTaint tyResult)
         vecParams <- traverse mkPAccess (map fst params)
         let vecFuncLambda = Vec.lambda vecParams vecBody
         return $ Vec.Func vecFuncType name' vecFuncLambda
@@ -83,7 +83,7 @@ mkPAccess :: V e m => Name -> m Vec.Pattern
 mkPAccess name = do
     index <- lookupIndex name
     ty    <- lookupType  name
-    tryPAccess ty <$> lookupName name index
+    tryPAccess (vectorizeType ty) <$> lookupName name index
 
 mkAccess :: V e m => Name -> m Vec.Expression
 mkAccess name = do
@@ -176,6 +176,22 @@ getFuncName name = case name of
         Just name' <- lookupName name Immutable
         return name'
 
+vectorizeLiteral :: Literal -> Vec.Literal
+vectorizeLiteral = \case
+    LitInteger a -> Vec.LitInteger a
+    LitDouble  a -> Vec.LitDouble  a
+    LitChar    a -> Vec.LitChar    a
+
+vectorizeType :: Type -> Vec.Type
+vectorizeType = \case
+    TypeInteger -> Vec.TypeInteger
+    TypeDouble -> Vec.TypeDouble
+    TypeBoolean -> Vec.TypeBoolean
+    TypeChar -> Vec.TypeChar
+    TypeUnit -> Vec.TypeUnit
+    TypeList ty -> Vec.TypeList (vectorizeType ty)
+    TypePair ty1 ty2 -> Vec.TypePair (vectorizeType ty1) (vectorizeType ty2)
+
 vectorizeStatement :: V e m => Statement Pattern Atom -> m ([Name], Vec.Expression)
 vectorizeStatement = \case
     Pass -> return ([], Vec.Taint Vec.LitUnit)
@@ -249,7 +265,7 @@ vectorizeStatement = \case
 
 vectorizeAtom :: V e m => Atom -> m Vec.Expression
 vectorizeAtom = \case
-    Primary a -> return (Vec.Primary a)
+    Primary a -> return (Vec.Primary (vectorizeLiteral a))
     Access name -> mkAccess name
 
 vectorizePattern :: V e m => Pattern -> m Vec.Pattern

@@ -17,7 +17,6 @@ library
                        Sodium.Pascal.Convert
                        Sodium.Haskell.Convert
                        Sodium.Haskell.Sugar
-                       Sodium.Nucleus.Program
                        Sodium.Nucleus.Scalar.Program
                        Sodium.Nucleus.Scalar.Build
                        Sodium.Nucleus.Scalar.Typecheck

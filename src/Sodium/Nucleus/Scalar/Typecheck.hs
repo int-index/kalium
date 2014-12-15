@@ -38,7 +38,10 @@ class Typecheck a where
     typecheck :: TypeEnv e m => a -> m Type
 
 instance Typecheck Literal where
-    typecheck = return . typecheckLiteral
+    typecheck = return . \case
+        LitInteger _ -> TypeInteger
+        LitDouble  _ -> TypeDouble
+        LitChar    _ -> TypeChar
 
 instance Typecheck Atom where
     typecheck (Primary lit) = typecheck lit

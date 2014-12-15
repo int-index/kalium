@@ -1,6 +1,6 @@
 module Sodium.Error where
 
-import qualified Sodium.Nucleus.Program as N
+import qualified Sodium.Nucleus.Scalar.Program as S
 
 import qualified Data.Map as M
 
@@ -16,7 +16,7 @@ data Error = ParseError String Int Int
            | NoReference
            | UpdateImmutable String
            | PasConvError
-           | TypeError String [N.Type]
+           | TypeError String [S.Type]
            | Insane String
     deriving (Show)
 
