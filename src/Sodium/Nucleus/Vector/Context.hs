@@ -45,7 +45,7 @@ extractCtxExpression = \case
     e -> return e
 
 -- TODO: typecheck
-hackish_typeApp :: Operator -> Type -> Maybe Type
+hackish_typeApp :: NameSpecial -> Type -> Maybe Type
 hackish_typeApp = \case
     OpFst -> \case
         TypePair ty _ -> pure ty

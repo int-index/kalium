@@ -13,7 +13,44 @@ import qualified Data.Map as M
 import Sodium.Nucleus.Program
 import Sodium.Util
 
-data Name = NameOp  Operator
+data NameSpecial
+    = OpAdd
+    | OpSubtract
+    | OpMultiply
+    | OpDivide
+    | OpDiv
+    | OpMod
+    | OpLess
+    | OpMore
+    | OpEquals
+    | OpAnd
+    | OpOr
+    | OpNot
+    | OpXor
+    | OpTrue
+    | OpFalse
+    | OpRange
+    | OpElem
+    | OpShow
+    | OpNegate
+    | OpPrintLn
+    | OpReadLn
+    | OpPutLn
+    | OpGetLn
+    | OpId
+    | OpUnit
+    | OpPair
+    | OpFst
+    | OpSnd
+    | OpNil
+    | OpCons
+    | OpSingleton
+    | OpConcat
+    | OpIntToDouble
+    | OpMain
+    deriving (Eq, Ord, Show)
+
+data Name = NameSpecial NameSpecial
           | NameGen Integer
     deriving (Eq, Ord, Show)
 

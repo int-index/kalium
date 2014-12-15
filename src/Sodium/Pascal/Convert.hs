@@ -86,7 +86,7 @@ instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
                 let noparams = D.Scope ([] :: Pairs D.Name D.ByType)
                 return $ D.Func D.TypeUnit (noparams clBody)
             clFuncs <- traverse conv funcs
-            return $ D.Program (M.fromList $ (D.NameOp (D.OpMain), clMain):clFuncs)
+            return $ D.Program (M.fromList $ (D.NameSpecial D.OpMain, clMain):clFuncs)
         where funcSigs = M.unions (map funcSigOf funcs)
               funcSigOf (S.Func name funcSig _ _) = M.singleton name funcSig
 
@@ -156,10 +156,10 @@ binary op a b = D.Call op [] [a,b]
 convReadLn [e@(S.Access name')] = do
     name <- nameV name'
     typecheck e >>= \case
-        S.TypeString -> return $ D.Exec (D.PAccess name) (D.NameOp D.OpGetLn) [] []
+        S.TypeString -> return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpGetLn) [] []
         ty' -> do
             ty <- conv ty'
-            return $ D.Exec (D.PAccess name) (D.NameOp D.OpReadLn) [ty] []
+            return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpReadLn) [ty] []
 convReadLn _ = error "IOMagic supports only single-value read operations"
 
 convWriteLn exprs = do
@@ -167,13 +167,13 @@ convWriteLn exprs = do
           ty <- typecheck expr
           let wrap = case ty of
                 S.TypeString -> id
-                S.TypeChar -> \e -> D.Call (D.NameOp D.OpSingleton) [] [e]
-                _ -> \e -> D.Call (D.NameOp D.OpShow) [] [e]
+                S.TypeChar -> \e -> D.Call (D.NameSpecial D.OpSingleton) [] [e]
+                _ -> \e -> D.Call (D.NameSpecial D.OpShow) [] [e]
           wrap <$> conv expr
     arg <- traverse convArg exprs <&> \case
         [] -> D.expression ""
-        args -> foldl1 (binary (D.NameOp D.OpConcat)) args
-    return $ D.Exec D.PUnit (D.NameOp D.OpPutLn) [] [arg]
+        args -> foldl1 (binary (D.NameSpecial D.OpConcat)) args
+    return $ D.Exec D.PUnit (D.NameSpecial D.OpPutLn) [] [arg]
 
 typeOfLiteral :: S.Literal -> S.Type
 typeOfLiteral = \case
@@ -278,7 +278,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
             clName <- nameV name
             clFromExpr <- conv fromExpr
             clToExpr   <- conv toExpr
-            let clRange = binary (D.NameOp D.OpRange) clFromExpr clToExpr
+            let clRange = binary (D.NameSpecial D.OpRange) clFromExpr clToExpr
             clAction <- conv statement
             let clForCycle = D.statement (D.ForCycle clName clRange clAction)
             return $ D.group [clForCycle, D.assign clName clToExpr]
@@ -295,12 +295,12 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
             let clCaseExpr = D.expression clName
             let instRange = \case
                     Right (exprFrom, exprTo)
-                         ->  binary (D.NameOp D.OpElem) clCaseExpr
-                        <$> (binary (D.NameOp D.OpRange) <$> conv exprFrom <*> conv exprTo)
-                    Left expr -> binary (D.NameOp D.OpEquals) clCaseExpr <$> conv expr
+                         ->  binary (D.NameSpecial D.OpElem) clCaseExpr
+                        <$> (binary (D.NameSpecial D.OpRange) <$> conv exprFrom <*> conv exprTo)
+                    Left expr -> binary (D.NameSpecial D.OpEquals) clCaseExpr <$> conv expr
             let instLeaf (exprs, body)
                      =  (,)
-                    <$> (foldl1 (binary (D.NameOp D.OpOr)) <$> traverse instRange exprs)
+                    <$> (foldl1 (binary (D.NameSpecial D.OpOr)) <$> traverse instRange exprs)
                     <*> conv body
             leafs <- traverse instLeaf leafs
             leafElse <- D.statements <$> traverse conv mBodyElse
@@ -332,7 +332,7 @@ instance Conv S.Literal D.Expression where
         S.LitBool x -> return (D.expression x)
 
 instance Conv S.Operator D.Name where
-    conv = return . D.NameOp . \case
+    conv = return . D.NameSpecial . \case
         S.OpAdd -> D.OpAdd
         S.OpSubtract -> D.OpSubtract
         S.OpMultiply -> D.OpMultiply

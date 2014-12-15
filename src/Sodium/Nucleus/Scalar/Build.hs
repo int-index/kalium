@@ -17,15 +17,15 @@ instance LiftExpression Atom    where expression = Atom
 instance LiftExpression Literal where expression = expression . Primary
 instance LiftExpression Name    where expression = expression . Access
 
-instance LiftExpression () where expression () = Call (NameOp OpUnit) [] []
+instance LiftExpression () where expression () = Call (NameSpecial OpUnit) [] []
 instance LiftExpression Bool where
     expression = \case
-        True  -> Call (NameOp OpTrue)  [] []
-        False -> Call (NameOp OpFalse) [] []
+        True  -> Call (NameSpecial OpTrue)  [] []
+        False -> Call (NameSpecial OpFalse) [] []
 instance LiftExpression String where
     expression = L.foldr listCons listNil . map expression
-        where listNil = Call (NameOp OpNil) [TypeChar] []
-              listCons x xs = Call (NameOp OpCons) [] [x, xs]
+        where listNil = Call (NameSpecial OpNil) [TypeChar] []
+              listCons x xs = Call (NameSpecial OpCons) [] [x, xs]
 
 
 instance LiftExpression Integer  where expression = expression . LitInteger
@@ -49,4 +49,4 @@ group :: [Statement a p] -> Statement a p
 group = L.foldr Follow Pass
 
 assign :: Name -> a -> Statement Pattern a
-assign name a = statement $ Exec (PAccess name) (NameOp OpId) [] [a]
+assign name a = statement $ Exec (PAccess name) (NameSpecial OpId) [] [a]

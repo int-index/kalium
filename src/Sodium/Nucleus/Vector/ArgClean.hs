@@ -40,7 +40,7 @@ funcArgClean (Func ty name a) = do
     let (ps, b) = unlambda a
         (ns, ps') = patsArgClean ps
         (untaint, b') = case b of
-            Taint e | name /= NameOp OpMain -> (True, e)
+            Taint e | name /= NameSpecial OpMain -> (True, e)
             e -> (False, e)
         a' = lambda ps' b'
     case tyArgClean ns untaint ty of

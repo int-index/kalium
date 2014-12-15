@@ -4,7 +4,7 @@ import Sodium.Nucleus.Vector.Program
 
 instance Show Name where
     show = \case
-        NameOp op -> show op
+        NameSpecial op -> show op
         NameGen n -> "_" ++ show n
 
 instance Show Expression where

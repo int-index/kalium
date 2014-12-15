@@ -8,7 +8,58 @@ import Control.Lens.TH
 
 import Sodium.Nucleus.Program
 
-data Name = NameOp  Operator
+data NameSpecial
+    = OpAdd
+    | OpSubtract
+    | OpMultiply
+    | OpDivide
+    | OpDiv
+    | OpMod
+    | OpLess
+    | OpMore
+    | OpEquals
+    | OpAnd
+    | OpOr
+    | OpNot
+    | OpXor
+    | OpTrue
+    | OpFalse
+    | OpRange
+    | OpElem
+    | OpShow
+    | OpNegate
+    | OpIf
+    | OpFold
+    | OpFoldTainted
+    | OpProduct
+    | OpSum
+    | OpAnd'
+    | OpOr'
+    | OpPrintLn
+    | OpReadLn
+    | OpPutLn
+    | OpGetLn
+    | OpId
+    | OpUnit
+    | OpPair
+    | OpFst
+    | OpSnd
+    | OpSwap
+    | OpNil
+    | OpCons
+    | OpSingleton
+    | OpTaint
+    | OpBind
+    | OpBindIgnore
+    | OpFmapIgnore
+    | OpIgnore
+    | OpConcat
+    | OpIntToDouble
+    | OpUndefined
+    | OpMain
+    deriving (Eq, Ord, Show)
+
+data Name = NameSpecial NameSpecial
           | NameGen Integer
     deriving (Eq, Ord)
 
@@ -31,7 +82,7 @@ data Expression
     | Beta Expression Expression
     deriving (Eq)
 
-pattern OpAccess op = Access (NameOp op)
+pattern OpAccess op = Access (NameSpecial op)
 pattern LitUnit = OpAccess OpUnit
 
 pattern App1 op a        = op `Beta` a

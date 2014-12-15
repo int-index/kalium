@@ -12,57 +12,6 @@ data Type
     | TypeTaint Type
     deriving (Eq, Ord, Show)
 
-data Operator
-    = OpAdd
-    | OpSubtract
-    | OpMultiply
-    | OpDivide
-    | OpDiv
-    | OpMod
-    | OpLess
-    | OpMore
-    | OpEquals
-    | OpAnd
-    | OpOr
-    | OpNot
-    | OpXor
-    | OpTrue
-    | OpFalse
-    | OpRange
-    | OpElem
-    | OpShow
-    | OpNegate
-    | OpIf
-    | OpFold
-    | OpFoldTainted
-    | OpProduct
-    | OpSum
-    | OpAnd'
-    | OpOr'
-    | OpPrintLn
-    | OpReadLn
-    | OpPutLn
-    | OpGetLn
-    | OpId
-    | OpUnit
-    | OpPair
-    | OpFst
-    | OpSnd
-    | OpSwap
-    | OpNil
-    | OpCons
-    | OpSingleton
-    | OpTaint
-    | OpBind
-    | OpBindIgnore
-    | OpFmapIgnore
-    | OpIgnore
-    | OpConcat
-    | OpIntToDouble
-    | OpUndefined
-    | OpMain
-    deriving (Eq, Ord, Show)
-
 data Literal
     = LitInteger Integer
     | LitDouble  Rational

@@ -59,7 +59,7 @@ instance Conv S.Expression where
     conv (S.Beta a1 a2) = H.App <$> conv a1 <*> conv a2
     conv (S.Primary lit) = return (convLit lit)
     conv (S.Access name) = return $ case name of
-        S.NameOp op -> convOp op
+        S.NameSpecial op -> convOp op
         S.NameGen n -> H.Var (H.UnQual (nameGen n))
 
 
@@ -68,7 +68,7 @@ instance Conv S.Func where
     conv (S.Func ty name expression) = do
         hsExpression <- conv expression
         hsName <- case name of
-            S.NameOp S.OpMain -> return H.main_name
+            S.NameSpecial S.OpMain -> return H.main_name
             S.NameGen n -> return (nameGen n)
             _ -> Nothing
         hsType <- conv ty
@@ -94,7 +94,7 @@ convLit = \case
     S.LitDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
     S.LitChar    c -> H.Lit $ H.Char c
 
-convOp :: S.Operator -> H.Exp
+convOp :: S.NameSpecial -> H.Exp
 convOp = \case
     S.OpSingleton -> H.RightSection (H.QConOp H.list_cons_name) (convOp S.OpNil)
     S.OpPair     -> H.tuple_con H.Boxed 1

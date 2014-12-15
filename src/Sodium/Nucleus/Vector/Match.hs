@@ -108,7 +108,7 @@ numericCompute = \case
 
     e -> e
 
-integerOp2 :: Operator -> Maybe (Integer -> Integer -> Integer)
+integerOp2 :: NameSpecial -> Maybe (Integer -> Integer -> Integer)
 integerOp2 = \case
     OpAdd -> return (+)
     OpSubtract -> return (-)
@@ -117,7 +117,7 @@ integerOp2 = \case
     OpMod -> return mod
     _ -> Nothing
 
-doubleOp2 :: Operator -> Maybe (Rational -> Rational -> Rational)
+doubleOp2 :: NameSpecial -> Maybe (Rational -> Rational -> Rational)
 doubleOp2 = \case
     OpAdd -> return (+)
     OpSubtract -> return (-)

@@ -76,7 +76,7 @@ mkExpTuple exps = foldr1 (Vec.AppOp2 Vec.OpPair) exps
 tryPAccess _  Nothing     = Vec.PWildCard
 tryPAccess ty (Just name) = Vec.PAccess name ty
 
-tryAccess Nothing     = Vec.Access (Vec.NameOp OpUndefined)
+tryAccess Nothing     = Vec.Access (Vec.NameSpecial Vec.OpUndefined)
 tryAccess (Just name) = Vec.Access name
 
 mkPAccess :: V e m => Name -> m Vec.Pattern
@@ -137,7 +137,41 @@ vectorizeAgainst changed (map Access -> results)
     $ Vec.Lambda <$> patTuple changed <*> vectorizeResults results
 
 getFuncName name = case name of
-    NameOp op -> return (Vec.NameOp op)
+    NameSpecial op -> return . Vec.NameSpecial $ case op of
+     OpAdd -> Vec.OpAdd
+     OpSubtract -> Vec.OpSubtract
+     OpMultiply -> Vec.OpMultiply
+     OpDivide -> Vec.OpDivide
+     OpDiv -> Vec.OpDiv
+     OpMod -> Vec.OpMod
+     OpLess -> Vec.OpLess
+     OpMore -> Vec.OpMore
+     OpEquals -> Vec.OpEquals
+     OpAnd -> Vec.OpAnd
+     OpOr -> Vec.OpOr
+     OpNot -> Vec.OpNot
+     OpXor -> Vec.OpXor
+     OpTrue -> Vec.OpTrue
+     OpFalse -> Vec.OpFalse
+     OpRange -> Vec.OpRange
+     OpElem -> Vec.OpElem
+     OpShow -> Vec.OpShow
+     OpNegate -> Vec.OpNegate
+     OpPrintLn -> Vec.OpPrintLn
+     OpReadLn -> Vec.OpReadLn
+     OpPutLn -> Vec.OpPutLn
+     OpGetLn -> Vec.OpGetLn
+     OpId -> Vec.OpId
+     OpUnit -> Vec.OpUnit
+     OpPair -> Vec.OpPair
+     OpFst -> Vec.OpFst
+     OpSnd -> Vec.OpSnd
+     OpNil -> Vec.OpNil
+     OpCons -> Vec.OpCons
+     OpSingleton -> Vec.OpSingleton
+     OpConcat -> Vec.OpConcat
+     OpIntToDouble -> Vec.OpIntToDouble
+     OpMain -> Vec.OpMain
     NameGen _ -> do
         Just name' <- lookupName name Immutable
         return name'
@@ -162,10 +196,10 @@ vectorizeStatement = \case
     Execute (Exec pat name _tyArgs args) -> do
         -- TODO: purity flag in function signature
         let impure = case name of
-              NameOp OpReadLn  -> True
-              NameOp OpGetLn      -> True
-              NameOp OpPrintLn    -> True
-              NameOp OpPutLn -> True
+              NameSpecial OpReadLn  -> True
+              NameSpecial OpGetLn      -> True
+              NameSpecial OpPrintLn    -> True
+              NameSpecial OpPutLn -> True
               NameGen _ -> True
               _ -> False
         vecArgs <- traverse vectorizeAtom args

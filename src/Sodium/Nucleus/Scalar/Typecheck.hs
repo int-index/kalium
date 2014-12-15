@@ -56,11 +56,11 @@ lookupFuncSig name = do
 instance Typecheck Expression where
     typecheck (Atom atom) = typecheck atom
     typecheck (Call name tyArgs args)
-        | NameOp op <- name = do
+        | NameSpecial op <- name = do
             mapM typecheck args >>= builtinOpType op tyArgs
         | otherwise = funcSigType <$> lookupFuncSig name
 
-builtinOpType :: TypeEnv e m => Operator -> [Type] -> [Type] -> m Type
+builtinOpType :: TypeEnv e m => NameSpecial -> [Type] -> [Type] -> m Type
 builtinOpType op tyArgs args = case op of
     OpAdd      -> argMatch2Same >>= require isNumeric
     OpSubtract -> argMatch2Same >>= require isNumeric
@@ -104,7 +104,6 @@ builtinOpType op tyArgs args = case op of
     OpConcat   -> argMatch2Same >>= require isList
     OpIntToDouble -> argMatch1 >>= require (==TypeInteger) >> return TypeDouble
     OpMain        -> return TypeUnit
-    _ -> error ("Not available: " ++ show op)
     where isNumeric ty = ty == TypeInteger || ty == TypeDouble
           isEq  _ty = True -- for now
           isOrd _ty = True -- ^^
@@ -123,7 +122,7 @@ builtinOpType op tyArgs args = case op of
           require p ty | p ty = return ty
                        | otherwise = panic
           panic :: TypeEnv e m => m a
-          panic = throwError (errorTypeMismatch (NameOp op) args)
+          panic = throwError (errorTypeMismatch (NameSpecial op) args)
 
 class TypeIntro a where
     typeIntro' :: a -> TypeScope -> TypeScope
