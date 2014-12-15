@@ -11,6 +11,7 @@ import Sodium.Nucleus.Vector.Program
 sanity_nameUniqueness :: Program -> Bool
 sanity_nameUniqueness program
     = (\xs -> xs == L.nub xs) . execWriter
+    -- TODO: take function names into account (itraverse?)
     $ (programFuncs . traversed . funcExpression) (\e -> e <$ snu e) program
             
 snu :: MonadWriter [Name] m => Expression -> m ()

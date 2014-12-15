@@ -4,7 +4,7 @@ module Sodium.Haskell.Convert (convert) where
 
 import Data.Traversable
 import Control.Applicative
--- S for Src, D for Dest
+import qualified Data.Map as M
 import qualified Sodium.Nucleus.Vector.Program as S
 import qualified Language.Haskell.Exts        as H
 import qualified Language.Haskell.Exts.SrcLoc as H
@@ -20,7 +20,7 @@ class Conv s where
 instance Conv S.Program where
     type Hask S.Program = H.Module
     conv (S.Program funcs) = do
-        funcDefs <- concat <$> traverse conv funcs
+        funcDefs <- concat <$> traverse conv (M.toList funcs)
         return $ H.Module H.noLoc
             (H.main_mod)
             (extensions ["LambdaCase", "TupleSections", "MultiWayIf", "ScopedTypeVariables"])
@@ -63,9 +63,9 @@ instance Conv S.Expression where
         S.NameGen n -> H.Var (H.UnQual (nameGen n))
 
 
-instance Conv S.Func where
-    type Hask S.Func = [H.Decl]
-    conv (S.Func ty name expression) = do
+instance Conv (S.Name, S.Func) where
+    type Hask (S.Name, S.Func) = [H.Decl]
+    conv (name, S.Func ty expression) = do
         hsExpression <- conv expression
         hsName <- case name of
             S.NameSpecial S.OpMain -> return H.main_name
@@ -73,7 +73,9 @@ instance Conv S.Func where
             _ -> Nothing
         hsType <- conv ty
         let sig = H.TypeSig H.noLoc [hsName] hsType
-        return [sig, H.FunBind [H.Match H.noLoc hsName [] Nothing (H.UnGuardedRhs hsExpression) (H.BDecls [])]]
+            hsRhs = H.UnGuardedRhs hsExpression
+            funBind = H.FunBind [H.Match H.noLoc hsName [] Nothing hsRhs (H.BDecls [])]
+        return [sig, funBind]
 
 instance Conv S.Pattern where
     type Hask S.Pattern = H.Pat

@@ -8,6 +8,7 @@ import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Sodium.Nucleus.Vector.Program
+import Sodium.Util
 
 class Mentionable a where mentionable :: a -> S.Set Name
 instance Mentionable (S.Set Name) where mentionable = id
@@ -57,8 +58,7 @@ instance Mask Expression where
 
 instance Mask Func where
     mask  =  funcType mask
-         >=> funcName mask
          >=> funcExpression mask
 
 instance Mask Program where
-    mask  =  programFuncs mask
+    mask  =  (programFuncs . mAsList) mask

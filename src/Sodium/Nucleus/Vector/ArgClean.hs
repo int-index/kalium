@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Sodium.Nucleus.Vector.ArgClean where
 
+import qualified Data.Map as M
 import Control.Applicative
 import Control.Lens
 import Control.Monad.Supply
@@ -14,28 +15,27 @@ import Sodium.Util
 argClean :: (Applicative m, MonadSupply Integer m) => Program -> m Program
 argClean program = do
     let funcs = program ^. programFuncs
-    info <- execWriterT (traverse funcArgClean funcs)
+    info <- execWriterT (itraverse funcArgClean funcs)
     return (foldr substitute program info)
 
 substitute :: CleanInfo -> Program -> Program
 substitute info program
     | program' <- (recmapped %~ tryApply (appArgClean info))
                   (programReplaceFunc info program)
-    , CleanInfo name _ _ _ <- info
+    , CleanInfo name _ _ _ _ <- info
     , False <- program' `mentions` name
     = program'
 substitute _ program = program
 
-data CleanInfo = CleanInfo Name [Bool] Bool Func
+data CleanInfo = CleanInfo Name [Bool] Bool Name Func
 
 programReplaceFunc :: CleanInfo -> Program -> Program
-programReplaceFunc (CleanInfo name _ _ func) = programFuncs %~ map replace
-  where
-    replace (view funcName -> name') | name == name' = func
-    replace func = func
+programReplaceFunc (CleanInfo name _ _  name' func) =
+    programFuncs %~ M.insert name' func . M.delete name
 
-funcArgClean :: (Applicative m, MonadWriter [CleanInfo] m, MonadSupply Integer m) => Func -> m ()
-funcArgClean (Func ty name a) = do
+funcArgClean :: (Applicative m, MonadWriter [CleanInfo] m, MonadSupply Integer m)
+             => Name -> Func -> m ()
+funcArgClean name (Func ty a) = do
     name' <- NameGen <$> supply
     let (ps, b) = unlambda a
         (ns, ps') = patsArgClean ps
@@ -45,7 +45,7 @@ funcArgClean (Func ty name a) = do
         a' = lambda ps' b'
     case tyArgClean ns untaint ty of
         Just ty' | ty' /= ty
-          -> tell [CleanInfo name ns untaint (Func ty' name' a')]
+          -> tell [CleanInfo name ns untaint name' (Func ty' a')]
         _ -> return ()
 
 patsArgClean :: [Pattern] -> ([Bool], [Pattern])
@@ -65,9 +65,8 @@ tyArgClean (n:ns) untaint (TypeFunction ty1 ty2) = wrap <$> tyArgClean ns untain
 tyArgClean _ _ _ = Nothing
 
 appArgClean :: CleanInfo -> Expression -> Maybe Expression
-appArgClean (CleanInfo name ns untaint func) e
-    | name' <- view funcName func
-    , (Access op:es) <- unbeta e
+appArgClean (CleanInfo name ns untaint name' _) e
+    | (Access op:es) <- unbeta e
     , op == name
      = (if untaint then Taint else id) . foldl1 Beta
     <$> ((Access name':) <$> zipFilter ns es)

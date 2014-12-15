@@ -51,9 +51,9 @@ vectorize program = do
             $ \name -> M.singleton (name, Immutable) <$> (Just . Vec.NameGen <$> supply)
     flip runReaderT (VectorizeScope mempty mempty names') $ do
         vecFuncs <- traverse (uncurry vectorizeFunc) (program ^. programFuncs & M.toList)
-        return $ Vec.Program vecFuncs
+        return $ Vec.Program (M.fromList vecFuncs)
 
-vectorizeFunc :: V e m => Name -> Func Type Pattern Atom -> m Vec.Func
+vectorizeFunc :: V e m => Name -> Func Type Pattern Atom -> m (Vec.Name, Vec.Func)
 vectorizeFunc name func = do
     let zeroIndex = Index 0
     let params = func ^. funcScope . scopeVars
@@ -65,7 +65,7 @@ vectorizeFunc name func = do
             vecFuncType = foldr1 Vec.TypeFunction (tyArgs `snoc` Vec.TypeTaint tyResult)
         vecParams <- traverse mkPAccess (map fst params)
         let vecFuncLambda = Vec.lambda vecParams vecBody
-        return $ Vec.Func vecFuncType name' vecFuncLambda
+        return (name', Vec.Func vecFuncType vecFuncLambda)
 
 mkPatTuple [  ] = Vec.PUnit
 mkPatTuple pats = foldr1 Vec.PTuple pats

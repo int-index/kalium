@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Sodium.Nucleus.Vector.Program where
 
+import qualified Data.Map as M
 import Control.Lens.TH
 
 data NameSpecial
@@ -78,13 +79,12 @@ data Literal
 
 data Program
     = Program
-    { _programFuncs :: [Func]
+    { _programFuncs :: M.Map Name Func
     } deriving (Eq)
 
 data Func
     = Func
     { _funcType :: Type
-    , _funcName :: Name
     , _funcExpression :: Expression
     } deriving (Eq)
 
