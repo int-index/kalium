@@ -84,6 +84,7 @@ instance Typing t => Scoping (Pairs Name t) where
 
 data Program param pat expr = Program
     { _programFuncs :: M.Map Name (Func param pat expr)
+    , _programNameTags :: M.Map Name String
     }
 
 data By

@@ -7,6 +7,7 @@ import Data.Monoid
 import Data.Traversable
 import Control.Applicative
 import Control.Monad.Reader
+import Control.Monad.Writer
 import Control.Monad.Except
 import Control.Monad.Supply
 import Control.Lens hiding (Index)
@@ -43,15 +44,32 @@ class Error e where
     errorInsane :: String -> e
 
 type E e m = (Applicative m, Error e, MonadError e m, MonadSupply Integer m)
-type V e m = (MonadReader VectorizeScope m, E e m)
+type W e m = (MonadWriter (M.Map Vec.Name Name) m, E e m)
+type V e m = (MonadReader VectorizeScope m, W e m)
+
+alias :: W e m => Name -> m Vec.Name
+alias name = do
+    name' <- fmap Vec.NameGen supply
+    tell (M.singleton name' name)
+    return name'
 
 vectorize :: E e m => Program Type Pattern Atom -> m Vec.Program
-vectorize program = do
+vectorize program = vectorizeNameTags (program ^. programNameTags) $ do
     (mconcat -> names') <- for (program ^. programFuncs . to M.keys)
-            $ \name -> M.singleton (name, Immutable) <$> (Just . Vec.NameGen <$> supply)
+            $ \name -> M.singleton (name, Immutable) <$> (Just <$> alias name)
     flip runReaderT (VectorizeScope mempty mempty names') $ do
         vecFuncs <- traverse (uncurry vectorizeFunc) (program ^. programFuncs & M.toList)
-        return $ Vec.Program (M.fromList vecFuncs)
+        return $ Vec.Program (M.fromList vecFuncs) M.empty
+
+vectorizeNameTags :: E e m => M.Map Name String
+                  -> WriterT (M.Map Vec.Name Name) m Vec.Program -> m Vec.Program
+vectorizeNameTags nameTags w = do
+    (p, nameTags') <- runWriterT w
+    return $ p & Vec.programNameTags %~ M.union (composeMap nameTags nameTags')
+
+composeMap :: (Ord k, Ord vk) => M.Map vk v -> M.Map k vk -> M.Map k v
+composeMap m = M.foldrWithKey go M.empty where
+    go k vk = maybe id (M.insert k) (M.lookup vk m)
 
 vectorizeFunc :: V e m => Name -> Func Type Pattern Atom -> m (Vec.Name, Vec.Func)
 vectorizeFunc name func = do
@@ -106,10 +124,10 @@ updateLocalize names action = do
     (unzip -> (names', updated)) <- for names $ \name -> do
         (index, name') <- lookupIndex name >>= \case
             Index n -> do
-                name' <- Just . Vec.NameGen <$> supply
+                name' <- Just <$> alias name
                 return (Index $ succ n, name')
             Uninitialized -> do
-                name' <- Just . Vec.NameGen <$> supply
+                name' <- Just <$> alias name
                 return (Index 0, name')
             Immutable -> throwError (errorUpdateImmutable name)
         return (((name, index), name'), (name, index))
@@ -292,12 +310,12 @@ lookupX f name = do
     M.lookup name xs
        & maybe (throwError $ errorNoAccess name (M.keys xs)) return
 
-initIndices :: E e m => Index -> M.Map Name Type -> m VectorizeScope
+initIndices :: W e m => Index -> M.Map Name Type -> m VectorizeScope
 initIndices n types = do
     scopes <- for (M.toList types) $ \(name, ty) -> do
         name' <- case n of
             Uninitialized -> return Nothing
-            _ -> Just . Vec.NameGen <$> supply
+            _ -> Just <$> alias name
         return $ VectorizeScope
             (M.singleton name ty)
             (M.singleton name n)

@@ -11,6 +11,7 @@ import Data.Traversable
 
 import Control.Applicative
 import Control.Monad.Reader
+import Control.Monad.Writer
 import Control.Monad.Except
 import Control.Monad.Supply
 import Control.Monad.Trans.Maybe
@@ -56,9 +57,10 @@ type Erroneous e m = (MonadError e m, Error e)
 
 convert :: (Applicative m, MonadSupply Integer m, Erroneous e m)
         => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
-convert program = runReaderT (conv program) mempty
+convert program = do
+    (p, nameTags) <- runWriterT (runReaderT (conv program) mempty)
+    return $ p & D.programNameTags %~ M.union nameTags
 
---nameV name = return $ D.NameGen 42 ("v_" ++ name)
 nameV name = lookupName (False, name)
 nameF name = lookupName (True, name)
 
@@ -68,14 +70,23 @@ lookupName k = do
     mname <- views csNames (M.lookup k)
     maybe (throwError errorNoAccess) return mname
 
+alias :: ( Applicative m
+         , MonadSupply Integer m
+         , MonadWriter (M.Map D.Name String) m
+         ) => S.Name -> m D.Name
+alias name = do
+    name' <- fmap D.NameGen supply
+    tell (M.singleton name' name)
+    return name'
+
 class Conv s d | s -> d where
     conv :: (Applicative m, MonadSupply Integer m, Erroneous e m)
-         => s -> ReaderT ConvScope m d
+         => s -> ReaderT ConvScope (WriterT (M.Map D.Name String) m) d
 
 instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
     conv (S.Program funcs vars body) = do
         (M.unions -> funcNames) <- for funcs $ \(S.Func name _ _ _) -> do
-            funcName <- D.NameGen <$> supply
+            funcName <- alias name
             return $ M.singleton (True, name) funcName
         local ( (csTypes . tsFunctions %~ M.union funcSigs)
               . (csNames %~ M.union funcNames)
@@ -86,7 +97,8 @@ instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
                 let noparams = D.Scope ([] :: Pairs D.Name D.ByType)
                 return $ D.Func D.TypeUnit (noparams clBody)
             clFuncs <- traverse conv funcs
-            return $ D.Program (M.fromList $ (D.NameSpecial D.OpMain, clMain):clFuncs)
+            let programFuncs = (D.NameSpecial D.OpMain, clMain):clFuncs
+            return $ D.Program (M.fromList programFuncs) M.empty
         where funcSigs = M.unions (map funcSigOf funcs)
               funcSigOf (S.Func name funcSig _ _) = M.singleton name funcSig
 
@@ -98,7 +110,7 @@ convScope vardecls inner = do
                        ) inner
     return $ D.Scope (D.scoping scopeVars) scopeElem
        where convVardecl (name, pasType) = do
-                varName <- D.NameGen <$> supply
+                varName <- alias name
                 ty <- conv pasType
                 return (M.singleton (False, name) varName, (varName, ty))
 
@@ -112,7 +124,7 @@ convScope' paramdecls inner = do
        where paramDeclToTup (S.ParamDecl name (_, ty)) = (name, ty)
              vardecls = M.fromList $ map paramDeclToTup paramdecls
              convParamdecl (S.ParamDecl name (r, pasType)) = do
-                paramName <- D.NameGen <$> supply
+                paramName <- alias name
                 r' <- conv r
                 ty <- conv pasType
                 return (M.singleton (False, name) paramName, (paramName, (r', ty)))
@@ -291,7 +303,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
         S.CaseBranch expr leafs mBodyElse -> do
             clType <- typecheck expr >>= conv
             clExpr <- conv expr
-            clName <- D.NameGen <$> supply
+            clName <- alias "case"
             let clCaseExpr = D.expression clName
             let instRange = \case
                     Right (exprFrom, exprTo)

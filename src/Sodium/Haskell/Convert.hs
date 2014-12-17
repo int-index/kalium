@@ -1,94 +1,74 @@
-{-# LANGUAGE FlexibleInstances, FlexibleContexts  #-}
-{-# LANGUAGE TypeFamilies #-}
 module Sodium.Haskell.Convert (convert) where
 
-import Data.Traversable
-import Control.Applicative
 import qualified Data.Map as M
 import qualified Sodium.Nucleus.Vector.Program as S
 import qualified Language.Haskell.Exts        as H
 import qualified Language.Haskell.Exts.SrcLoc as H
 
 convert :: S.Program -> H.Module
-convert = maybe (error "Sodium.Haskell.Convert") id . conv
+convert = convProgram
 
-class Conv s where
-
-    type Hask s :: *
-    conv :: s -> Maybe (Hask s)
-
-instance Conv S.Program where
-    type Hask S.Program = H.Module
-    conv (S.Program funcs) = do
-        funcDefs <- concat <$> traverse conv (M.toList funcs)
-        return $ H.Module H.noLoc
-            (H.main_mod)
-            (extensions ["LambdaCase", "TupleSections", "MultiWayIf", "ScopedTypeVariables"])
-            Nothing
-            Nothing
-            (map importDecl ["Control.Monad", "Control.Applicative", "Data.Bool"])
-            funcDefs
-      where extensions names = [H.LanguagePragma H.noLoc (map H.Ident names)]
-            importDecl s = H.ImportDecl H.noLoc (H.ModuleName s)
-                           False False False Nothing Nothing Nothing
+convProgram :: S.Program -> H.Module
+convProgram (S.Program funcs _) =
+    H.Module H.noLoc
+        (H.main_mod)
+        (extensions ["LambdaCase", "TupleSections", "MultiWayIf", "ScopedTypeVariables"])
+        Nothing
+        Nothing
+        (map importDecl ["Control.Monad", "Control.Applicative", "Data.Bool"])
+        (M.toList funcs >>= uncurry convFunc)
+  where extensions names = [H.LanguagePragma H.noLoc (map H.Ident names)]
+        importDecl s = H.ImportDecl H.noLoc (H.ModuleName s)
+                       False False False Nothing Nothing Nothing
 
 nameGen :: Integer -> H.Name
 nameGen n = H.Ident ("_" ++ show n)
 
-instance Conv S.Type where
-    type Hask S.Type = H.Type
-    conv = \case
-        S.TypeInteger -> return $ H.TyCon (H.UnQual (H.Ident "Int"))
-        S.TypeDouble  -> return $ H.TyCon (H.UnQual (H.Ident "Double"))
-        S.TypeBoolean -> return $ H.TyCon (H.UnQual (H.Ident "Bool"))
-        S.TypeChar    -> return $ H.TyCon (H.UnQual (H.Ident "Char"))
-        S.TypeUnit    -> return $ H.TyCon (H.Special H.UnitCon)
-        S.TypePair t1 t2  -> (\t1 t2 -> H.TyTuple H.Boxed [t1, t2])
-                         <$> conv t1 <*> conv t2
-        S.TypeList S.TypeChar -> return $ H.TyCon (H.UnQual (H.Ident "String"))
-        S.TypeList ts -> H.TyList <$> conv ts
-        S.TypeFunction t1 t2 -> H.TyFun <$> conv t1 <*> conv t2
-        S.TypeTaint t -> H.TyApp (H.TyCon (H.UnQual (H.Ident "IO"))) <$> conv t
+convType :: S.Type -> H.Type
+convType = \case
+    S.TypeInteger -> H.TyCon (H.UnQual (H.Ident "Int"))
+    S.TypeDouble  -> H.TyCon (H.UnQual (H.Ident "Double"))
+    S.TypeBoolean -> H.TyCon (H.UnQual (H.Ident "Bool"))
+    S.TypeChar    -> H.TyCon (H.UnQual (H.Ident "Char"))
+    S.TypeUnit    -> H.TyCon (H.Special H.UnitCon)
+    S.TypePair t1 t2  -> H.TyTuple H.Boxed [convType t1, convType t2]
+    S.TypeList S.TypeChar -> H.TyCon (H.UnQual (H.Ident "String"))
+    S.TypeList ts -> H.TyList (convType ts)
+    S.TypeFunction t1 t2 -> H.TyFun (convType t1) (convType t2)
+    S.TypeTaint t -> H.TyApp (H.TyCon (H.UnQual (H.Ident "IO"))) (convType t)
 
 
-instance Conv S.Expression where
-
-    type Hask S.Expression = H.Exp
-
-    conv (S.Lambda pat act) = H.Lambda H.noLoc <$> traverse conv [pat] <*> conv act
-    conv (S.Beta a1 a2) = H.App <$> conv a1 <*> conv a2
-    conv (S.Primary lit) = return (convLit lit)
-    conv (S.Access name) = return $ case name of
+convExpression :: S.Expression -> H.Exp
+convExpression = \case
+    S.Lambda pat act -> H.Lambda H.noLoc [convPattern pat] (convExpression act)
+    S.Beta a1 a2 -> H.App (convExpression a1) (convExpression a2)
+    S.Primary lit -> convLit lit
+    S.Access name -> case name of
         S.NameSpecial op -> convOp op
         S.NameGen n -> H.Var (H.UnQual (nameGen n))
 
+convFunc :: S.Name -> S.Func -> [H.Decl]
+convFunc name (S.Func ty expression) =
+    let hsName = case name of
+          S.NameSpecial S.OpMain -> H.main_name
+          S.NameGen n -> nameGen n
+          _ -> error "convFunc: incorrect name"
+        sig = H.TypeSig H.noLoc [hsName] (convType ty)
+        hsRhs = H.UnGuardedRhs (convExpression expression)
+        funBind = H.FunBind [H.Match H.noLoc hsName [] Nothing hsRhs (H.BDecls [])]
+    in [sig, funBind]
 
-instance Conv (S.Name, S.Func) where
-    type Hask (S.Name, S.Func) = [H.Decl]
-    conv (name, S.Func ty expression) = do
-        hsExpression <- conv expression
-        hsName <- case name of
-            S.NameSpecial S.OpMain -> return H.main_name
-            S.NameGen n -> return (nameGen n)
-            _ -> Nothing
-        hsType <- conv ty
-        let sig = H.TypeSig H.noLoc [hsName] hsType
-            hsRhs = H.UnGuardedRhs hsExpression
-            funBind = H.FunBind [H.Match H.noLoc hsName [] Nothing hsRhs (H.BDecls [])]
-        return [sig, funBind]
-
-instance Conv S.Pattern where
-    type Hask S.Pattern = H.Pat
-    conv S.PUnit = return (H.PTuple H.Boxed [])
-    conv S.PWildCard = return H.PWildCard
-    conv (S.PAccess name ty) = do
-        hsName <- case name of
-            S.NameGen n -> return (nameGen n)
-            _ -> Nothing
-        hsType <- conv ty
-        let annotate pat = H.PatTypeSig H.noLoc pat hsType
-        return $ annotate (H.PVar hsName)
-    conv (S.PTuple pat1 pat2) = H.PTuple H.Boxed <$> traverse conv [pat1, pat2]
+convPattern :: S.Pattern -> H.Pat
+convPattern = \case
+    S.PUnit -> H.PTuple H.Boxed []
+    S.PWildCard -> H.PWildCard
+    S.PAccess name ty ->
+        let hsName = case name of
+              S.NameGen n -> nameGen n
+              _ -> error "convPattern: incorrect name"
+            annotate pat = H.PatTypeSig H.noLoc pat (convType ty)
+        in annotate (H.PVar hsName)
+    S.PTuple pat1 pat2 -> H.PTuple H.Boxed [convPattern pat1, convPattern pat2]
 
 convLit :: S.Literal -> H.Exp
 convLit = \case
