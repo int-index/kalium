@@ -80,7 +80,7 @@ data Literal
 data Program
     = Program
     { _programFuncs :: M.Map Name Func
-    , _programNameTags :: M.Map Name String
+    , _programNameTags :: M.Map Integer String
     } deriving (Eq)
 
 data Func

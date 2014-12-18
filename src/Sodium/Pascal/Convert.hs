@@ -72,16 +72,16 @@ lookupName k = do
 
 alias :: ( Applicative m
          , MonadSupply Integer m
-         , MonadWriter (M.Map D.Name String) m
+         , MonadWriter (M.Map Integer String) m
          ) => S.Name -> m D.Name
 alias name = do
-    name' <- fmap D.NameGen supply
-    tell (M.singleton name' name)
-    return name'
+    n <- supply
+    tell (M.singleton n name)
+    return (D.NameGen n)
 
 class Conv s d | s -> d where
     conv :: (Applicative m, MonadSupply Integer m, Erroneous e m)
-         => s -> ReaderT ConvScope (WriterT (M.Map D.Name String) m) d
+         => s -> ReaderT ConvScope (WriterT (M.Map Integer String) m) d
 
 instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
     conv (S.Program funcs vars body) = do

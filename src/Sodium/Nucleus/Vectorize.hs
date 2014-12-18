@@ -44,14 +44,15 @@ class Error e where
     errorInsane :: String -> e
 
 type E e m = (Applicative m, Error e, MonadError e m, MonadSupply Integer m)
-type W e m = (MonadWriter (M.Map Vec.Name Name) m, E e m)
+type W e m = (MonadWriter (M.Map Integer Integer) m, E e m)
 type V e m = (MonadReader VectorizeScope m, W e m)
 
 alias :: W e m => Name -> m Vec.Name
-alias name = do
-    name' <- fmap Vec.NameGen supply
-    tell (M.singleton name' name)
-    return name'
+alias (NameGen m) = do
+    n <- supply
+    tell (M.singleton n m)
+    return (Vec.NameGen n)
+alias _ = Vec.NameGen <$> supply
 
 vectorize :: E e m => Program Type Pattern Atom -> m Vec.Program
 vectorize program = vectorizeNameTags (program ^. programNameTags) $ do
@@ -61,8 +62,8 @@ vectorize program = vectorizeNameTags (program ^. programNameTags) $ do
         vecFuncs <- traverse (uncurry vectorizeFunc) (program ^. programFuncs & M.toList)
         return $ Vec.Program (M.fromList vecFuncs) M.empty
 
-vectorizeNameTags :: E e m => M.Map Name String
-                  -> WriterT (M.Map Vec.Name Name) m Vec.Program -> m Vec.Program
+vectorizeNameTags :: E e m => M.Map Integer String
+                  -> WriterT (M.Map Integer Integer) m Vec.Program -> m Vec.Program
 vectorizeNameTags nameTags w = do
     (p, nameTags') <- runWriterT w
     return $ p & Vec.programNameTags %~ M.union (composeMap nameTags nameTags')
