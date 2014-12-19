@@ -10,16 +10,18 @@
 
 \emph{Sodium} defines several internal (intermediate) representations. Thus
 translation can be split into simpler steps: parsing, source conversion,
-atomization, vectorization, target conversion, and rendering. The intermediate
-representations between source and target conversions are called internal and
-their specifications are provided in this document.
+atomization, valuefication, vectorization, target conversion, and rendering. The
+intermediate representations between source and target conversions are called
+internal and their specifications are provided in this document.
 
 \section { The Scalar Representation }
 
 The scalar representation comes in two flavors: non-atomic and atomic.
 Translation of the former to the latter is called \emph{atomization}. The only
-difference between the two is that in the atomic scalar representation
-every expression is atomic, whereas in the non-atomic one some are not.
+difference between the two is that in the atomic scalar representation every
+expression is atomic, whereas in the non-atomic one some are not. It can also be
+with or without reference parameters. Removal of reference parameters is called
+\emph{valuefication}.
 
 \subsection { Program Structure }
 
@@ -37,7 +39,7 @@ parameter, performing the action, and receiving the return value.
 Thus, a function has a parameter list that declares what values can influence
 the action and a body that defines this action. A parameter is basically a
 variable declaration, annotated by a passing mechanism. The body consists of a
-statement and an atomic expression that defines the return value.
+statement and an expression that defines the return value.
 
 That is, a function consists of a parameter list, local variables, and a body.
 Their precise scoping relation is described in another section. A function is
