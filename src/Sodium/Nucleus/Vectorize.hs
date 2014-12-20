@@ -165,11 +165,14 @@ getFuncName name = case name of
      OpMod -> Vec.OpMod
      OpLess -> Vec.OpLess
      OpMore -> Vec.OpMore
+     OpLessEquals -> Vec.OpLessEquals
+     OpMoreEquals -> Vec.OpMoreEquals
      OpEquals -> Vec.OpEquals
+     OpNotEquals -> Vec.OpNotEquals
      OpAnd -> Vec.OpAnd
      OpOr -> Vec.OpOr
      OpNot -> Vec.OpNot
-     OpXor -> Vec.OpXor
+     OpXor -> Vec.OpNotEquals
      OpTrue -> Vec.OpTrue
      OpFalse -> Vec.OpFalse
      OpRange -> Vec.OpRange
@@ -179,6 +182,7 @@ getFuncName name = case name of
      OpPrintLn -> Vec.OpPrintLn
      OpReadLn -> Vec.OpReadLn
      OpPutLn -> Vec.OpPutLn
+     OpPut -> Vec.OpPut
      OpGetLn -> Vec.OpGetLn
      OpId -> Vec.OpId
      OpUnit -> Vec.OpUnit
@@ -231,10 +235,11 @@ vectorizeStatement = \case
     Execute (Exec pat name _tyArgs args) -> do
         -- TODO: purity flag in function signature
         let impure = case name of
-              NameSpecial OpReadLn  -> True
-              NameSpecial OpGetLn      -> True
-              NameSpecial OpPrintLn    -> True
+              NameSpecial OpReadLn -> True
+              NameSpecial OpGetLn -> True
+              NameSpecial OpPrintLn -> True
               NameSpecial OpPutLn -> True
+              NameSpecial OpPut -> True
               NameGen _ -> True
               _ -> False
         vecArgs <- traverse vectorizeAtom args

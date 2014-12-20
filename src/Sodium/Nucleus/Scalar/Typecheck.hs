@@ -73,7 +73,10 @@ builtinOpType op tyArgs args = case op of
     OpMod      -> argMatch2Same >>= require (==TypeInteger)
     OpLess     -> argMatch2Same >>= require isOrd >> return TypeBoolean
     OpMore     -> argMatch2Same >>= require isOrd >> return TypeBoolean
+    OpLessEquals -> argMatch2Same >>= require isOrd >> return TypeBoolean
+    OpMoreEquals -> argMatch2Same >>= require isOrd >> return TypeBoolean
     OpEquals   -> argMatch2Same >>= require isEq  >> return TypeBoolean
+    OpNotEquals-> argMatch2Same >>= require isEq  >> return TypeBoolean
     OpAnd      -> argMatch2Same >>= require (==TypeBoolean)
     OpOr       -> argMatch2Same >>= require (==TypeBoolean)
     OpNot      -> argMatch1 >>= require (==TypeBoolean)
@@ -91,6 +94,7 @@ builtinOpType op tyArgs args = case op of
     OpPrintLn  -> argMatch1 >> return TypeUnit
     OpReadLn   -> return (tyArgs !! 0)
     OpPutLn    -> argMatch1 >>= require (==TypeList TypeChar) >> return TypeUnit
+    OpPut      -> argMatch1 >>= require (==TypeList TypeChar) >> return TypeUnit
     OpGetLn    -> return (TypeList TypeChar)
     OpUnit     -> return TypeUnit
     OpId       -> argMatch1

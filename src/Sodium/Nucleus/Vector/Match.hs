@@ -155,6 +155,7 @@ isTaintedUnit :: Expression -> Bool
 isTaintedUnit = \case
     Taint LitUnit -> True
     AppOp1 OpPutLn  _ -> True
+    AppOp1 OpPut _ -> True
     AppOp1 OpPrintLn _ -> True
     AppOp1 OpIgnore _ -> True
     AppOp3 OpIf xElse xThen _ -> isTaintedUnit xElse && isTaintedUnit xThen

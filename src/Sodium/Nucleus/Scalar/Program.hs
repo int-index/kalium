@@ -18,7 +18,10 @@ data NameSpecial
     | OpMod
     | OpLess
     | OpMore
+    | OpLessEquals
+    | OpMoreEquals
     | OpEquals
+    | OpNotEquals
     | OpAnd
     | OpOr
     | OpNot
@@ -32,6 +35,7 @@ data NameSpecial
     | OpPrintLn
     | OpReadLn
     | OpPutLn
+    | OpPut
     | OpGetLn
     | OpId
     | OpUnit

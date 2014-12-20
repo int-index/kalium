@@ -174,7 +174,7 @@ convReadLn [e@(S.Access name')] = do
             return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpReadLn) [ty] []
 convReadLn _ = error "IOMagic supports only single-value read operations"
 
-convWriteLn exprs = do
+convWriteLn ln exprs = do
     let convArg expr = do
           ty <- typecheck expr
           let wrap = case ty of
@@ -182,10 +182,12 @@ convWriteLn exprs = do
                 S.TypeChar -> \e -> D.Call (D.NameSpecial D.OpSingleton) [] [e]
                 _ -> \e -> D.Call (D.NameSpecial D.OpShow) [] [e]
           wrap <$> conv expr
+        op | ln = D.NameSpecial D.OpPutLn
+           | otherwise = D.NameSpecial D.OpPut
     arg <- traverse convArg exprs <&> \case
         [] -> D.expression ""
         args -> foldl1 (binary (D.NameSpecial D.OpConcat)) args
-    return $ D.Exec D.PUnit (D.NameSpecial D.OpPutLn) [] [arg]
+    return $ D.Exec D.PUnit op [] [arg]
 
 typeOfLiteral :: S.Literal -> S.Type
 typeOfLiteral = \case
@@ -250,7 +252,10 @@ typecheck' = runMaybeT . \case
             (S.OpMod     , [S.TypeInteger, S.TypeInteger]) -> return S.TypeInteger
             (S.OpLess    , [t1, t2]) | t1 == t2 -> return S.TypeBoolean
             (S.OpMore    , [t1, t2]) | t1 == t2 -> return S.TypeBoolean
+            (S.OpLessEquals, [t1, t2]) | t1 == t2 -> return S.TypeBoolean
+            (S.OpMoreEquals, [t1, t2]) | t1 == t2 -> return S.TypeBoolean
             (S.OpEquals  , [t1, t2]) | t1 == t2 -> return S.TypeBoolean
+            (S.OpNotEquals, [t1, t2]) | t1 == t2 -> return S.TypeBoolean
             (S.OpAnd     , [S.TypeBoolean, S.TypeBoolean]) -> return S.TypeBoolean
             (S.OpOr      , [S.TypeBoolean, S.TypeBoolean]) -> return S.TypeBoolean
             (S.OpXor     , [S.TypeBoolean, S.TypeBoolean]) -> return S.TypeBoolean
@@ -281,7 +286,8 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
             expr <- typecastConv tyW expr'
             return $ D.assign name expr
         S.Execute "readln"  exprs -> D.statement <$> convReadLn  exprs
-        S.Execute "writeln" exprs -> D.statement <$> convWriteLn exprs
+        S.Execute "write"   exprs -> D.statement <$> convWriteLn False exprs
+        S.Execute "writeln" exprs -> D.statement <$> convWriteLn True  exprs
         S.Execute name' exprs' -> do
             name <- nameF name'
             exprs <- traverse conv exprs'
@@ -353,6 +359,9 @@ instance Conv S.Operator D.Name where
         S.OpMod  -> D.OpMod
         S.OpLess -> D.OpLess
         S.OpMore -> D.OpMore
+        S.OpLessEquals -> D.OpLessEquals
+        S.OpMoreEquals -> D.OpMoreEquals
+        S.OpNotEquals  -> D.OpNotEquals
         S.OpEquals -> D.OpEquals
         S.OpAnd -> D.OpAnd
         S.OpOr  -> D.OpOr

@@ -58,6 +58,9 @@ import qualified Text.Parsec as P
     '='      { T.EqSign    }
     '<'      { T.Suck      }
     '>'      { T.Blow      }
+    '<>'     { T.SuckBlow  }
+    '<='     { T.SuckEq    }
+    '>='     { T.BlowEq    }
     '['      { T.LSqBrace  }
     ']'      { T.RSqBrace  }
     name     { T.Name $$   }
@@ -66,7 +69,7 @@ import qualified Text.Parsec as P
     quote    { T.Quote $$  }
     unknown  { T.Unknown _ }
 
-%nonassoc '<' '>' '='
+%nonassoc '<' '>' '<>' '<=' '>=' '='
 %left     '+' '-' or  xor
 %left     '*' '/' div mod and
 %left     NEG POS
@@ -168,6 +171,9 @@ Range :                  Expression_ { Left $1 }
 Expression : Expression '<' Expression { binary OpLess   $1 $3 }
            | Expression '>' Expression { binary OpMore   $1 $3 }
            | Expression '=' Expression { binary OpEquals $1 $3 }
+           | Expression '>=' Expression { binary OpMoreEquals $1 $3 }
+           | Expression '<=' Expression { binary OpLessEquals $1 $3 }
+           | Expression '<>' Expression { binary OpNotEquals $1 $3 }
            | Expression_ { $1 }
 
 Expression_ : Expression '+' Expression { binary OpAdd      $1 $3 }

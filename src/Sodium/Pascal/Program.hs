@@ -62,7 +62,10 @@ data Operator
     | OpMod
     | OpLess
     | OpMore
+    | OpLessEquals
+    | OpMoreEquals
     | OpEquals
+    | OpNotEquals
     | OpAnd
     | OpOr
     | OpXor

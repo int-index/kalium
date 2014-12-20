@@ -46,6 +46,9 @@ data Token
     | EqSign
     | Suck
     | Blow
+    | SuckBlow
+    | SuckEq
+    | BlowEq
     | Name String
     | INumber Integer
     | FNumber Rational
@@ -90,8 +93,15 @@ pPunct = choice
    , char ',' $> Comma
    , char ';' $> Semicolon
    , char '=' $> EqSign
-   , char '<' $> Suck
-   , char '>' $> Blow
+   , char '<' >> choice
+        [ char '>' $> SuckBlow
+        , char '=' $> SuckEq
+        , return Suck
+        ]
+   , char '>' >> choice
+        [ char '=' $> BlowEq
+        , return Blow
+        ]
    , char '.' >> choice
         [ char '.' $> DoubleDot
         , char ')' $> RSqBrace
