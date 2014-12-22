@@ -1,5 +1,5 @@
 {
-module Sodium.Pascal.Parse (parse, tokenize, Error(..)) where
+module Sodium.Pascal.Parse (parse, Error(..)) where
 
 import qualified Data.Map as M
 import Data.Ratio
@@ -236,10 +236,4 @@ match_type t = case t of
     "string"  -> TypeString
     "char"    -> TypeChar
     _         -> TypeCustom t
-
-tokenize :: String -> Either P.ParseError [T.Token]
-tokenize = P.parse tokenizer "" where
-    tokenizer = T.tokenCC cont
-    cont T.EOF = return []
-    cont token = (token:) `fmap` tokenizer
 }
