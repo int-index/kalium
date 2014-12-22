@@ -158,6 +158,8 @@ expAppSection = \case
 expDoMatch = \case
     App2 (Var (UnQual (Symbol ">>="))) x (Lambda srcLoc [pat] a)
         -> Do [Generator srcLoc pat x, Qualifier a]
+    App2 (Var (UnQual (Symbol ">>"))) x y
+        -> Do [Qualifier x, Qualifier y]
     Do [Qualifier exp] -> exp
     Do stmts -> Do (stmts >>= expandStmt) where
         expandStmt = \case
