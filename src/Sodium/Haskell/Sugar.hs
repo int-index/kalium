@@ -40,20 +40,23 @@ instance Sugar Binds where
         IPBinds {} -> error "not supported: IPBinds"
         BDecls decls -> BDecls <$> sugar decls
 
+sugarUniverseStrip a = expStripParen ParensUniverse <$> sugar a
+
 instance Sugar Rhs where
     sugar = \case
         UnGuardedRhs (MultiIf rhss) -> sugar (GuardedRhss rhss)
-        UnGuardedRhs exp -> UnGuardedRhs <$> (expStripParen True <$> sugar exp)
+        UnGuardedRhs exp -> UnGuardedRhs <$> sugarUniverseStrip exp
         GuardedRhss rhss -> GuardedRhss  <$> sugar rhss
 
 instance Sugar GuardedRhs where
     sugar (GuardedRhs srcLoc           stmts           exp)
-        =  GuardedRhs srcLoc <$> sugar stmts <*> sugar exp
+        =  GuardedRhs srcLoc <$> sugar stmts <*> sugarUniverseStrip exp
 
 instance Sugar Stmt where
     sugar = \case
-        Generator srcLoc pat exp -> Generator srcLoc pat <$> sugar exp
-        Qualifier exp -> Qualifier <$> sugar exp
+        Generator srcLoc pat exp
+            -> Generator srcLoc pat <$> sugarUniverseStrip exp
+        Qualifier exp -> Qualifier <$> sugarUniverseStrip exp
         LetStmt binds -> LetStmt <$> sugar binds
         RecStmt stmts -> RecStmt <$> sugar stmts
 
@@ -79,7 +82,7 @@ instance Sugar Exp where
         exp -> error ("unsupported exp: " ++ show exp)
 
 expMatch
-    = expStripParen False
+    = expStripParen ParensAtom
     . expMatchInfix
     . expMatchIf
     . expJoinLambda
@@ -87,7 +90,7 @@ expMatch
     . expAppSection
     . expDoMatch
 
-isInfix op = op /= UnQual (Ident "bool")
+isInfix op = lookup op fixtable /= Nothing
 
 expMatchIf = \case
     App3 (Var op) x y z | UnQual (Ident "bool") <- op -> If z y x
@@ -107,32 +110,34 @@ expMatchInfix = \case
         _ -> Paren (InfixApp (Paren x) (QConOp op) (Paren y))
     App2 (Var op) x y | UnQual (Ident "enumFromTo") <- op
         -> EnumFromTo x y
-    App2 (Var op) x y | isInfix op
+    App2 (Var op) x y | isInfix (QVarOp op)
         -> Paren (InfixApp (Paren x) (QVarOp op) (Paren y))
     exp -> exp
 
-expStripParen aggressive = \case
-    Paren exp | (aggressive || expLevel exp == ParensAtom) -> exp
+expStripParen outerLevel = \case
+    Paren exp | expLevel exp `lesserLevel` outerLevel -> exp
     InfixApp (Paren (InfixApp l_lhs l_op l_rhs)) op rhs
         | (Leftfix, l_n) <- whatfix l_op
         , (Leftfix,   n) <- whatfix   op
         , l_n == n
         -> InfixApp (InfixApp l_lhs l_op l_rhs) op rhs
 
+    InfixApp lhs op (Paren (InfixApp r_lhs r_op r_rhs))
+        | (Rightfix, r_n) <- whatfix r_op
+        , (Rightfix,   n) <- whatfix   op
+        , r_n == n
+        -> InfixApp lhs op (InfixApp r_lhs r_op r_rhs)
+
     InfixApp lhs op rhs | (fx, n) <- whatfix op
         -> InfixApp
-            (expStripParen' (fx, n) lhs)
+            (expStripParen (ParensInfix fx n) lhs)
             op
-            (expStripParen' (fx, n) rhs)
+            (expStripParen (ParensInfix fx n) rhs)
     Do stmts ->
         let strip = \case
               Qualifier (Paren exp) -> Qualifier exp
               stmt -> stmt
         in Do (map strip stmts)
-    exp -> exp
-
-expStripParen' (fx, n) = \case
-    Paren exp | expLevel exp `lesserLevel` ParensInfix fx n -> exp
     exp -> exp
 
 expJoinLambda = \case
@@ -191,6 +196,7 @@ expLevel = \case
     Con{} -> ParensAtom
     Lit{} -> ParensAtom
     List{} -> ParensAtom
+    EnumFromTo{} -> ParensAtom
     App{} -> ParensApp
     InfixApp _ op _ -> ParensInfix `uncurry` whatfix op
     _ -> ParensUniverse
@@ -203,11 +209,16 @@ fixtable = [ (QVarOp $ UnQual $ Symbol "+", (Leftfix, 6))
            , (QVarOp $ UnQual $ Ident "div", (Leftfix, 7))
            , (QVarOp $ UnQual $ Ident "mod", (Leftfix, 7))
            , (QVarOp $ UnQual $ Symbol "++", (Rightfix, 5))
+           , (QVarOp $ UnQual $ Symbol "<$", (Leftfix, 4))
            , (QVarOp $ UnQual $ Symbol "==", (Nonfix, 4))
            , (QVarOp $ UnQual $ Symbol "/=", (Nonfix, 4))
            , (QVarOp $ UnQual $ Symbol "<",  (Nonfix, 4))
            , (QVarOp $ UnQual $ Symbol ">",  (Nonfix, 4))
+           , (QVarOp $ UnQual $ Symbol "<=", (Nonfix, 4))
+           , (QVarOp $ UnQual $ Symbol ">=", (Nonfix, 4))
            , (QVarOp $ UnQual $ Ident "elem", (Nonfix, 4))
            , (QVarOp $ UnQual $ Symbol "&&", (Rightfix, 3))
            , (QVarOp $ UnQual $ Symbol "||", (Rightfix, 2))
+           , (QVarOp $ UnQual $ Symbol ">>=", (Leftfix, 1))
+           , (QVarOp $ UnQual $ Symbol ">>",  (Leftfix, 1))
            ]

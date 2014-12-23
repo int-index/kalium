@@ -186,7 +186,7 @@ convWriteLn ln exprs = do
            | otherwise = D.NameSpecial D.OpPut
     arg <- traverse convArg exprs <&> \case
         [] -> D.expression ""
-        args -> foldl1 (binary (D.NameSpecial D.OpConcat)) args
+        args -> foldr1 (binary (D.NameSpecial D.OpConcat)) args
     return $ D.Exec D.PUnit op [] [arg]
 
 typeOfLiteral :: S.Literal -> S.Type
@@ -318,7 +318,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
                     Left expr -> binary (D.NameSpecial D.OpEquals) clCaseExpr <$> conv expr
             let instLeaf (exprs, body)
                      =  (,)
-                    <$> (foldl1 (binary (D.NameSpecial D.OpOr)) <$> traverse instRange exprs)
+                    <$> (foldr1 (binary (D.NameSpecial D.OpOr)) <$> traverse instRange exprs)
                     <*> conv body
             leafs <- traverse instLeaf leafs
             leafElse <- D.statements <$> traverse conv mBodyElse

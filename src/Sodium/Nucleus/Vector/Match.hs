@@ -50,7 +50,7 @@ matchExpression = \case
         , AppOp1 opThen aThen <- xThen
         , opElse == opThen
         -- some type-preserving functions:
-        , opElse `elem` [OpPutLn, OpTaint]
+        , opElse `elem` [OpPutLn, OpPut, OpTaint]
         -- TODO: typecheck (typeof aElse == typeof aThen)
         -> AppOp1 opElse (AppOp3 OpIf aElse aThen cond)
 
