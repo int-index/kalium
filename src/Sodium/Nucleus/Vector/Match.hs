@@ -17,6 +17,7 @@ match = over recmapped
       . foldMatch
       . booleanCompute
       . numericCompute
+      . appIgnore
 
 pattern LitZero = Primary (LitInteger 0)
 pattern LitOne  = Primary (LitInteger 1)
@@ -31,18 +32,6 @@ matchExpression = \case
     Bind (Taint a) x -> App1 x a
     Bind x (OpAccess OpTaint) -> x
 
-    Follow PWildCard x a -> AppOp2 OpBindIgnore x a
-    AppOp2 OpBindIgnore x (Taint a) -> AppOp2 OpFmapIgnore a x
-
-    AppOp2 OpFmapIgnore LitUnit x -> Ignore x
-    AppOp2 OpFmapIgnore a (Taint  _) -> Taint a
-    AppOp2 OpFmapIgnore a (Ignore x) -> AppOp2 OpFmapIgnore a x
-    AppOp2 OpFmapIgnore c (propagateOpFmapIgnore c -> e) -> e
-
-    Ignore (Taint _) -> Taint LitUnit
-    Ignore e | isTaintedUnit e -> e
-    Ignore (propagateOpIgnore -> e) -> e
-
     AppOp1 OpPutLn (AppOp1 OpShow a) -> AppOp1 OpPrintLn a
 
     AppOp3 OpIf xElse xThen cond
@@ -53,6 +42,25 @@ matchExpression = \case
         , opElse `elem` [OpPutLn, OpPut, OpTaint]
         -- TODO: typecheck (typeof aElse == typeof aThen)
         -> AppOp1 opElse (AppOp3 OpIf aElse aThen cond)
+
+    e -> e
+
+appIgnore :: Expression -> Expression
+appIgnore = \case
+
+    Follow PWildCard x a -> AppOp2 OpBindIgnore x a
+    AppOp2 OpBindIgnore x (Taint a) -> AppOp2 OpFmapIgnore a x
+
+    AppOp2 OpFmapIgnore LitUnit x -> Ignore x
+    AppOp2 OpFmapIgnore a (Taint  _) -> Taint a
+    AppOp2 OpFmapIgnore a (Ignore x) -> AppOp2 OpFmapIgnore a x
+    AppOp2 OpFmapIgnore c (over propagate (AppOp2 OpFmapIgnore c) -> e) -> e
+
+    Ignore (AppOp2 OpFmapIgnore _ a) -> Ignore a
+
+    Ignore (Taint _) -> Taint LitUnit
+    Ignore e | isTaintedUnit e -> e
+    Ignore (over propagate Ignore -> e) -> e
 
     e -> e
 
@@ -127,11 +135,11 @@ doubleOp2 = \case
 
 pairReduce :: Expression -> Expression
 pairReduce = \case
-    Lambda (PTuple p1 p2) (pureAttempt (swapApp p1 p2) -> Just a)
+    Lambda (PTuple p1 p2) (propagate (swapApp p1 p2) -> Just a)
         -> Lambda (PTuple p2 p1) a
-    AppOp1 OpSwap (pureAttempt swapAttempt -> Just a) -> a
-    AppOp1 OpFst (pureAttempt fstAttempt -> Just a) -> a
-    AppOp1 OpSnd (pureAttempt sndAttempt -> Just a) -> a
+    AppOp1 OpSwap (propagate swapAttempt -> Just a) -> a
+    AppOp1 OpFst (propagate fstAttempt -> Just a) -> a
+    AppOp1 OpSnd (propagate sndAttempt -> Just a) -> a
     e -> e
   where
     fstAttempt = \case
@@ -165,18 +173,6 @@ etaReduce = \case
     Eta p x a | preciseMatch p a
               , not (x `mentions` patBound p) -> x
     e -> e
-
-propagateOpIgnore = \case
-    Follow p x a -> Follow p x (propagateOpIgnore a)
-    AppOp2 OpFmapIgnore _ a -> propagateOpIgnore a
-    Into p x a -> Into p x (propagateOpIgnore a)
-    e -> Ignore e
-
-propagateOpFmapIgnore c = \case
-    Follow p x a -> Follow p x (propagateOpFmapIgnore c a)
-    AppOp2 OpFmapIgnore _ a -> propagateOpFmapIgnore c a
-    Into p x a -> Into p x (propagateOpFmapIgnore c a)
-    e -> AppOp2 OpFmapIgnore c e
 
 lambdaReduce = \case
     Into PWildCard _ a -> a

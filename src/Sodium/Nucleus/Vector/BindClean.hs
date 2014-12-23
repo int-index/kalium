@@ -21,7 +21,7 @@ taintSubst :: Expression -> Expression -> (Pattern, Attempt) -> Maybe Expression
 taintSubst x a (p, c) = taintAttempt c x <&> \x' -> Follow p x' a
 
 pureSubst :: Expression -> Expression -> (Pattern, Attempt) -> Maybe Expression
-pureSubst x a (p, c) = pureAttempt c x <&> \x' -> Into p x' a
+pureSubst x a (p, c) = propagate c x <&> \x' -> Into p x' a
 
 type Con = forall a . (a,a) -> (a,a)
 
