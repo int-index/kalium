@@ -29,6 +29,7 @@ data NameSpecial
     | OpIf
     | OpFold
     | OpFoldTainted
+    | OpMapTaintedIgnore
     | OpProduct
     | OpSum
     | OpAnd'

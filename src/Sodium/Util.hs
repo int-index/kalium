@@ -5,6 +5,7 @@ import Data.Bool
 import qualified Data.Map as M
 
 type Pairs a b = [(a, b)]
+type Endo a = a -> a
 
 mAsList :: Ord k => Iso' (M.Map k a) (Pairs k a)
 mAsList = iso M.toList M.fromList

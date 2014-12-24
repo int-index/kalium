@@ -7,8 +7,9 @@ import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Pattern
 import Sodium.Nucleus.Vector.Name
 import Sodium.Nucleus.Vector.Attempt
+import Sodium.Util
 
-match :: Program -> Program
+match :: Endo Program
 match = over recmapped
       $ matchExpression
       . lambdaReduce
@@ -24,7 +25,7 @@ pattern LitOne  = Primary (LitInteger 1)
 pattern LitTrue = OpAccess OpTrue
 pattern LitFalse = OpAccess OpFalse
 
-matchExpression :: Expression -> Expression
+matchExpression :: Endo Expression
 matchExpression = \case
 
     AppOp1 OpId a -> a
@@ -45,29 +46,39 @@ matchExpression = \case
 
     e -> e
 
-appIgnore :: Expression -> Expression
+appIgnore :: Endo Expression
 appIgnore = \case
 
     Follow PWildCard x a -> AppOp2 OpBindIgnore x a
     AppOp2 OpBindIgnore x (Taint a) -> AppOp2 OpFmapIgnore a x
+    AppOp2 OpBindIgnore (propagate attemptIgnore -> Just x) a
+        -> AppOp2 OpBindIgnore x a
 
     AppOp2 OpFmapIgnore LitUnit x -> Ignore x
     AppOp2 OpFmapIgnore a (Taint  _) -> Taint a
     AppOp2 OpFmapIgnore a (Ignore x) -> AppOp2 OpFmapIgnore a x
+    AppOp2 OpFmapIgnore a (propagate attemptIgnore -> Just e)
+        -> AppOp2 OpFmapIgnore a e
     AppOp2 OpFmapIgnore c (over propagate (AppOp2 OpFmapIgnore c) -> e) -> e
 
-    Ignore (AppOp2 OpFmapIgnore _ a) -> Ignore a
-
-    Ignore (Taint _) -> Taint LitUnit
-    Ignore e | isTaintedUnit e -> e
-    Ignore (over propagate Ignore -> e) -> e
+    Ignore (propagate attemptIgnore -> Just e) -> e
 
     e -> e
 
-foldMatch :: Expression -> Expression
+attemptIgnore :: Attempt
+attemptIgnore = \case
+    Taint _ -> Just (Taint LitUnit)
+    e | isTaintedUnit e -> Just e
+    AppOp2 OpFmapIgnore _ a -> Just (Ignore a)
+    _ -> Nothing
+
+foldMatch :: Endo Expression
 foldMatch = \case
     AppOp3 OpFoldTainted (Lambda2 p1 p2 (Taint a)) x1 x2
         -> Taint (AppOp3 OpFold (Lambda2 p1 p2 a) x1 x2)
+
+    AppOp3 OpFoldTainted (Lambda2 PWildCard p2 a) LitUnit x2
+        -> AppOp2 OpMapTaintedIgnore (Lambda p2 a) x2
 
     AppOp3 OpFold (OpAccess OpMultiply) LitOne x -> AppOp1 OpProduct x
     AppOp3 OpFold (OpAccess OpAdd) LitZero x -> AppOp1 OpSum x
@@ -76,7 +87,7 @@ foldMatch = \case
 
     e -> e
 
-booleanCompute :: Expression -> Expression
+booleanCompute :: Endo Expression
 booleanCompute = \case
 
     AppOp1 OpNot LitTrue  -> LitFalse
@@ -133,7 +144,7 @@ doubleOp2 = \case
     OpDivide -> return (/)
     _ -> Nothing
 
-pairReduce :: Expression -> Expression
+pairReduce :: Endo Expression
 pairReduce = \case
     Lambda (PTuple p1 p2) (propagate (swapApp p1 p2) -> Just a)
         -> Lambda (PTuple p2 p1) a
@@ -166,6 +177,7 @@ isTaintedUnit = \case
     AppOp1 OpPut _ -> True
     AppOp1 OpPrintLn _ -> True
     AppOp1 OpIgnore _ -> True
+    AppOp2 OpMapTaintedIgnore _ _ -> True
     AppOp3 OpIf xElse xThen _ -> isTaintedUnit xElse && isTaintedUnit xThen
     _ -> False
 

@@ -4,14 +4,14 @@ import Data.Function
 import Control.Applicative
 import Control.Lens
 import Sodium.Nucleus.Vector.Program
+import Sodium.Util
 
 type Attempt = Expression -> Maybe Expression
 
-taintAttempt :: Attempt -> Attempt
-taintAttempt c = propagate tainted where
-    tainted = \case
-        Taint a -> Taint <$> propagate c a
-        _ -> Nothing
+tainting :: Alternative m => Endo (LensLike' m Expression Expression)
+tainting prop c = prop $ \case
+    Taint a -> Taint <$> prop c a
+    _ -> empty
 
 propagate :: Applicative m => LensLike' m Expression Expression
 propagate c = fix $ \go -> \case

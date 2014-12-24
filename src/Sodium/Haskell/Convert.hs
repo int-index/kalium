@@ -88,6 +88,7 @@ convOp = \case
     S.OpIf       -> H.Var (H.UnQual (H.Ident "bool"))
     S.OpFold     -> H.Var (H.UnQual (H.Ident "foldl"))
     S.OpFoldTainted -> H.Var (H.UnQual (H.Ident "foldM"))
+    S.OpMapTaintedIgnore -> H.Var (H.UnQual (H.Ident "mapM_"))
     S.OpProduct  -> H.Var (H.UnQual (H.Ident "product"))
     S.OpSum      -> H.Var (H.UnQual (H.Ident "sum"))
     S.OpAnd'     -> H.Var (H.UnQual (H.Ident "and"))
