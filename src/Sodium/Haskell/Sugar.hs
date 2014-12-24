@@ -25,6 +25,8 @@ instance Sugar Module where
 instance Sugar Decl where
     sugar = \case
         FunBind matches -> FunBind <$> sugar matches
+        PatBind srcLoc pat rhs binds
+            -> PatBind srcLoc pat <$> sugar rhs <*> sugar binds
         decl -> pure decl
 
 instance Sugar Match where
@@ -79,6 +81,7 @@ instance Sugar Exp where
         InfixApp x op y -> InfixApp <$> sugar x <*> pure op <*> sugar y
         RightSection op exp -> RightSection op <$> sugar exp
         Do stmts -> Do <$> sugar stmts
+        Let binds exp -> Let <$> sugar binds <*> sugar exp
         exp -> error ("unsupported exp: " ++ show exp)
 
 expMatch
@@ -89,6 +92,7 @@ expMatch
     . expJoinList
     . expAppSection
     . expDoMatch
+    . expLetMatch
 
 isInfix op = lookup op fixtable /= Nothing
 
@@ -170,6 +174,14 @@ expDoMatch = \case
         expandStmt = \case
             Qualifier (Do stmts) -> stmts
             stmt -> [stmt]
+    exp -> exp
+
+expLetMatch = \case
+    App (Lambda srcLoc [pat] a) x ->
+        let decl = PatBind srcLoc pat (UnGuardedRhs x) (BDecls [])
+        in Let (BDecls [decl]) a
+    Let (BDecls decls) (Let (BDecls decls') a)
+        -> Let (BDecls (decls ++ decls')) a
     exp -> exp
 
 data Fixity = Nonfix | Leftfix | Rightfix
