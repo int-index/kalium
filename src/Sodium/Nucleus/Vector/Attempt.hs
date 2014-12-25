@@ -5,8 +5,6 @@ import Sodium.Util
 
 import Sodium.Nucleus.Vector.Program
 
-type Attempt = Expression -> Maybe Expression
-
 tainting :: Alternative m => Endo' (LensLike' m Expression Expression)
 tainting prop c = prop $ \case
     Taint a -> Taint <$> prop c a

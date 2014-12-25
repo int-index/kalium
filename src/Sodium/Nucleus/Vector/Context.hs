@@ -9,7 +9,7 @@ import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Name
 import Sodium.Nucleus.Vector.Attempt
 
-contexts :: MonadWriter [Expression] m => Attempt -> Expression -> m Expression
+contexts :: MonadWriter [Expression] m => EndoKleisli' Maybe Expression -> EndoKleisli' m Expression
 contexts fits (Beta cxt (fits -> Just e)) = tell [cxt] >> return e
 contexts _ e = return e
 
@@ -24,7 +24,7 @@ context name a cont = do
             _ -> Nothing
     cont name' b $ guard (not dangling) >> uniform cxts
 
-extractCtx :: (Applicative m, MonadSupply Integer m) => Program -> m Program
+extractCtx :: (Applicative m, MonadSupply Integer m) => EndoKleisli' m Program
 extractCtx = recmapped extractCtxExpression
 
 extractCtxExpression

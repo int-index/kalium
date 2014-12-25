@@ -65,7 +65,7 @@ appIgnore = \case
 
     e -> e
 
-attemptIgnore :: Attempt
+attemptIgnore :: EndoKleisli' Maybe Expression
 attemptIgnore = \case
     Taint _ -> Just (Taint LitUnit)
     e | isTaintedUnit e -> Just e
@@ -111,7 +111,7 @@ booleanCompute = \case
 
     e -> e
 
-numericCompute :: Expression -> Expression
+numericCompute :: Endo' Expression
 numericCompute = \case
 
     AppOp2 op (Primary (LitDouble x)) (Primary (LitDouble y))

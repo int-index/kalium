@@ -6,6 +6,7 @@ import qualified Data.Map as M
 type Pairs a b = [(a, b)]
 type Endo' a = a -> a
 type Kleisli' m a b = a -> m b
+type EndoKleisli' m a = Kleisli' m a a
 
 mAsList :: Ord k => Iso' (Map k a) (Pairs k a)
 mAsList = iso M.toList M.fromList
@@ -17,7 +18,7 @@ composeMap m = M.foldrWithKey go mempty where
 tryApply :: (a -> Maybe a) -> (a -> a)
 tryApply f a = maybe a id (f a)
 
-closureM :: (Eq a, Monad m) => (a -> m a) -> (a -> m a)
+closureM :: (Eq a, Monad m) => LensLike' m a a
 closureM f = go where
     go x = f x >>= \y -> bool (go y) (return x) (x == y)
 

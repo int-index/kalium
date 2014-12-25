@@ -5,6 +5,7 @@
 module Sodium.Nucleus.Scalar.Typecheck where
 
 import Sodium.Prelude
+import Sodium.Util
 
 import qualified Data.Map as M
 
@@ -131,7 +132,7 @@ builtinOpType op tyArgs args = case op of
 class TypeIntro a where
     typeIntro' :: a -> TypeScope -> TypeScope
 
-typeIntro :: (TypeIntro a, TypeEnv e m) => (a -> m b) -> (a -> m b)
+typeIntro :: (TypeIntro a, TypeEnv e m) => Endo' (Kleisli' m a b)
 typeIntro k x = local (typeIntro' x) (k x)
 
 instance Typing param => TypeIntro (Program param expr pat) where

@@ -109,18 +109,15 @@ vectorizeBody :: (V e m, Scoping v) => Scope v Body Pattern Atom -> m ([Name], V
 vectorizeBody scope = do
     let vars = scope ^. scopeVars
     let Body statement result = scope ^. scopeElem
-    vectorizeScope (Scope vars statement) (const [result])
+    vectorizeScope (const [result]) (Scope vars statement)
 
 updateLocalize names action = do
     (unzip -> (names', updated)) <- for names $ \name -> do
-        (index, name') <- lookupIndex name >>= \case
-            Index n -> do
-                name' <- Just <$> alias name
-                return (Index $ succ n, name')
-            Uninitialized -> do
-                name' <- Just <$> alias name
-                return (Index 0, name')
+        index <- lookupIndex name >>= \case
+            Index n -> return (Index $ succ n)
+            Uninitialized -> return (Index 0)
             Immutable -> throwError (errorUpdateImmutable name)
+        name' <- Just <$> alias name
         return (((name, index), name'), (name, index))
     local ( (vsIndices %~ mappend (M.fromList updated))
           . (vsNames   %~ mappend (M.fromList names'))
@@ -129,8 +126,9 @@ updateLocalize names action = do
 vectorizeResults :: V e m => [Atom] -> m Vec.Expression
 vectorizeResults results = Vec.Taint . mkExpTuple <$> traverse vectorizeAtom results
 
-vectorizeScope :: (V e m, Scoping v) => Scope v Statement Pattern Atom -> ([Name] -> [Atom]) -> m ([Name], Vec.Expression)
-vectorizeScope (Scope (scoping -> vars) statement) resulting = do
+vectorizeScope :: (V e m, Scoping v) => ([Name] -> [Atom])
+    -> Scope v Statement Pattern Atom -> m ([Name], Vec.Expression)
+vectorizeScope resulting (Scope (scoping -> vars) statement) = do
     localScope <- initIndices Uninitialized vars
     local (localScope <>) $ do
         (changed, vecStatement) <- vectorizeStatement statement
@@ -207,7 +205,9 @@ vectorizeType = \case
 
 vectorizeStatement :: V e m => Statement Pattern Atom -> m ([Name], Vec.Expression)
 vectorizeStatement = \case
+
     Pass -> return ([], Vec.Taint Vec.LitUnit)
+
     Follow st1 st2 -> do
         (changed1, vecStatement1) <- vectorizeStatement st1
         updateLocalize changed1 $ do
@@ -221,7 +221,9 @@ vectorizeStatement = \case
                             $ Vec.Follow vecPat2 vecStatement2
                             $ results
                 return (changed, vecBody)
-    ScopeStatement scope -> vectorizeScope scope (map Access)
+
+    ScopeStatement scope -> vectorizeScope (map Access) scope
+
     Execute (Exec pat name _tyArgs args) -> do
         -- TODO: purity flag in function signature
         let impure = case name of
@@ -248,6 +250,7 @@ vectorizeStatement = \case
                 vecExecute = vecTaint vecCall
                 vecBody = Vec.Follow vecPattern vecExecute results
             return (changed, vecBody)
+
     ForStatement forCycle -> do
         vecRange <- vectorizeAtom (forCycle ^. forRange)
         let iter_name  = forCycle ^. forName
@@ -267,6 +270,7 @@ vectorizeStatement = \case
                 let vecLambda = Vec.lambda [argPat, iterPat] vecStatement
                 let vecFor = Vec.AppOp3 Vec.OpFoldTainted vecLambda argExp vecRange
                 return (changed, vecFor)
+
     IfStatement ifb -> do
         vecCond <- vectorizeAtom (ifb ^. ifCond)
         (changedThen, vecStatementThen) <- vectorizeStatement (ifb ^. ifThen)
@@ -277,12 +281,12 @@ vectorizeStatement = \case
         let vecIf = Vec.AppOp3 Vec.OpIf vecBodyElse vecBodyThen vecCond
         return (changed, vecIf)
 
-vectorizeAtom :: V e m => Atom -> m Vec.Expression
+vectorizeAtom :: V e m => Kleisli' m Atom Vec.Expression
 vectorizeAtom = \case
     Primary a -> return (Vec.Primary (vectorizeLiteral a))
     Access name -> mkAccess name
 
-vectorizePattern :: V e m => Pattern -> m Vec.Pattern
+vectorizePattern :: V e m => Kleisli' m Pattern Vec.Pattern
 vectorizePattern = \case
     PUnit -> return Vec.PUnit
     PWildCard -> return Vec.PWildCard

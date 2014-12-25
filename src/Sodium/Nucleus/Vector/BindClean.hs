@@ -1,30 +1,26 @@
 module Sodium.Nucleus.Vector.BindClean where
 
 import Sodium.Prelude
+import Sodium.Util
 
 import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Attempt
-import Sodium.Util
 
-bindClean :: Program -> Program
+bindClean :: Endo' Program
 bindClean = over recmapped bindCleanExpression
 
-bindCleanExpression :: Expression -> Expression
+bindCleanExpression :: Endo' Expression
 bindCleanExpression = \case
-    Follow p x a | Just e <- asum $ map (taintSubst x a) (patClean p) -> e
-    Into   p x a | Just e <- asum $ map (pureSubst  x a) (patClean p) -> e
+    Follow p x a | Just e <- asum $ map (subst Follow tainting x a) (patClean p) -> e
+    Into   p x a | Just e <- asum $ map (subst Into   id       x a) (patClean p) -> e
     e -> e
 
-taintSubst :: Expression -> Expression -> (Pattern, Attempt) -> Maybe Expression
-taintSubst x a (p, c) = tainting propagate c x <&> \x' -> Follow p x' a
+subst h t x a (p, c) = t propagate c x <&> \x' -> h p x' a
 
-pureSubst :: Expression -> Expression -> (Pattern, Attempt) -> Maybe Expression
-pureSubst x a (p, c) = propagate c x <&> \x' -> Into p x' a
+type Con = forall a . Endo' (a,a)
 
-type Con = forall a . (a,a) -> (a,a)
-
-patClean :: Pattern -> Pairs Pattern Attempt
+patClean :: Pattern -> Pairs Pattern (EndoKleisli' Maybe Expression)
 patClean p@PWildCard = return (p, \_ -> return LitUnit)
 patClean (PTuple PWildCard p) = return (p, Just . AppOp1 OpSnd)
 patClean (PTuple p PWildCard) = return (p, Just . AppOp1 OpFst)
