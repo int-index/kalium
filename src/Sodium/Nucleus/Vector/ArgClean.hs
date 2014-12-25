@@ -1,16 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Sodium.Nucleus.Vector.ArgClean where
 
+import Sodium.Prelude
+import Sodium.Util
+
 import qualified Data.Map as M
-import Control.Applicative
-import Control.Lens
-import Control.Monad.Supply
-import Control.Monad.Writer
 
 import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Name
-import Sodium.Util
 
 argClean :: (Applicative m, MonadSupply Integer m) => Program -> m Program
 argClean program = do

@@ -61,6 +61,7 @@ library
                     ,  ConstraintKinds
                     ,  RankNTypes
                     ,  MultiParamTypeClasses
+                    ,  NoImplicitPrelude
 
 executable sodium-tool
   main-is:             Main.hs

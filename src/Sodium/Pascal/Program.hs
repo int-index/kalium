@@ -1,6 +1,6 @@
 module Sodium.Pascal.Program where
 
-import qualified Data.Map as M
+import Sodium.Prelude
 
 type Name = String
 
@@ -8,7 +8,7 @@ data Program
     = Program [Func] Vars Body
     deriving (Show)
 
-type Vars = M.Map Name Type
+type Vars = Map Name Type
 
 type Body = [Statement]
 

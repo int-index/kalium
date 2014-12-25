@@ -6,8 +6,7 @@
 
 module Sodium.Nucleus.Scalar.Build where
 
-import qualified Data.List as L
-import Data.Foldable
+import Sodium.Prelude
 import Sodium.Nucleus.Scalar.Program
 
 class LiftExpression a where
@@ -23,7 +22,7 @@ instance LiftExpression Bool where
         True  -> Call (NameSpecial OpTrue)  [] []
         False -> Call (NameSpecial OpFalse) [] []
 instance LiftExpression String where
-    expression = L.foldr listCons listNil . map expression
+    expression = foldr listCons listNil . map expression
         where listNil = Call (NameSpecial OpNil) [TypeChar] []
               listCons x xs = Call (NameSpecial OpCons) [] [x, xs]
 
@@ -43,10 +42,10 @@ instance Scoping v => LiftStatement (Scope v Statement)
     where statement = ScopeStatement
 
 statements :: (Foldable c, LiftStatement f) => c (f a p) -> Statement a p
-statements ss = group (map statement $ toList ss)
+statements ss = follow (map statement $ toList ss)
 
-group :: [Statement a p] -> Statement a p
-group = L.foldr Follow Pass
+follow :: [Statement a p] -> Statement a p
+follow = foldr Follow Pass
 
 assign :: Name -> a -> Statement Pattern a
 assign name a = statement $ Exec (PAccess name) (NameSpecial OpId) [] [a]

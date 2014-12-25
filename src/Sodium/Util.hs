@@ -1,14 +1,17 @@
 module Sodium.Util where
 
-import Control.Lens
-import Data.Bool
+import Sodium.Prelude
 import qualified Data.Map as M
 
 type Pairs a b = [(a, b)]
-type Endo a = a -> a
+type Endo' a = a -> a
 
-mAsList :: Ord k => Iso' (M.Map k a) (Pairs k a)
+mAsList :: Ord k => Iso' (Map k a) (Pairs k a)
 mAsList = iso M.toList M.fromList
+
+composeMap :: (Ord k, Ord vk) => Map vk v -> Map k vk -> Map k v
+composeMap m = M.foldrWithKey go mempty where
+    go k vk = maybe id (M.insert k) (M.lookup vk m)
 
 tryApply :: (a -> Maybe a) -> (a -> a)
 tryApply f a = maybe a id (f a)

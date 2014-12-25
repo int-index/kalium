@@ -2,15 +2,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Sodium.Nucleus.Vectorize (vectorize, Error(..)) where
 
-import Data.List
-import Data.Monoid
-import Data.Traversable
-import Control.Applicative
-import Control.Monad.Reader
-import Control.Monad.Writer
-import Control.Monad.Except
-import Control.Monad.Supply
-import Control.Lens hiding (Index)
+import Sodium.Prelude
+import Sodium.Util
+
 import qualified Data.Map as M
 import Sodium.Nucleus.Scalar.Program
 import qualified Sodium.Nucleus.Vector.Program as Vec
@@ -24,9 +18,9 @@ data Index
 declareLenses [d|
 
     data VectorizeScope = VectorizeScope
-        { vsTypes   :: M.Map Name Type
-        , vsIndices :: M.Map Name Index
-        , vsNames   :: M.Map (Name, Index) (Maybe Vec.Name)
+        { vsTypes   :: Map Name Type
+        , vsIndices :: Map Name Index
+        , vsNames   :: Map (Name, Index) (Maybe Vec.Name)
         } deriving (Eq)
 
                 |]
@@ -44,7 +38,7 @@ class Error e where
     errorInsane :: String -> e
 
 type E e m = (Applicative m, Error e, MonadError e m, MonadSupply Integer m)
-type W e m = (MonadWriter (M.Map Integer Integer) m, E e m)
+type W e m = (MonadWriter (Map Integer Integer) m, E e m)
 type V e m = (MonadReader VectorizeScope m, W e m)
 
 alias :: W e m => Name -> m Vec.Name
@@ -60,17 +54,13 @@ vectorize program = vectorizeNameTags (program ^. programNameTags) $ do
             $ \name -> M.singleton (name, Immutable) <$> (Just <$> alias name)
     flip runReaderT (VectorizeScope mempty mempty names') $ do
         vecFuncs <- traverse (uncurry vectorizeFunc) (program ^. programFuncs & M.toList)
-        return $ Vec.Program (M.fromList vecFuncs) M.empty
+        return $ Vec.Program (M.fromList vecFuncs) mempty
 
-vectorizeNameTags :: E e m => M.Map Integer String
-                  -> WriterT (M.Map Integer Integer) m Vec.Program -> m Vec.Program
+vectorizeNameTags :: E e m => Map Integer String
+                  -> WriterT (Map Integer Integer) m Vec.Program -> m Vec.Program
 vectorizeNameTags nameTags w = do
     (p, nameTags') <- runWriterT w
-    return $ p & Vec.programNameTags %~ M.union (composeMap nameTags nameTags')
-
-composeMap :: (Ord k, Ord vk) => M.Map vk v -> M.Map k vk -> M.Map k v
-composeMap m = M.foldrWithKey go M.empty where
-    go k vk = maybe id (M.insert k) (M.lookup vk m)
+    return $ p & Vec.programNameTags %~ mappend (composeMap nameTags nameTags')
 
 vectorizeFunc :: V e m => Name -> Func Type Pattern Atom -> m (Vec.Name, Vec.Func)
 vectorizeFunc name func = do
@@ -310,15 +300,15 @@ lookupName name index =
     views vsNames (M.lookup (name, index))
        >>= maybe (throwError $ errorNoAccess name []) return
 
-lookupX :: V e m => (VectorizeScope -> M.Map Name x) -> Name -> m x
+lookupX :: V e m => (VectorizeScope -> Map Name x) -> Name -> m x
 lookupX f name = do
     xs <- asks f
     M.lookup name xs
        & maybe (throwError $ errorNoAccess name (M.keys xs)) return
 
-initIndices :: W e m => Index -> M.Map Name Type -> m VectorizeScope
+initIndices :: W e m => Index -> Map Name Type -> m VectorizeScope
 initIndices n types = do
-    scopes <- for (M.toList types) $ \(name, ty) -> do
+    scopes <- for (itoList types) $ \(name, ty) -> do
         name' <- case n of
             Uninitialized -> return Nothing
             _ -> Just <$> alias name

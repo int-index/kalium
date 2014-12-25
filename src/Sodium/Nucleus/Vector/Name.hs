@@ -1,18 +1,15 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Sodium.Nucleus.Vector.Name where
 
-import qualified Data.Set as S
-import Control.Lens
-import Control.Applicative
-import Control.Monad.State
-import Control.Monad.Reader
-import Control.Monad.Writer
-import Sodium.Nucleus.Vector.Program
+import Sodium.Prelude
 import Sodium.Util
 
-class Mentionable a where mentionable :: a -> S.Set Name
-instance Mentionable (S.Set Name) where mentionable = id
-instance Mentionable        Name  where mentionable = S.singleton
+import qualified Data.Set as S
+import Sodium.Nucleus.Vector.Program
+
+class Mentionable a where mentionable :: a -> Set Name
+instance Mentionable (Set Name) where mentionable = id
+instance Mentionable      Name  where mentionable = S.singleton
 
 mentions :: (Mask a, Mentionable names) => a -> names -> Bool
 a `mentions` names = getAny . execWriter

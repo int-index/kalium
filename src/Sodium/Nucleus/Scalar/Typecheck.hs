@@ -4,12 +4,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Sodium.Nucleus.Scalar.Typecheck where
 
-import Data.Monoid
-import Control.Applicative
-import Control.Lens
-import Control.Monad.Reader
-import Control.Monad.Except
-import qualified Data.Map  as M
+import Sodium.Prelude
+
+import qualified Data.Map as M
 
 import Sodium.Nucleus.Scalar.Program
 
@@ -21,7 +18,7 @@ class Error e where
 declareLenses [d|
 
     data TypeScope = TypeScope
-        { tsFunctions :: M.Map Name FuncSig
+        { tsFunctions :: Map Name FuncSig
         , tsVariables :: Vars
         } deriving (Eq)
 
@@ -60,7 +57,7 @@ instance Typecheck Expression where
     typecheck (Atom atom) = typecheck atom
     typecheck (Call name tyArgs args)
         | NameSpecial op <- name = do
-            mapM typecheck args >>= builtinOpType op tyArgs
+            traverse typecheck args >>= builtinOpType op tyArgs
         | otherwise = funcSigType <$> lookupFuncSig name
 
 builtinOpType :: TypeEnv e m => NameSpecial -> [Type] -> [Type] -> m Type
@@ -139,7 +136,7 @@ typeIntro k x = local (typeIntro' x) (k x)
 
 instance Typing param => TypeIntro (Program param expr pat) where
     typeIntro' program = tsFunctions
-        %~ mappend (program ^. programFuncs & M.map funcSig)
+        %~ mappend (program ^. programFuncs & fmap funcSig)
 
 instance Scoping vars => TypeIntro (Scope vars obj expr pat) where
     typeIntro' scope = tsVariables %~ mappend (scope ^. scopeVars . to scoping)

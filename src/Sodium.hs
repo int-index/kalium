@@ -1,7 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Sodium (translate) where
 
-import Sodium.Nucleus.Vectorize   (vectorize)
+import Sodium.Prelude
+
+import Sodium.Nucleus.Vectorize (vectorize)
 import Sodium.Nucleus.Scalar.Atomize (atomize')
 import Sodium.Nucleus.Scalar.Valueficate (valueficate)
 import Sodium.Nucleus.Vector.Match (match)
@@ -18,11 +20,6 @@ import qualified Sodium.Haskell.Convert as H (convert)
 import qualified Sodium.Error as E
 import qualified Sodium.Nucleus.Vector.Program as V
 import Sodium.Util (closureM)
-
-import Control.Applicative
-import Control.Monad.Writer hiding (pass)
-import Control.Monad.Except
-import Control.Monad.Supply
 
 namestack :: [Integer]
 namestack = [0..]
@@ -47,13 +44,13 @@ translate src = do
 type TranslationLog = [V.Program]
 
 optimize :: (Applicative m, Monad m, MonadSupply Integer m) => V.Program -> m (V.Program, TranslationLog)
-optimize program = runWriterT (closureM pass program)
+optimize program = runWriterT (closureM optimizeStep program)
 
 logging :: MonadWriter [a] m => (a -> m a) -> (a -> m a)
 logging f x = tell [x] >> f x
 
-pass :: (Applicative m, MonadWriter TranslationLog m, MonadSupply Integer m) => V.Program -> m V.Program
-pass = closureM (logging f) >=> logging reorder
+optimizeStep :: (Applicative m, MonadWriter TranslationLog m, MonadSupply Integer m) => V.Program -> m V.Program
+optimizeStep = closureM (logging f) >=> logging reorder
     where f  =  return . match
             >=> inline
             >=> return . bindClean

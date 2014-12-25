@@ -1,16 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Sodium.Nucleus.Vector.Sanity where
 
-import qualified Data.List as L
-import Control.Lens
-import Control.Applicative
-import Control.Monad.Writer
-
+import Sodium.Prelude
 import Sodium.Nucleus.Vector.Program
 
 sanity_nameUniqueness :: Program -> Bool
 sanity_nameUniqueness program
-    = (\xs -> xs == L.nub xs) . execWriter
+    = (\xs -> xs == nub xs) . execWriter
     -- TODO: take function names into account (itraverse?)
     $ (programFuncs . traversed . funcExpression) (\e -> e <$ snu e) program
             

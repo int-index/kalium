@@ -2,18 +2,18 @@
 module Sodium.Nucleus.Vector.Pattern where
 
 import qualified Data.Set as S
-import Control.Monad.Writer
 
+import Sodium.Prelude
 import Sodium.Nucleus.Vector.Program
 
-patBound :: Pattern -> S.Set Name
+patBound :: Pattern -> Set Name
 patBound = \case
-    PWildCard -> S.empty
-    PUnit -> S.empty
+    PWildCard -> mempty
+    PUnit -> mempty
     PAccess name _ -> S.singleton name
-    PTuple p1 p2 -> patBound p1 `S.union` patBound p2
+    PTuple p1 p2 -> patBound p1 <> patBound p2
 
-patRemoveUnits :: MonadWriter (S.Set Name) m => Pattern -> m Pattern
+patRemoveUnits :: MonadWriter (Set Name) m => Pattern -> m Pattern
 patRemoveUnits = \case
     PWildCard -> return PWildCard
     PUnit -> return PWildCard

@@ -1,8 +1,7 @@
 module Sodium.Nucleus.Vector.BindClean where
 
-import Control.Applicative
-import Control.Lens
-import Data.Foldable
+import Sodium.Prelude
+
 import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Attempt

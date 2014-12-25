@@ -3,19 +3,14 @@
 {-# LANGUAGE OverlappingInstances #-}
 module Sodium.Nucleus.Scalar.Atomize (atomize, atomize') where
 
+import Sodium.Prelude
+import Sodium.Util
+
 import qualified Data.Map as M
 
-import Data.Monoid
-import Control.Lens
-import Control.Monad.Writer
-import Control.Monad.Reader
-import Control.Monad.Except
-import Control.Monad.Supply
-import Control.Applicative
 import Sodium.Nucleus.Scalar.Program
-import Sodium.Nucleus.Scalar.Build (statement, group)
+import Sodium.Nucleus.Scalar.Build (statement, follow)
 import Sodium.Nucleus.Scalar.Typecheck
-import Sodium.Util
 
 atomize' :: (Atomize a, MonadError e m, Error e, MonadSupply Integer m, Applicative m)
          => a Expression -> m (a Atom)
@@ -35,8 +30,8 @@ instance Atomize (Scope Vars Body Pattern) where
         (atom, (vardecls, statements)) <- runWriterT (atomizeExpression expr)
         statement <- atomize stmt
         return $ Scope
-            (M.fromList vardecls `M.union` vars)
-            (Body (group (statement:statements)) atom)
+            (M.fromList vardecls <> vars)
+            (Body (follow (statement:statements)) atom)
 
 instance (Atomize (obj pat), Scoping vars) => Atomize (Scope vars obj pat) where
     atomize = typeIntro $ scopeElem atomize
@@ -61,7 +56,7 @@ instance Atomize (Statement Pattern) where
 atomizeStatement w = do
     (a, (vardecls, statements)) <- runWriterT w
     return $ ScopeStatement
-           $ Scope (scoping vardecls) (group (statements `snoc` statement a))
+           $ Scope (scoping vardecls) (follow (statements `snoc` statement a))
 
 atomizeExpression :: (TypeEnv e m, MonadSupply Integer m) => Expression
                   -> WriterT (Pairs Name Type, [Statement Pattern Atom]) m Atom

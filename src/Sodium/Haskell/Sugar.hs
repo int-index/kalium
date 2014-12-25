@@ -1,9 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Sodium.Haskell.Sugar where
 
-import Control.Applicative
-import Control.Monad.Identity
-import Control.Lens
+import Sodium.Prelude
 
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.SrcLoc (noLoc)

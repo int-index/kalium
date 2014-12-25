@@ -1,5 +1,6 @@
 module Sodium.Pascal.Tokenize (tokenCC, Token(..)) where
 
+import Prelude
 import Data.Functor
 import Control.Monad
 

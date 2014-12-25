@@ -1,6 +1,6 @@
 module Sodium.Error where
 
-import qualified Sodium.Nucleus.Scalar.Program as S
+import Sodium.Prelude
 
 import qualified Data.Map as M
 
@@ -8,6 +8,7 @@ import qualified Text.Parsec as P
 import qualified Sodium.Pascal.Parse as P
 import qualified Sodium.Nucleus.Vectorize as V
 import qualified Sodium.Nucleus.Scalar.Typecheck as T
+import qualified Sodium.Nucleus.Scalar.Program as S
 import qualified Sodium.Pascal.Convert as CP
 
 data Error = ParseError String Int Int

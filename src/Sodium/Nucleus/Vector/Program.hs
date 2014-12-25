@@ -1,8 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Sodium.Nucleus.Vector.Program where
 
-import qualified Data.Map as M
-import Control.Lens.TH
+import Sodium.Prelude
 
 data NameSpecial
     = OpAdd
@@ -83,8 +82,8 @@ data Literal
 
 data Program
     = Program
-    { _programFuncs :: M.Map Name Func
-    , _programNameTags :: M.Map Integer String
+    { _programFuncs :: Map Name Func
+    , _programNameTags :: Map Integer String
     } deriving (Eq)
 
 data Func
@@ -121,6 +120,7 @@ pattern Taint  a     = AppOp1 OpTaint  a
 pattern Bind   a1 a2 = AppOp2 OpBind   a1 a2
 pattern Follow p x a = Bind x (Lambda p a)
 
+lambda :: [Pattern] -> Expression -> Expression
 lambda = flip (foldr Lambda)
 
 unlambda :: Expression -> ([Pattern], Expression)

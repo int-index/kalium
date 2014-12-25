@@ -1,6 +1,6 @@
 module Sodium.Nucleus.Vector.Match where
 
-import Control.Lens
+import Sodium.Prelude
 
 import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
@@ -9,7 +9,7 @@ import Sodium.Nucleus.Vector.Name
 import Sodium.Nucleus.Vector.Attempt
 import Sodium.Util
 
-match :: Endo Program
+match :: Endo' Program
 match = over recmapped
       $ matchExpression
       . lambdaReduce
@@ -25,7 +25,7 @@ pattern LitOne  = Primary (LitInteger 1)
 pattern LitTrue = OpAccess OpTrue
 pattern LitFalse = OpAccess OpFalse
 
-matchExpression :: Endo Expression
+matchExpression :: Endo' Expression
 matchExpression = \case
 
     AppOp1 OpId a -> a
@@ -46,7 +46,7 @@ matchExpression = \case
 
     e -> e
 
-appIgnore :: Endo Expression
+appIgnore :: Endo' Expression
 appIgnore = \case
 
     Follow PWildCard x a -> AppOp2 OpBindIgnore x a
@@ -72,7 +72,7 @@ attemptIgnore = \case
     AppOp2 OpFmapIgnore _ a -> Just (Ignore a)
     _ -> Nothing
 
-foldMatch :: Endo Expression
+foldMatch :: Endo' Expression
 foldMatch = \case
     AppOp3 OpFoldTainted (Lambda2 p1 p2 (Taint a)) x1 x2
         -> Taint (AppOp3 OpFold (Lambda2 p1 p2 a) x1 x2)
@@ -87,7 +87,7 @@ foldMatch = \case
 
     e -> e
 
-booleanCompute :: Endo Expression
+booleanCompute :: Endo' Expression
 booleanCompute = \case
 
     AppOp1 OpNot LitTrue  -> LitFalse
@@ -144,7 +144,7 @@ doubleOp2 = \case
     OpDivide -> return (/)
     _ -> Nothing
 
-pairReduce :: Endo Expression
+pairReduce :: Endo' Expression
 pairReduce = \case
     Lambda (PTuple p1 p2) (propagate (swapApp p1 p2) -> Just a)
         -> Lambda (PTuple p2 p1) a

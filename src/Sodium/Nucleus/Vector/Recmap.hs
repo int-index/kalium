@@ -1,8 +1,6 @@
 module Sodium.Nucleus.Vector.Recmap where
 
-import Control.Applicative
-import Control.Monad
-import Control.Lens
+import Sodium.Prelude
 import Sodium.Nucleus.Vector.Program
 
 -- Be careful! Not a valid setter:

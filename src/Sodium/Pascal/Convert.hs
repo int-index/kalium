@@ -5,33 +5,27 @@
  
 module Sodium.Pascal.Convert (convert, Error(..)) where
 
-import qualified Data.Map as M
-import Data.Monoid
-import Data.Traversable
+import Sodium.Prelude
+import Sodium.Util
 
-import Control.Applicative
-import Control.Monad.Reader
-import Control.Monad.Writer
-import Control.Monad.Except
-import Control.Monad.Supply
+import qualified Data.Map as M
+
 import Control.Monad.Trans.Maybe
-import Control.Lens
 -- S for Src, D for Dest
 import qualified Sodium.Pascal.Program as S
 import qualified Sodium.Nucleus.Scalar.Program as D
 import qualified Sodium.Nucleus.Scalar.Build   as D
-import Sodium.Util
 
 declareLenses [d|
 
     data TypeScope = TypeScope
-        { tsFunctions :: M.Map S.Name S.FuncSig
-        , tsVariables :: M.Map S.Name S.Type
+        { tsFunctions :: Map S.Name S.FuncSig
+        , tsVariables :: Map S.Name S.Type
         } deriving (Eq)
 
     data ConvScope = ConvScope
         { csTypes :: TypeScope
-        , csNames :: M.Map (Bool, S.Name) D.Name
+        , csNames :: Map (Bool, S.Name) D.Name
         } deriving (Eq)
 
                 |]
@@ -59,7 +53,7 @@ convert :: (Applicative m, MonadSupply Integer m, Erroneous e m)
         => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
 convert program = do
     (p, nameTags) <- runWriterT (runReaderT (conv program) mempty)
-    return $ p & D.programNameTags %~ M.union nameTags
+    return $ p & D.programNameTags %~ mappend nameTags
 
 nameV name = lookupName (False, name)
 nameF name = lookupName (True, name)
@@ -72,7 +66,7 @@ lookupName k = do
 
 alias :: ( Applicative m
          , MonadSupply Integer m
-         , MonadWriter (M.Map Integer String) m
+         , MonadWriter (Map Integer String) m
          ) => S.Name -> m D.Name
 alias name = do
     n <- supply
@@ -81,15 +75,15 @@ alias name = do
 
 class Conv s d | s -> d where
     conv :: (Applicative m, MonadSupply Integer m, Erroneous e m)
-         => s -> ReaderT ConvScope (WriterT (M.Map Integer String) m) d
+         => s -> ReaderT ConvScope (WriterT (Map Integer String) m) d
 
 instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
     conv (S.Program funcs vars body) = do
-        (M.unions -> funcNames) <- for funcs $ \(S.Func name _ _ _) -> do
+        (mconcat -> funcNames) <- for funcs $ \(S.Func name _ _ _) -> do
             funcName <- alias name
             return $ M.singleton (True, name) funcName
-        local ( (csTypes . tsFunctions %~ M.union funcSigs)
-              . (csNames %~ M.union funcNames)
+        local ( (csTypes . tsFunctions %~ mappend funcSigs)
+              . (csNames %~ mappend funcNames)
               ) $ do
             clMain <- do
                 clBody <- convScope vars
@@ -98,15 +92,15 @@ instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
                 return $ D.Func D.TypeUnit (noparams clBody)
             clFuncs <- traverse conv funcs
             let programFuncs = (D.NameSpecial D.OpMain, clMain):clFuncs
-            return $ D.Program (M.fromList programFuncs) M.empty
-        where funcSigs = M.unions (map funcSigOf funcs)
+            return $ D.Program (M.fromList programFuncs) mempty
+        where funcSigs = mconcat (map funcSigOf funcs)
               funcSigOf (S.Func name funcSig _ _) = M.singleton name funcSig
 
 convScope vardecls inner = do
-    (M.unions -> varNames, scopeVars)
+    (mconcat -> varNames, scopeVars)
         <- unzip <$> traverse convVardecl (M.toList vardecls)
-    scopeElem <- local ( (csTypes . tsVariables %~ M.union vardecls)
-                       . (csNames %~ M.union varNames)
+    scopeElem <- local ( (csTypes . tsVariables %~ mappend vardecls)
+                       . (csNames %~ mappend varNames)
                        ) inner
     return $ D.Scope (D.scoping scopeVars) scopeElem
        where convVardecl (name, pasType) = do
@@ -115,10 +109,10 @@ convScope vardecls inner = do
                 return (M.singleton (False, name) varName, (varName, ty))
 
 convScope' paramdecls inner = do
-    (M.unions -> paramNames, scopeVars)
+    (mconcat -> paramNames, scopeVars)
         <- unzip <$> traverse convParamdecl paramdecls
-    scopeElem <- local ( (csTypes . tsVariables %~ M.union vardecls)
-                       . (csNames %~ M.union paramNames)
+    scopeElem <- local ( (csTypes . tsVariables %~ mappend vardecls)
+                       . (csNames %~ mappend paramNames)
                        ) inner
     return $ D.Scope scopeVars scopeElem
        where paramDeclToTup (S.ParamDecl name (_, ty)) = (name, ty)
@@ -130,7 +124,7 @@ convScope' paramdecls inner = do
                 return (M.singleton (False, name) paramName, (paramName, (r', ty)))
 
 instance Conv S.Body (D.Statement D.Pattern D.Expression) where
-    conv statements = D.group <$> traverse conv statements
+    conv statements = D.follow <$> traverse conv statements
 
 instance Conv S.Func (D.Name, D.Func D.ByType D.Pattern D.Expression) where
     conv (S.Func name (S.FuncSig params pasType) vars body) = case pasType of
@@ -143,7 +137,7 @@ instance Conv S.Func (D.Name, D.Func D.ByType D.Pattern D.Expression) where
         Just ty -> do
             let retVars = M.singleton name ty
             clScope <- convScope' params
-                     $ convScope (M.union vars retVars)
+                     $ convScope (vars <> retVars)
                      $ D.Body <$> conv body <*> (D.Atom . D.Access <$> nameV name)
             retType <- conv ty
             fname <- nameF name
@@ -299,7 +293,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
             let clRange = binary (D.NameSpecial D.OpRange) clFromExpr clToExpr
             clAction <- conv statement
             let clForCycle = D.statement (D.ForCycle clName clRange clAction)
-            return $ D.group [clForCycle, D.assign clName clToExpr]
+            return $ D.follow [clForCycle, D.assign clName clToExpr]
         S.IfBranch expr bodyThen mBodyElse
              -> fmap D.statement
              $  D.If
@@ -328,7 +322,7 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
                      leafElse leafs
             return $ D.statement $ D.Scope
                         (M.singleton clName clType)
-                        (D.group [D.assign clName clExpr, statement])
+                        (D.follow [D.assign clName clExpr, statement])
 
 instance Conv S.Expression D.Expression where
     -- TODO: use typecastConv everywhere

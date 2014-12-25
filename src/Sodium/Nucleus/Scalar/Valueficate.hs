@@ -3,10 +3,9 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 module Sodium.Nucleus.Scalar.Valueficate where
 
-import qualified Data.Map as M
+import Sodium.Prelude
 
-import Control.Lens
-import Control.Monad
+import qualified Data.Map as M
 
 import Sodium.Nucleus.Scalar.Program
 
@@ -56,7 +55,7 @@ instance ValueficateSubstitute (ForCycle Pattern) where
 valueficate :: Program ByType Pattern Atom -> Program Type Pattern Expression
 valueficate program =
     let referenceInfo = gather program
-    in program & programFuncs %~ M.mapWithKey (valueficateFunc referenceInfo)
+    in program & programFuncs %~ imap (valueficateFunc referenceInfo)
 
 valueficateFunc
     :: ReferenceInfo
@@ -82,9 +81,9 @@ valueficateFunc referenceInfo name
 
       in Func ty' (Scope params' (Scope vars (Body statement' result')))
 
-type ReferenceInfo = M.Map Name [Bool]
+type ReferenceInfo = Map Name [Bool]
 
 gather :: Program ByType pat expr -> ReferenceInfo
-gather = M.map inspect . view programFuncs where
+gather = fmap inspect . view programFuncs where
     inspect = map check . view (funcScope . scopeVars)
     check (_name, (by, _ty)) = by == ByReference

@@ -1,11 +1,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Sodium.Nucleus.Vector.Inline where
 
+import Sodium.Prelude
+import Sodium.Util
+
 import qualified Data.Set as S
-import Data.Traversable
-import Control.Applicative
-import Control.Monad.Writer
-import Control.Monad.Supply
 
 import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
@@ -13,7 +12,6 @@ import Sodium.Nucleus.Vector.Pattern
 import Sodium.Nucleus.Vector.Name
 import Sodium.Nucleus.Vector.Attempt
 import Sodium.Nucleus.Vector.Cost
-import Sodium.Util
 
 inline :: (Applicative m, MonadSupply Integer m, Recmappable a) => a -> m a
 inline = recmapped (mergePattern . inlineExpression)

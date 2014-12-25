@@ -1,5 +1,6 @@
 module Sodium.Nucleus.Vector.Show where
 
+import Sodium.Prelude
 import Sodium.Nucleus.Vector.Program
 
 instance Show Name where

@@ -4,10 +4,10 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module Sodium.Nucleus.Scalar.Program where
 
-import Control.Lens
-import qualified Data.Map as M
-
+import Sodium.Prelude
 import Sodium.Util
+
+import qualified Data.Map as M
 
 data NameSpecial
     = OpAdd
@@ -70,7 +70,7 @@ data Literal
     | LitChar    Char
     deriving (Eq, Show)
 
-type Vars = M.Map Name Type
+type Vars = Map Name Type
 
 class Typing t where
     typing :: t -> Type
@@ -79,16 +79,16 @@ instance Typing Type   where typing = id
 instance Typing ByType where typing = snd
 
 class Scoping vars where
-    scoping :: vars -> M.Map Name Type
+    scoping :: vars -> Map Name Type
 
-instance Typing t => Scoping (M.Map Name t) where
-    scoping = M.map typing
+instance Typing t => Scoping (Map Name t) where
+    scoping = fmap typing
 instance Typing t => Scoping (Pairs Name t) where
     scoping = scoping . M.fromList
 
 data Program param pat expr = Program
-    { _programFuncs :: M.Map Name (Func param pat expr)
-    , _programNameTags :: M.Map Integer String
+    { _programFuncs :: Map Name (Func param pat expr)
+    , _programNameTags :: Map Integer String
     }
 
 data By

@@ -1,15 +1,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Sodium.Nucleus.Vector.Context where
 
-import Control.Applicative
-import Control.Monad.Writer
-import Control.Monad.Supply
+import Sodium.Prelude
+import Sodium.Util
 
 import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Name
 import Sodium.Nucleus.Vector.Attempt
-import Sodium.Util
 
 contexts :: MonadWriter [Expression] m => Attempt -> Expression -> m Expression
 contexts fits (Beta cxt (fits -> Just e)) = tell [cxt] >> return e

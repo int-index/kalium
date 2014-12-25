@@ -1,6 +1,7 @@
 module Sodium.Haskell.Convert (convert) where
 
-import qualified Data.Map as M
+import Sodium.Prelude
+
 import qualified Sodium.Nucleus.Vector.Program as S
 import qualified Language.Haskell.Exts        as H
 import qualified Language.Haskell.Exts.SrcLoc as H
@@ -16,7 +17,7 @@ convProgram (S.Program funcs _) =
         Nothing
         Nothing
         (map importDecl ["Control.Monad", "Control.Applicative", "Data.Bool"])
-        (M.toList funcs >>= uncurry convFunc)
+        (itoList funcs >>= uncurry convFunc)
   where extensions names = [H.LanguagePragma H.noLoc (map H.Ident names)]
         importDecl s = H.ImportDecl H.noLoc (H.ModuleName s)
                        False False False Nothing Nothing Nothing

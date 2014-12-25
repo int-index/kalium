@@ -3,8 +3,9 @@
 {-# LANGUAGE BangPatterns #-}
 module Sodium.Nucleus.Vector.Cost where
 
-import Data.List
-import Data.Ord
+import Prelude
+import Data.Ord  (comparing)
+import Data.List (minimumBy)
 import Control.Applicative
 import Control.Monad.Writer.Strict
 

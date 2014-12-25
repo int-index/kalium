@@ -1,14 +1,13 @@
 module Sodium.Nucleus.Vector.Attempt where
 
-import Data.Function
-import Control.Applicative
-import Control.Lens
-import Sodium.Nucleus.Vector.Program
+import Sodium.Prelude
 import Sodium.Util
+
+import Sodium.Nucleus.Vector.Program
 
 type Attempt = Expression -> Maybe Expression
 
-tainting :: Alternative m => Endo (LensLike' m Expression Expression)
+tainting :: Alternative m => Endo' (LensLike' m Expression Expression)
 tainting prop c = prop $ \case
     Taint a -> Taint <$> prop c a
     _ -> empty
