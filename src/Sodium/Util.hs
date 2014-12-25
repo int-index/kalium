@@ -5,6 +5,7 @@ import qualified Data.Map as M
 
 type Pairs a b = [(a, b)]
 type Endo' a = a -> a
+type Kleisli' m a b = a -> m b
 
 mAsList :: Ord k => Iso' (Map k a) (Pairs k a)
 mAsList = iso M.toList M.fromList

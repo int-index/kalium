@@ -1,7 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverlappingInstances #-}
-module Sodium.Nucleus.Scalar.Atomize (atomize, atomize') where
+module Sodium.Nucleus.Scalar.Atomize (atomize) where
 
 import Sodium.Prelude
 import Sodium.Util
@@ -12,53 +10,57 @@ import Sodium.Nucleus.Scalar.Program
 import Sodium.Nucleus.Scalar.Build (statement, follow)
 import Sodium.Nucleus.Scalar.Typecheck
 
-atomize' :: (Atomize a, MonadError e m, Error e, MonadSupply Integer m, Applicative m)
-         => a Expression -> m (a Atom)
-atomize' a = runReaderT (atomize a) mempty
+atomize a = runReaderT (atomizeProgram a) mempty
 
-class Atomize a where
-    atomize :: (TypeEnv e m, MonadSupply Integer m) => a Expression -> m (a Atom)
+type T e m = (TypeEnv e m, MonadSupply Integer m)
+type A e m h = T e m => Kleisli' m (h Expression) (h Atom)
 
-instance Typing param => Atomize (Program param Pattern) where
-    atomize = typeIntro $ programFuncs (traverse atomize)
+atomizeProgram :: Typing param => A e m (Program param Pattern)
+atomizeProgram = typeIntro $ programFuncs (traverse atomizeFunc)
 
-instance Typing param => Atomize (Func param Pattern) where
-    atomize = funcScope atomize
+atomizeFunc :: Typing param => A e m (Func param Pattern)
+atomizeFunc = funcScope (atomizeScope atomizeBodyScope)
 
-instance Atomize (Scope Vars Body Pattern) where
-    atomize = typeIntro $ \(Scope vars (Body stmt expr)) -> do
-        (atom, (vardecls, statements)) <- runWriterT (atomizeExpression expr)
-        statement <- atomize stmt
-        return $ Scope
-            (M.fromList vardecls <> vars)
-            (Body (follow (statement:statements)) atom)
+atomizeBodyScope :: A e m (Scope Vars Body Pattern)
+atomizeBodyScope = typeIntro $ \(Scope vars (Body stmt expr)) -> do
+    (atom, (vardecls, statements)) <- runWriterT (atomizeExpression expr)
+    statement <- atomizeStatement stmt
+    return $ Scope
+        (M.fromList vardecls <> vars)
+        (Body (follow (statement:statements)) atom)
 
-instance (Atomize (obj pat), Scoping vars) => Atomize (Scope vars obj pat) where
-    atomize = typeIntro $ scopeElem atomize
+atomizeScope atomize = typeIntro $ scopeElem atomize
 
-instance Atomize (Statement Pattern) where
-
-    atomize (Execute (Exec mname op tyArgs exprs)) = atomizeStatement
+atomizeStatement :: A e m (Statement Pattern)
+atomizeStatement = \case
+    Execute (Exec mname op tyArgs exprs) -> atomizeStatementW
         $ Exec mname op tyArgs <$> traverse atomizeExpression exprs
 
-    atomize (ForStatement (ForCycle name range body)) = atomizeStatement
-        $ ForCycle name <$> atomizeExpression range <*> atomize body
+    ForStatement (ForCycle name range body) -> atomizeStatementW
+        $ ForCycle name <$> atomizeExpression range <*> atomizeStatement body
 
-    atomize (IfStatement (If cond thenb elseb)) = atomizeStatement
+    IfStatement (If cond thenb elseb) -> atomizeStatementW
         $ If <$> atomizeExpression cond
-             <*> atomize thenb
-             <*> atomize elseb
+             <*> atomizeStatement thenb
+             <*> atomizeStatement elseb
 
-    atomize (ScopeStatement scope) = ScopeStatement <$> atomize scope
-    atomize (Follow st1 st2) = Follow <$> atomize st1 <*> atomize st2
-    atomize Pass = pure Pass
+    ScopeStatement scope
+         -> ScopeStatement
+        <$> atomizeScope atomizeStatement scope
 
-atomizeStatement w = do
+    Follow st1 st2
+         -> Follow
+        <$> atomizeStatement st1
+        <*> atomizeStatement st2
+
+    Pass -> pure Pass
+
+atomizeStatementW w = do
     (a, (vardecls, statements)) <- runWriterT w
     return $ ScopeStatement
            $ Scope (scoping vardecls) (follow (statements `snoc` statement a))
 
-atomizeExpression :: (TypeEnv e m, MonadSupply Integer m) => Expression
+atomizeExpression :: T e m => Expression
                   -> WriterT (Pairs Name Type, [Statement Pattern Atom]) m Atom
 atomizeExpression = \case
     Atom atom -> return atom

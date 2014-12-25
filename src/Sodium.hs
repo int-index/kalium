@@ -4,7 +4,7 @@ module Sodium (translate) where
 import Sodium.Prelude
 
 import Sodium.Nucleus.Vectorize (vectorize)
-import Sodium.Nucleus.Scalar.Atomize (atomize')
+import Sodium.Nucleus.Scalar.Atomize (atomize)
 import Sodium.Nucleus.Scalar.Valueficate (valueficate)
 import Sodium.Nucleus.Vector.Match (match)
 import Sodium.Nucleus.Vector.Inline (inline, reorder)
@@ -33,8 +33,8 @@ translate src = do
     pas <- P.parse src
     (optimal, log) <- flip evalSupplyT namestack
           $ P.convert pas
-        >>= atomize'
-        >>= atomize' . valueficate
+        >>= atomize
+        >>= atomize . valueficate
         >>= vectorize
         >>= sanity_check "Name uniqueness" sanity_nameUniqueness
         >>= optimize
