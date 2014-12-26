@@ -116,7 +116,7 @@ convOp = \case
     S.OpIf       -> H.Var (HsIdent "Data.Bool" "bool")
     S.OpFold     -> H.Var (HsIdent "Prelude" "foldl")
     S.OpFoldTainted -> H.Var (HsIdent "Control.Monad" "foldM")
-    S.OpMapTaintedIgnore -> H.Var (HsIdent "Control.Monad" "mapM_")
+    S.OpMapTaintedIgnore -> H.Var (HsIdent "Data.Foldable" "traverse_")
     S.OpProduct  -> H.Var (HsIdent "Prelude" "product")
     S.OpSum      -> H.Var (HsIdent "Prelude" "sum")
     S.OpAnd'     -> H.Var (HsIdent "Prelude" "and")
