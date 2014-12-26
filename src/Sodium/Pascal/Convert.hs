@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TemplateHaskell #-}
  
 module Sodium.Pascal.Convert (convert, Error(..)) where
@@ -30,36 +30,26 @@ declareLenses [d|
 
                 |]
 
-instance Monoid TypeScope where
-    mempty = TypeScope mempty mempty
-    ts1 `mappend` ts2 = TypeScope
-        (ts1 ^. tsFunctions <> ts2 ^. tsFunctions)
-        (ts1 ^. tsVariables <> ts2 ^. tsVariables)
-
-instance Monoid ConvScope where
-    mempty = ConvScope mempty mempty
-    cs1 `mappend` cs2 = ConvScope
-        (cs1 ^. csTypes <> cs2 ^. csTypes)
-        (cs1 ^. csNames <> cs2 ^. csNames)
-
 class Error e where
     errorTypecheck  :: e
     errorNoAccess   :: e
     errorNoFunction :: e
 
-type Erroneous e m = (MonadError e m, Error e)
+type E e m = (Applicative m, MonadError e m, Error e)
+type G e m = (MonadSupply Integer   m, E e m)
+type R m = MonadReader ConvScope m
+type W m = MonadWriter (Map Integer String) m
 
-convert :: (Applicative m, MonadSupply Integer m, Erroneous e m)
-        => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
+convert :: G e m => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
 convert program = do
-    (p, nameTags) <- runWriterT (runReaderT (conv program) mempty)
+    let initScope = ConvScope (TypeScope mempty mempty) mempty
+    (p, nameTags) <- runWriterT (runReaderT (conv program) initScope)
     return $ p & D.programNameTags %~ mappend nameTags
 
 nameV name = lookupName (False, name)
 nameF name = lookupName (True, name)
 
-lookupName :: (Applicative m, MonadReader ConvScope m, Erroneous e m)
-           => (Bool, S.Name) -> m D.Name
+lookupName :: (E e m, R m) => (Bool, S.Name) -> m D.Name
 lookupName k = do
     mname <- views csNames (M.lookup k)
     maybe (throwError errorNoAccess) return mname
@@ -73,11 +63,12 @@ alias name = do
     tell (M.singleton n name)
     return (D.NameGen n)
 
-class Conv s d | s -> d where
-    conv :: (Applicative m, MonadSupply Integer m, Erroneous e m)
-         => s -> ReaderT ConvScope (WriterT (Map Integer String) m) d
+class Conv s where
+    type Scalar s :: *
+    conv :: (R m, W m, G e m) => s -> m (Scalar s)
 
-instance Conv S.Program (D.Program D.ByType D.Pattern D.Expression) where
+instance Conv S.Program where
+    type Scalar S.Program = D.Program D.ByType D.Pattern D.Expression
     conv (S.Program funcs vars body) = do
         (mconcat -> funcNames) <- for funcs $ \(S.Func name _ _ _) -> do
             funcName <- alias name
@@ -123,10 +114,12 @@ convScope' paramdecls inner = do
                 ty <- conv pasType
                 return (M.singleton (False, name) paramName, (paramName, (r', ty)))
 
-instance Conv S.Body (D.Statement D.Pattern D.Expression) where
+instance Conv S.Body where
+    type Scalar S.Body = D.Statement D.Pattern D.Expression
     conv statements = D.follow <$> traverse conv statements
 
-instance Conv S.Func (D.Name, D.Func D.ByType D.Pattern D.Expression) where
+instance Conv S.Func where
+    type Scalar S.Func = (D.Name, D.Func D.ByType D.Pattern D.Expression)
     conv (S.Func name (S.FuncSig params pasType) vars body) = case pasType of
         Nothing -> do
             clScope <- convScope' params
@@ -143,11 +136,13 @@ instance Conv S.Func (D.Name, D.Func D.ByType D.Pattern D.Expression) where
             fname <- nameF name
             return (fname, D.Func retType clScope)
     
-instance Conv S.By D.By where
+instance Conv S.By where
+    type Scalar S.By = D.By
     conv S.ByValue     = pure D.ByValue
     conv S.ByReference = pure D.ByReference
 
-instance Conv S.Type D.Type where
+instance Conv S.Type where
+    type Scalar S.Type = D.Type
     conv = \case
         S.TypeInteger -> return D.TypeInteger
         S.TypeReal    -> return D.TypeDouble
@@ -191,14 +186,12 @@ typeOfLiteral = \case
     S.LitChar _ -> S.TypeChar
     S.LitStr  _ -> S.TypeString
 
-typeOfAccess :: (Applicative m, MonadReader ConvScope m, Erroneous e m)
-             => S.Name -> m S.Type
+typeOfAccess :: (E e m, R m) => S.Name -> m S.Type
 typeOfAccess name = do
     mtype <- views (csTypes.tsVariables) (M.lookup name)
     maybe (throwError errorNoAccess) return mtype
 
-typecasts :: (Applicative m, MonadReader ConvScope m, Erroneous e m)
-          => S.Expression -> m [S.Expression]
+typecasts :: (E e m, R m) => S.Expression -> m [S.Expression]
 typecasts expr@(S.Primary lit) = return $ typecasting (typeOfLiteral lit) expr
 typecasts expr@(S.Access name) = do
     ty <- typeOfAccess name
@@ -218,12 +211,12 @@ typecasting ty expr = expr : [op1App tc expr | tc <- tcs]
             S.TypeInteger -> [S.OpIntToReal]
             _ -> []
 
+typecheck :: (E e m, R m) => S.Expression -> m S.Type
 typecheck expr = do
     mty <- typecheck' expr
     maybe (throwError errorTypecheck) return mty
 
-typecheck' :: (Applicative m, MonadReader ConvScope m, Erroneous e m)
-          => S.Expression -> m (Maybe S.Type)
+typecheck' :: (E e m, R m) => S.Expression -> m (Maybe S.Type)
 typecheck' = runMaybeT . \case
     S.Primary lit -> return (typeOfLiteral lit)
     S.Access name -> typeOfAccess name
@@ -264,6 +257,7 @@ typecheck' = runMaybeT . \case
 op1App :: S.Operator -> S.Expression -> S.Expression
 op1App op e = S.Call (Left op) [e]
 
+typecastConv :: (R m, W m, G e m) => S.Type -> S.Expression -> m D.Expression
 typecastConv ty expr = do
     tcs <- typecasts expr
     tc <- filterM (\tc -> (==) ty <$> typecheck tc) tcs >>= \case
@@ -271,7 +265,8 @@ typecastConv ty expr = do
         tc:_ -> return tc
     conv tc
 
-instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
+instance Conv S.Statement where
+    type Scalar S.Statement = D.Statement D.Pattern D.Expression
     conv = \case
         S.BodyStatement body -> D.statement <$> conv body
         S.Assign name' expr' -> do
@@ -324,7 +319,8 @@ instance Conv S.Statement (D.Statement D.Pattern D.Expression) where
                         (M.singleton clName clType)
                         (D.follow [D.assign clName clExpr, statement])
 
-instance Conv S.Expression D.Expression where
+instance Conv S.Expression where
+    type Scalar S.Expression = D.Expression
     -- TODO: use typecastConv everywhere
     conv = \case
         S.Access name -> D.expression <$> nameV name
@@ -335,7 +331,8 @@ instance Conv S.Expression D.Expression where
             D.Call name [] <$> traverse conv exprs
         S.Primary lit -> conv lit
 
-instance Conv S.Literal D.Expression where
+instance Conv S.Literal where
+    type Scalar S.Literal = D.Expression
     conv = \case
         S.LitInt  x -> return (D.expression x)
         S.LitReal x -> return (D.expression x)
@@ -343,7 +340,8 @@ instance Conv S.Literal D.Expression where
         S.LitChar x -> return (D.expression x)
         S.LitBool x -> return (D.expression x)
 
-instance Conv S.Operator D.Name where
+instance Conv S.Operator where
+    type Scalar S.Operator = D.Name
     conv = return . D.NameSpecial . \case
         S.OpAdd -> D.OpAdd
         S.OpSubtract -> D.OpSubtract
