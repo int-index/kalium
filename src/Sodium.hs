@@ -16,6 +16,7 @@ import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified Sodium.Pascal.Parse   as P (parse)
 import qualified Sodium.Pascal.Convert as P (convert)
 import qualified Sodium.Haskell.Sugar   as H (sugarcoat)
+import qualified Sodium.Haskell.Imports as H (imports)
 import qualified Sodium.Haskell.Convert as H (convert)
 import qualified Sodium.Error as E
 import qualified Sodium.Nucleus.Vector.Program as V
@@ -38,7 +39,7 @@ translate src = do
         >>= vectorize
         >>= sanity_check "Name uniqueness" sanity_nameUniqueness
         >>= optimize
-    let sweet = H.sugarcoat (H.convert optimal)
+    let sweet = (H.imports . H.sugarcoat . H.convert) optimal
     return (map (prettyPrint . H.convert) log, prettyPrint sweet)
 
 type TranslationLog = [V.Program]

@@ -2,10 +2,11 @@
 module Sodium.Haskell.Sugar where
 
 import Sodium.Prelude
+import Sodium.Util (closureM)
 
+import Sodium.Haskell.Common
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.SrcLoc (noLoc)
-import Sodium.Util (closureM)
 
 sugarcoat :: Module -> Module
 sugarcoat = runIdentity . closureM sugar
@@ -25,7 +26,8 @@ instance Sugar Decl where
         FunBind matches -> FunBind <$> sugar matches
         PatBind srcLoc pat rhs binds
             -> PatBind srcLoc pat <$> sugar rhs <*> sugar binds
-        decl -> pure decl
+        decl@TypeSig{} -> pure decl
+        decl -> error ("unsupported decl: " ++ show decl)
 
 instance Sugar Match where
     sugar (Match srcLoc name pats ty rhs binds) = do
@@ -95,7 +97,7 @@ expMatch
 isInfix op = lookup op fixtable /= Nothing
 
 expMatchIf = \case
-    App3 (Var op) x y z | UnQual (Ident "bool") <- op -> If z y x
+    App3 (Var op) x y z | HsIdent "Data.Bool" "bool" <- op -> If z y x
     If expCond expThen expElse
         | MultiIf rhss <- expElse
             -> MultiIf (GuardedRhs noLoc [Qualifier expCond] expThen : rhss)
@@ -103,14 +105,14 @@ expMatchIf = \case
             -> MultiIf [ GuardedRhs noLoc [Qualifier expCond ] expThen
                        , GuardedRhs noLoc [Qualifier expCond'] expThen'
                        , GuardedRhs noLoc [Qualifier trueCond] expElse'
-                       ] where trueCond = Var (UnQual (Ident "otherwise"))
+                       ] where trueCond = Var (HsIdent "Prelude" "otherwise")
     exp -> exp
 
 expMatchInfix = \case
     App2 (Con op) x y -> case op of
         Special (TupleCon boxed _) -> Tuple boxed [x, y]
         _ -> Paren (InfixApp (Paren x) (QConOp op) (Paren y))
-    App2 (Var op) x y | UnQual (Ident "enumFromTo") <- op
+    App2 (Var op) x y | HsIdent "Prelude" "enumFromTo" <- op
         -> EnumFromTo x y
     App2 (Var op) x y | isInfix (QVarOp op)
         -> Paren (InfixApp (Paren x) (QVarOp op) (Paren y))
@@ -163,9 +165,9 @@ expAppSection = \case
     exp -> exp
 
 expDoMatch = \case
-    App2 (Var (UnQual (Symbol ">>="))) x (Lambda srcLoc [pat] a)
+    App2 (Var (HsSymbol "Prelude" ">>=")) x (Lambda srcLoc [pat] a)
         -> Do [Generator srcLoc pat x, Qualifier a]
-    App2 (Var (UnQual (Symbol ">>"))) x y
+    App2 (Var (HsSymbol "Prelude" ">>")) x y
         -> Do [Qualifier x, Qualifier y]
     Do [Qualifier exp] -> exp
     Do stmts -> Do (stmts >>= expandStmt) where
@@ -212,23 +214,23 @@ expLevel = \case
     _ -> ParensUniverse
 
 whatfix op = maybe (Leftfix, 9) id (lookup op fixtable)
-fixtable = [ (QVarOp $ UnQual $ Symbol "+", (Leftfix, 6))
-           , (QVarOp $ UnQual $ Symbol "-", (Leftfix, 6))
-           , (QVarOp $ UnQual $ Symbol "*", (Leftfix, 7))
-           , (QVarOp $ UnQual $ Symbol "/", (Leftfix, 7))
-           , (QVarOp $ UnQual $ Ident "div", (Leftfix, 7))
-           , (QVarOp $ UnQual $ Ident "mod", (Leftfix, 7))
-           , (QVarOp $ UnQual $ Symbol "++", (Rightfix, 5))
-           , (QVarOp $ UnQual $ Symbol "<$", (Leftfix, 4))
-           , (QVarOp $ UnQual $ Symbol "==", (Nonfix, 4))
-           , (QVarOp $ UnQual $ Symbol "/=", (Nonfix, 4))
-           , (QVarOp $ UnQual $ Symbol "<",  (Nonfix, 4))
-           , (QVarOp $ UnQual $ Symbol ">",  (Nonfix, 4))
-           , (QVarOp $ UnQual $ Symbol "<=", (Nonfix, 4))
-           , (QVarOp $ UnQual $ Symbol ">=", (Nonfix, 4))
-           , (QVarOp $ UnQual $ Ident "elem", (Nonfix, 4))
-           , (QVarOp $ UnQual $ Symbol "&&", (Rightfix, 3))
-           , (QVarOp $ UnQual $ Symbol "||", (Rightfix, 2))
-           , (QVarOp $ UnQual $ Symbol ">>=", (Leftfix, 1))
-           , (QVarOp $ UnQual $ Symbol ">>",  (Leftfix, 1))
+fixtable = [ (QVarOp $ HsSymbol "Prelude" "+", (Leftfix, 6))
+           , (QVarOp $ HsSymbol "Prelude" "-", (Leftfix, 6))
+           , (QVarOp $ HsSymbol "Prelude" "*", (Leftfix, 7))
+           , (QVarOp $ HsSymbol "Prelude" "/", (Leftfix, 7))
+           , (QVarOp $ HsSymbol "Prelude" "div", (Leftfix, 7))
+           , (QVarOp $ HsSymbol "Prelude" "mod", (Leftfix, 7))
+           , (QVarOp $ HsSymbol "Prelude" "++", (Rightfix, 5))
+           , (QVarOp $ HsSymbol "Control.Applicative" "<$", (Leftfix, 4))
+           , (QVarOp $ HsSymbol "Prelude" "==", (Nonfix, 4))
+           , (QVarOp $ HsSymbol "Prelude" "/=", (Nonfix, 4))
+           , (QVarOp $ HsSymbol "Prelude" "<",  (Nonfix, 4))
+           , (QVarOp $ HsSymbol "Prelude" ">",  (Nonfix, 4))
+           , (QVarOp $ HsSymbol "Prelude" "<=", (Nonfix, 4))
+           , (QVarOp $ HsSymbol "Prelude" ">=", (Nonfix, 4))
+           , (QVarOp $ HsSymbol "Prelude" "elem", (Nonfix, 4))
+           , (QVarOp $ HsSymbol "Prelude" "&&", (Rightfix, 3))
+           , (QVarOp $ HsSymbol "Prelude" "||", (Rightfix, 2))
+           , (QVarOp $ HsSymbol "Prelude" ">>=", (Leftfix, 1))
+           , (QVarOp $ HsSymbol "Prelude" ">>",  (Leftfix, 1))
            ]

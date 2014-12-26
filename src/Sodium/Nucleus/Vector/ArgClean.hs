@@ -28,8 +28,13 @@ substitute _ program = program
 data CleanInfo = CleanInfo Name [Bool] Bool Name Func
 
 programReplaceFunc :: CleanInfo -> Endo' Program
-programReplaceFunc (CleanInfo name _ _  name' func) =
-    programFuncs %~ M.insert name' func . M.delete name
+programReplaceFunc (CleanInfo name _ _  name' func)
+    = (programNameTags %~ nameTagUpdate name name')
+    . (programFuncs %~ M.insert name' func . M.delete name)
+
+nameTagUpdate :: Name -> Name -> Endo' (Map Integer String)
+nameTagUpdate (NameGen n) (NameGen n') = aliasUpdate n n'
+nameTagUpdate _ _ = id
 
 funcArgClean :: (Applicative m, MonadWriter [CleanInfo] m, MonadSupply Integer m)
              => Name -> Func -> m ()
