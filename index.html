@@ -181,12 +181,13 @@ end.
                     </td>
                     <td class="source">
 <pre>
+main :: IO ()
 main
-  = do n &lt;- readLn :: IO Int
+  = do n :: Int &lt;- readLn
        print (f (product [1 .. n]))
-       return ()
 
-f a = sum [1 .. a]
+f :: Int -&gt; Int
+f (a :: Int) = sum [1 .. a]
 </pre>
                     </td>
                 </tr>
