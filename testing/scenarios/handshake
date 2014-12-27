@@ -1,11 +1,11 @@
 #!/usr/bin/python
 from subprocess import check_output
 
-names = [b'Simon Peyton Jones', b'Edward Kmett']
+names = [b'', b'Simon Peyton Jones', b'Edward Kmett']
 
 program = input()
 for name in names:
-    out = check_output(program, input=name, timeout=3)
+    out = check_output(program, input=(name + b'\n'), timeout=3)
     exp = b'Hi, ' + name + b'!\n'
     if not out == exp:
         print('output mismatch')
