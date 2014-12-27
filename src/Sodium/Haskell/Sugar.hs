@@ -142,6 +142,17 @@ expStripParen outerLevel = \case
               Qualifier (Paren exp) -> Qualifier exp
               stmt -> stmt
         in Do (map strip stmts)
+
+    Let binds exp -> Let binds (expStripParen ParensUniverse exp)
+
+    Tuple boxed exps -> Tuple boxed (expStripParen ParensUniverse `map` exps)
+    List        exps -> List        (expStripParen ParensUniverse `map` exps)
+
+    If exp1 exp2 exp3 -> If
+        (expStripParen ParensUniverse exp1)
+        (expStripParen ParensUniverse exp2)
+        (expStripParen ParensUniverse exp3)
+
     exp -> exp
 
 expJoinLambda = \case
