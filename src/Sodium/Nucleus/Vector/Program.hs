@@ -128,6 +128,9 @@ unlambda = \case
     Lambda p a -> let (ps, b) = unlambda a in (p:ps, b)
     e -> ([], e)
 
+beta :: [Expression] -> Expression
+beta = foldl1 Beta
+
 unbeta :: Expression -> [Expression]
 unbeta = reverse . go where
     go = \case

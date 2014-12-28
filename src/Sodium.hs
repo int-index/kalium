@@ -9,6 +9,7 @@ import Sodium.Nucleus.Scalar.Valueficate (valueficate)
 import Sodium.Nucleus.Vector.Match (match)
 import Sodium.Nucleus.Vector.Inline (inline, reorder)
 import Sodium.Nucleus.Vector.ArgClean (argClean)
+import Sodium.Nucleus.Vector.Purify (purify)
 import Sodium.Nucleus.Vector.BindClean (bindClean)
 import Sodium.Nucleus.Vector.Context (extractCtx)
 import Sodium.Nucleus.Vector.Sanity (sanity_nameUniqueness)
@@ -57,3 +58,4 @@ optimizeStep = closureM (logging f) >=> logging reorder
             >=> return . bindClean
             >=> extractCtx
             >=> argClean
+            >=> purify

@@ -20,15 +20,15 @@ substitute :: CleanInfo -> Endo' Program
 substitute info program
     | program' <- (recmapped %~ tryApply (appArgClean info))
                   (programReplaceFunc info program)
-    , CleanInfo name _ _ _ _ <- info
+    , CleanInfo name _ _ _ <- info
     , False <- program' `mentions` name
     = program'
 substitute _ program = program
 
-data CleanInfo = CleanInfo Name [Bool] Bool Name Func
+data CleanInfo = CleanInfo Name [Bool] Name Func
 
 programReplaceFunc :: CleanInfo -> Endo' Program
-programReplaceFunc (CleanInfo name _ _  name' func)
+programReplaceFunc (CleanInfo name _  name' func)
     = (programNameTags %~ nameTagUpdate name name')
     . (programFuncs %~ M.insert name' func . M.delete name)
 
@@ -42,13 +42,10 @@ funcArgClean name (Func ty a) = do
     name' <- NameGen <$> supply
     let (ps, b) = unlambda a
         (ns, ps') = patsArgClean ps
-        (untaint, b') = case b of
-            Taint e | name /= NameSpecial OpMain -> (True, e)
-            e -> (False, e)
-        a' = lambda ps' b'
-    case tyArgClean ns untaint ty of
+        a' = lambda ps' b
+    case tyArgClean ns ty of
         Just ty' | ty' /= ty
-          -> tell [CleanInfo name ns untaint name' (Func ty' a')]
+          -> tell [CleanInfo name ns name' (Func ty' a')]
         _ -> return ()
 
 patsArgClean :: [Pattern] -> ([Bool], [Pattern])
@@ -59,18 +56,15 @@ patsArgClean (p:ps) =
         PWildCard -> (False:ns, ps')
         _ -> (True:ns, p:ps')
 
-tyArgClean :: [Bool] -> Bool -> Type -> Maybe Type
-tyArgClean [] False ty = Just ty
-tyArgClean [] True (TypeTaint ty) = Just ty
-tyArgClean (n:ns) untaint (TypeFunction ty1 ty2) = wrap <$> tyArgClean ns untaint ty2
+tyArgClean :: [Bool] -> Type -> Maybe Type
+tyArgClean [] ty = Just ty
+tyArgClean (n:ns) (TypeFunction ty1 ty2) = wrap <$> tyArgClean ns ty2
     where wrap | n = TypeFunction ty1
                | otherwise = id
-tyArgClean _ _ _ = Nothing
+tyArgClean _ _ = Nothing
 
 appArgClean :: CleanInfo -> Expression -> Maybe Expression
-appArgClean (CleanInfo name ns untaint name' _) e
-    | (Access op:es) <- unbeta e
-    , op == name
-     = (if untaint then Taint else id) . foldl1 Beta
-    <$> ((Access name':) <$> zipFilter ns es)
+appArgClean (CleanInfo name ns name' _) e
+    | (Access op:es) <- unbeta e, op == name
+     = beta <$> ((Access name':) <$> zipFilter ns es)
 appArgClean _ _ = Nothing

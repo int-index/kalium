@@ -31,6 +31,7 @@ library
                        Sodium.Nucleus.Vector.Inline
                        Sodium.Nucleus.Vector.BindClean
                        Sodium.Nucleus.Vector.ArgClean
+                       Sodium.Nucleus.Vector.Purify
                        Sodium.Nucleus.Vector.Attempt
                        Sodium.Nucleus.Vector.Context
                        Sodium.Nucleus.Vector.Cost
