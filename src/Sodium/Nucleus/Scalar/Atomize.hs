@@ -12,7 +12,7 @@ import Sodium.Nucleus.Scalar.Typecheck
 
 atomize a = runReaderT (atomizeProgram a) mempty
 
-type T e m = (TypeEnv e m, MonadSupply Integer m)
+type T e m = (TypeEnv e m, MonadRename Integer String m)
 type A e m h = T e m => Kleisli' m (h Expression) (h Atom)
 
 atomizeProgram :: Typing param => A e m (Program param Pattern)
@@ -66,7 +66,7 @@ atomizeExpression = \case
     Atom atom -> return atom
     e@(Call op tyArgs args) -> do
         eArgs <- traverse atomizeExpression args
-        name  <- NameGen <$> supply
+        name  <- NameGen <$> mkname Nothing
         ty <- typecheck e
         let vardecl = (name, ty)
         tell ([vardecl], [Execute $ Exec (PAccess name) op tyArgs eArgs])

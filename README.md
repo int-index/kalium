@@ -7,15 +7,12 @@ development, so nothing is documented.
 
 ## Building
 
-Download (using `git clone`):
-* https://github.com/int-index/sodium into `/path/to/sodium`
-* https://github.com/int-index/monad-supply into `/path/to/monad-supply`
+Choose an arbitrary path, to which we will further refer as `path/to/sodium`.
+Issue the following commands to initialize the building environment:
 
-The paths can be arbitrary. Then change your directory to `/path/to/sodium` and
-initialize the building environment. Issue the following commands:
-
+* `git clone https://github.com/int-index/sodium /path/to/sodium`
+* `cd /path/to/sodium`
 * `cabal sandbox init`
-* `cabal sandbox add-source /path/to/monad-supply`
 * `cabal install --dependencies-only`
 
 If something goes wrong, you can always `cabal sandbox delete` and then repeat

@@ -23,9 +23,6 @@ import qualified Sodium.Error as E
 import qualified Sodium.Nucleus.Vector.Program as V
 import Sodium.Util (closureM)
 
-namestack :: [Integer]
-namestack = [0..]
-
 sanity_check name f x
     | f x = return x
     | otherwise = throwError (E.Insane name)
@@ -33,25 +30,25 @@ sanity_check name f x
 translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
 translate src = do
     pas <- P.parse src
-    (optimal, log) <- flip evalSupplyT namestack
+    ((optimal, log), nameTags) <- (`runRenameT` 0)
           $ P.convert pas
         >>= atomize
         >>= atomize . valueficate
         >>= vectorize
         >>= sanity_check "Name uniqueness" sanity_nameUniqueness
         >>= optimize
-    let sweet = (H.imports . H.sugarcoat . H.convert) optimal
-    return (map (prettyPrint . H.convert) log, prettyPrint sweet)
+    let sweet = (H.imports . H.sugarcoat . H.convert nameTags) optimal
+    return (map (prettyPrint . H.convert nameTags) log, prettyPrint sweet)
 
 type TranslationLog = [V.Program]
 
-optimize :: (Applicative m, Monad m, MonadSupply Integer m) => V.Program -> m (V.Program, TranslationLog)
+optimize :: (Applicative m, Monad m, MonadRename Integer String m) => V.Program -> m (V.Program, TranslationLog)
 optimize program = runWriterT (closureM optimizeStep program)
 
 logging :: MonadWriter [a] m => (a -> m a) -> (a -> m a)
 logging f x = tell [x] >> f x
 
-optimizeStep :: (Applicative m, MonadWriter TranslationLog m, MonadSupply Integer m) => V.Program -> m V.Program
+optimizeStep :: (Applicative m, MonadWriter TranslationLog m, MonadRename Integer String m) => V.Program -> m V.Program
 optimizeStep = closureM (logging f) >=> logging reorder
     where f  =  return . match
             >=> inline

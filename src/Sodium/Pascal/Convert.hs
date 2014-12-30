@@ -36,15 +36,13 @@ class Error e where
     errorNoFunction :: e
 
 type E e m = (Applicative m, MonadError e m, Error e)
-type G e m = (MonadSupply Integer   m, E e m)
+type G e m = (MonadRename Integer String m, E e m)
 type R m = MonadReader ConvScope m
-type W m = MonadWriter (Map Integer String) m
 
 convert :: G e m => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
 convert program = do
     let initScope = ConvScope (TypeScope mempty mempty) mempty
-    (p, nameTags) <- runWriterT (runReaderT (conv program) initScope)
-    return $ p & D.programNameTags %~ mappend nameTags
+    runReaderT (conv program) initScope
 
 nameV name = lookupName (False, name)
 nameF name = lookupName (True, name)
@@ -55,17 +53,13 @@ lookupName k = do
     maybe (throwError errorNoAccess) return mname
 
 alias :: ( Applicative m
-         , MonadSupply Integer m
-         , MonadWriter (Map Integer String) m
+         , MonadRename Integer String m
          ) => S.Name -> m D.Name
-alias name = do
-    n <- supply
-    tell (M.singleton n name)
-    return (D.NameGen n)
+alias name = D.NameGen <$> mkname (Just name)
 
 class Conv s where
     type Scalar s :: *
-    conv :: (R m, W m, G e m) => s -> m (Scalar s)
+    conv :: (R m, G e m) => s -> m (Scalar s)
 
 instance Conv S.Program where
     type Scalar S.Program = D.Program D.ByType D.Pattern D.Expression
@@ -83,7 +77,7 @@ instance Conv S.Program where
                 return $ D.Func D.TypeUnit (noparams clBody)
             clFuncs <- traverse conv funcs
             let programFuncs = (D.NameSpecial D.OpMain, clMain):clFuncs
-            return $ D.Program (M.fromList programFuncs) mempty
+            return $ D.Program (M.fromList programFuncs)
         where funcSigs = mconcat (map funcSigOf funcs)
               funcSigOf (S.Func name funcSig _ _) = M.singleton name funcSig
 
@@ -257,7 +251,7 @@ typecheck' = runMaybeT . \case
 op1App :: S.Operator -> S.Expression -> S.Expression
 op1App op e = S.Call (Left op) [e]
 
-typecastConv :: (R m, W m, G e m) => S.Type -> S.Expression -> m D.Expression
+typecastConv :: (R m, G e m) => S.Type -> S.Expression -> m D.Expression
 typecastConv ty expr = do
     tcs <- typecasts expr
     tc <- filterM (\tc -> (==) ty <$> typecheck tc) tcs >>= \case

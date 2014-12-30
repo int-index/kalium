@@ -38,6 +38,7 @@ library
                        Sodium.Nucleus.Vector.Sanity
                        Sodium.Nucleus.Vector.Show
                        Sodium.Nucleus.Vectorize
+                       Control.Monad.Rename
 
   build-depends:       base
                ,       transformers
@@ -47,7 +48,6 @@ library
                ,       array
                ,       lens
                ,       profunctors
-               ,       monad-supply
                ,       haskell-src-exts == 1.16.*
                ,       parsec
 

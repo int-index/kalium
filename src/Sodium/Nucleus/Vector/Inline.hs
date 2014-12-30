@@ -12,10 +12,10 @@ import Sodium.Nucleus.Vector.Pattern
 import Sodium.Nucleus.Vector.Name
 import Sodium.Nucleus.Vector.Cost
 
-inline :: (Applicative m, MonadSupply Integer m, Recmappable a) => EndoKleisli' m a
+inline :: (Applicative m, MonadRename Integer String m, Recmappable a) => EndoKleisli' m a
 inline = recmapped (mergePattern . inlineExpression)
 
-reorder :: (Applicative m, MonadSupply Integer m, Recmappable a) => EndoKleisli' m a
+reorder :: (Applicative m, MonadRename Integer String m, Recmappable a) => EndoKleisli' m a
 reorder = recmapped reorderPattern
 
 inlineExpression (Into p x a) | not excessive, not dangling = b
@@ -42,7 +42,7 @@ mergePattern e@(Lambda p a)
     | Just ty <- patType p
     , not (patIsAccess p)
     = do
-        name <- NameGen <$> supply
+        name <- NameGen <$> mkname Nothing
         let w = replace $ \case
               e | preciseMatch p e -> Just (Access name)
               _ -> Nothing

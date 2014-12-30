@@ -9,7 +9,7 @@ import Control.Monad.Reader as Exports hiding (mapM_, sequence_, forM_, msum, ma
 import Control.Monad.Writer as Exports hiding (mapM_, sequence_, forM_, msum, mapM, sequence, forM)
 import Control.Monad.State  as Exports hiding (mapM_, sequence_, forM_, msum, mapM, sequence, forM)
 import Control.Monad.Except as Exports hiding (mapM_, sequence_, forM_, msum, mapM, sequence, forM)
-import Control.Monad.Supply as Exports
+import Control.Monad.Rename as Exports
 import Control.Applicative as Exports
 import Control.Category as Exports
 import Data.Foldable as Exports

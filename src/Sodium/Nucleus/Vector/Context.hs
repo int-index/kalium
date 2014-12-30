@@ -13,10 +13,10 @@ contexts :: MonadWriter [Expression] m => EndoKleisli' Maybe Expression -> EndoK
 contexts fits (Beta cxt (fits -> Just e)) = tell [cxt] >> return e
 contexts _ e = return e
 
-context :: (Applicative m, MonadSupply Integer m) => Name -> Expression
+context :: (Applicative m, MonadRename Integer String m) => Name -> Expression
         -> (Name -> Expression -> Maybe Expression -> m a) -> m a
 context name a cont = do
-    name' <- NameGen <$> supply
+    name' <- NameGen <$> mkname Nothing
     let (b, cxts) = runWriter (recmapped w a)
         dangling = b `mentions` name
         w = contexts $ \case
@@ -24,11 +24,11 @@ context name a cont = do
             _ -> Nothing
     cont name' b $ guard (not dangling) >> uniform cxts
 
-extractCtx :: (Applicative m, MonadSupply Integer m) => EndoKleisli' m Program
+extractCtx :: (Applicative m, MonadRename Integer String m) => EndoKleisli' m Program
 extractCtx = recmapped extractCtxExpression
 
 extractCtxExpression
-    :: (Applicative m, MonadSupply Integer m)
+    :: (Applicative m, MonadRename Integer String m)
     => Expression -> m Expression
 extractCtxExpression = \case
     e@(Follow (PAccess name ty) x a) -> do

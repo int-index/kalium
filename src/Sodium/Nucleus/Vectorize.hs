@@ -37,30 +37,20 @@ class Error e where
     errorUpdateImmutable :: Name -> e
     errorInsane :: String -> e
 
-type E e m = (Applicative m, Error e, MonadError e m, MonadSupply Integer m)
-type W e m = (MonadWriter (Map Integer Integer) m, E e m)
-type V e m = (MonadReader VectorizeScope m, W e m)
+type E e m = (Applicative m, Error e, MonadError e m, MonadRename Integer String m)
+type V e m = (MonadReader VectorizeScope m, E e m)
 
-alias :: W e m => Name -> m Vec.Name
-alias (NameGen m) = do
-    n <- supply
-    tell (M.singleton n m)
-    return (Vec.NameGen n)
-alias _ = Vec.NameGen <$> supply
+alias :: E e m => Name -> m Vec.Name
+alias (NameGen m) = Vec.NameGen <$> rename m
+alias _ = Vec.NameGen <$> mkname Nothing
 
 vectorize :: E e m => Program Type Pattern Atom -> m Vec.Program
-vectorize program = vectorizeNameTags (program ^. programNameTags) $ do
+vectorize program = do
     (mconcat -> names') <- for (program ^. programFuncs . to M.keys)
             $ \name -> M.singleton (name, Immutable) <$> (Just <$> alias name)
     flip runReaderT (VectorizeScope mempty mempty names') $ do
         vecFuncs <- traverse (uncurry vectorizeFunc) (program ^. programFuncs & M.toList)
-        return $ Vec.Program (M.fromList vecFuncs) mempty
-
-vectorizeNameTags :: E e m => Map Integer String
-                  -> WriterT (Map Integer Integer) m Vec.Program -> m Vec.Program
-vectorizeNameTags nameTags w = do
-    (p, nameTags') <- runWriterT w
-    return $ p & Vec.programNameTags %~ mappend (composeMap nameTags nameTags')
+        return $ Vec.Program (M.fromList vecFuncs)
 
 vectorizeFunc :: V e m => Name -> Func Type Pattern Atom -> m (Vec.Name, Vec.Func)
 vectorizeFunc name func = do
@@ -310,7 +300,7 @@ lookupX f name = do
     M.lookup name xs
        & maybe (throwError $ errorNoAccess name (M.keys xs)) return
 
-initIndices :: W e m => Index -> Map Name Type -> m VectorizeScope
+initIndices :: E e m => Index -> Map Name Type -> m VectorizeScope
 initIndices n types = do
     scopes <- for (itoList types) $ \(name, ty) -> do
         name' <- case n of

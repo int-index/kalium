@@ -11,13 +11,6 @@ type EndoKleisli' m a = Kleisli' m a a
 mAsList :: Ord k => Iso' (Map k a) (Pairs k a)
 mAsList = iso M.toList M.fromList
 
-composeMap :: (Ord k, Ord vk) => Map vk v -> Map k vk -> Map k v
-composeMap m = M.foldrWithKey go mempty where
-    go k vk = maybe id (M.insert k) (M.lookup vk m)
-
-aliasUpdate :: Ord k => k -> k -> Endo' (Map k v)
-aliasUpdate k1 k2 m = m & maybe id (M.insert k2) (M.lookup k1 m)
-
 tryApply :: (a -> Maybe a) -> (a -> a)
 tryApply f a = maybe a id (f a)
 

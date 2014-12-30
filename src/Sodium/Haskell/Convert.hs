@@ -11,13 +11,13 @@ import qualified Sodium.Nucleus.Vector.Program as S
 import qualified Language.Haskell.Exts        as H
 import qualified Language.Haskell.Exts.SrcLoc as H
 
-convert :: S.Program -> H.Module
+convert :: Map Integer String -> S.Program -> H.Module
 convert = convProgram
 
 type T m = (Applicative m, MonadState (Map Integer (Either String H.Name)) m)
 
-convProgram :: S.Program -> H.Module
-convProgram (S.Program funcs nameTags) = (`evalState` fmap Left nameTags) $ do
+convProgram :: Map Integer String -> S.Program -> H.Module
+convProgram nameTags (S.Program funcs) = (`evalState` fmap Left nameTags) $ do
     (concat -> hsDecls) <- traverse (uncurry convFunc) (itoList funcs)
     let hsExts = extensions ["MultiWayIf", "ScopedTypeVariables"]
         hsMod = H.Module H.noLoc H.main_mod hsExts Nothing Nothing [] hsDecls
