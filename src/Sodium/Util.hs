@@ -28,3 +28,5 @@ zipFilter (keep:keeps) (a:as)
     | otherwise = zipFilter keeps as
 zipFilter [] [] = Just []
 zipFilter _ _ = Nothing
+
+type MonadNameGen m = MonadRename Integer String m

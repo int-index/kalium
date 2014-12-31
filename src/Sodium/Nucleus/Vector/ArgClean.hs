@@ -10,7 +10,7 @@ import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Name
 
-argClean :: (Applicative m, MonadRename Integer String m) => Kleisli' m Program Program
+argClean :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
 argClean program = do
     let funcs = program ^. programFuncs
     info <- execWriterT (itraverse funcArgClean funcs)
@@ -31,11 +31,7 @@ programReplaceFunc :: CleanInfo -> Endo' Program
 programReplaceFunc (CleanInfo name _  name' func)
     = programFuncs %~ M.insert name' func . M.delete name
 
-alias :: (Applicative m, MonadRename Integer String m) => Name -> m Name
-alias (NameGen m) = NameGen <$> rename m
-alias _ = NameGen <$> mkname Nothing
-
-funcArgClean :: (Applicative m, MonadWriter [CleanInfo] m, MonadRename Integer String m)
+funcArgClean :: (Applicative m, MonadWriter [CleanInfo] m, MonadNameGen m)
              => Name -> Func -> m ()
 funcArgClean name (Func ty a) = do
     name' <- alias name

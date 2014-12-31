@@ -37,7 +37,7 @@ class Error e where
     errorUpdateImmutable :: Name -> e
     errorInsane :: String -> e
 
-type E e m = (Applicative m, Error e, MonadError e m, MonadRename Integer String m)
+type E e m = (Applicative m, Error e, MonadError e m, MonadNameGen m)
 type V e m = (MonadReader VectorizeScope m, E e m)
 
 alias :: E e m => Name -> m Vec.Name

@@ -12,10 +12,10 @@ import Sodium.Nucleus.Vector.Pattern
 import Sodium.Nucleus.Vector.Name
 import Sodium.Nucleus.Vector.Cost
 
-inline :: (Applicative m, MonadRename Integer String m, Recmappable a) => EndoKleisli' m a
+inline :: (Applicative m, MonadNameGen m, Recmappable a) => EndoKleisli' m a
 inline = recmapped (mergePattern . inlineExpression)
 
-reorder :: (Applicative m, MonadRename Integer String m, Recmappable a) => EndoKleisli' m a
+reorder :: (Applicative m, MonadNameGen m, Recmappable a) => EndoKleisli' m a
 reorder = recmapped reorderPattern
 
 inlineExpression (Into p x a) | not excessive, not dangling = b
@@ -57,7 +57,10 @@ reorderPattern e | Follow p x a <- e = do
     return (lesser e rs)
 reorderPattern e = return e
 
-replace :: MonadWriter (Sum Integer) m => EndoKleisli' Maybe Expression -> EndoKleisli' m Expression
+replace
+    :: MonadWriter (Sum Integer) m
+    => EndoKleisli' Maybe Expression
+    -> EndoKleisli' m     Expression
 replace fits e
     | Just e' <- fits e = tell (Sum 1) >> return e'
     | otherwise = return e

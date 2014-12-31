@@ -1,7 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Sodium.Nucleus.Vector.Program where
 
 import Sodium.Prelude
+import Sodium.Util
 
 data NameSpecial
     = OpAdd
@@ -61,6 +63,10 @@ data NameSpecial
 data Name = NameSpecial NameSpecial
           | NameGen Integer
     deriving (Eq, Ord)
+
+alias :: (Applicative m, MonadNameGen m) => EndoKleisli' m Name
+alias (NameGen m) = NameGen <$> rename m
+alias _ = NameGen <$> mkname Nothing
 
 data Type
     = TypeInteger

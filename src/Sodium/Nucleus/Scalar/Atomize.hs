@@ -12,7 +12,7 @@ import Sodium.Nucleus.Scalar.Typecheck
 
 atomize a = runReaderT (atomizeProgram a) mempty
 
-type T e m = (TypeEnv e m, MonadRename Integer String m)
+type T e m = (TypeEnv e m, MonadNameGen m)
 type A e m h = T e m => Kleisli' m (h Expression) (h Atom)
 
 atomizeProgram :: Typing param => A e m (Program param Pattern)

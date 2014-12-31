@@ -9,11 +9,14 @@ import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Name
 import Sodium.Nucleus.Vector.Attempt
 
-contexts :: MonadWriter [Expression] m => EndoKleisli' Maybe Expression -> EndoKleisli' m Expression
+contexts
+    :: MonadWriter [Expression] m
+    => EndoKleisli' Maybe Expression
+    -> EndoKleisli' m     Expression
 contexts fits (Beta cxt (fits -> Just e)) = tell [cxt] >> return e
 contexts _ e = return e
 
-context :: (Applicative m, MonadRename Integer String m) => Name -> Expression
+context :: (Applicative m, MonadNameGen m) => Name -> Expression
         -> (Name -> Expression -> Maybe Expression -> m a) -> m a
 context name a cont = do
     name' <- NameGen <$> mkname Nothing
@@ -24,12 +27,12 @@ context name a cont = do
             _ -> Nothing
     cont name' b $ guard (not dangling) >> uniform cxts
 
-extractCtx :: (Applicative m, MonadRename Integer String m) => EndoKleisli' m Program
+extractCtx :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
 extractCtx = recmapped extractCtxExpression
 
 extractCtxExpression
-    :: (Applicative m, MonadRename Integer String m)
-    => Expression -> m Expression
+    :: (Applicative m, MonadNameGen m)
+    => EndoKleisli' m Expression
 extractCtxExpression = \case
     e@(Follow (PAccess name ty) x a) -> do
         context name a $ \name' b -> \case

@@ -20,35 +20,47 @@ import qualified Sodium.Haskell.Sugar   as H (sugarcoat)
 import qualified Sodium.Haskell.Imports as H (imports)
 import qualified Sodium.Haskell.Convert as H (convert)
 import qualified Sodium.Error as E
+import qualified Sodium.Nucleus.Scalar.Program as S
 import qualified Sodium.Nucleus.Vector.Program as V
-import Sodium.Util (closureM)
+import Sodium.Util
 
 sanity_check name f x
     | f x = return x
     | otherwise = throwError (E.Insane name)
 
+nuclear
+    :: ( Applicative m
+       , MonadError E.Error m
+       , MonadNameGen m
+       ) => Kleisli' m (S.Program S.ByType S.Pattern S.Expression)
+                       (V.Program, TranslationLog)
+nuclear
+     =  atomize
+    >=> atomize . valueficate
+    >=> vectorize
+    >=> sanity_check "Name uniqueness" sanity_nameUniqueness
+    >=> optimize
+
 translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
 translate src = do
     pas <- P.parse src
-    ((optimal, log), nameTags) <- (`runRenameT` 0)
-          $ P.convert pas
-        >>= atomize
-        >>= atomize . valueficate
-        >>= vectorize
-        >>= sanity_check "Name uniqueness" sanity_nameUniqueness
-        >>= optimize
+    ((optimal, log), nameTags) <- (`runRenameT` 0) $ P.convert pas >>= nuclear
     let sweet = (H.imports . H.sugarcoat . H.convert nameTags) optimal
     return (map (prettyPrint . H.convert nameTags) log, prettyPrint sweet)
 
 type TranslationLog = [V.Program]
 
-optimize :: (Applicative m, Monad m, MonadRename Integer String m) => V.Program -> m (V.Program, TranslationLog)
+optimize
+    :: (Applicative m, MonadNameGen m)
+    => V.Program -> m (V.Program, TranslationLog)
 optimize program = runWriterT (closureM optimizeStep program)
 
-logging :: MonadWriter [a] m => (a -> m a) -> (a -> m a)
+logging :: MonadWriter [a] m => LensLike' m a a
 logging f x = tell [x] >> f x
 
-optimizeStep :: (Applicative m, MonadWriter TranslationLog m, MonadRename Integer String m) => V.Program -> m V.Program
+optimizeStep
+    :: (Applicative m, MonadWriter TranslationLog m, MonadNameGen m)
+    => EndoKleisli' m V.Program
 optimizeStep = closureM (logging f) >=> logging reorder
     where f  =  return . match
             >=> inline

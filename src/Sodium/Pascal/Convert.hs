@@ -36,7 +36,7 @@ class Error e where
     errorNoFunction :: e
 
 type E e m = (Applicative m, MonadError e m, Error e)
-type G e m = (MonadRename Integer String m, E e m)
+type G e m = (MonadNameGen m, E e m)
 type R m = MonadReader ConvScope m
 
 convert :: G e m => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
@@ -52,9 +52,7 @@ lookupName k = do
     mname <- views csNames (M.lookup k)
     maybe (throwError errorNoAccess) return mname
 
-alias :: ( Applicative m
-         , MonadRename Integer String m
-         ) => S.Name -> m D.Name
+alias :: ( Applicative m , MonadNameGen m) => S.Name -> m D.Name
 alias name = D.NameGen <$> mkname (Just name)
 
 class Conv s where
