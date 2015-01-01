@@ -25,15 +25,15 @@ declareLenses [d|
 
     data ConvScope = ConvScope
         { csTypes :: TypeScope
-        , csNames :: Map (Bool, S.Name) D.Name
+        , csNames :: Map Bool (Map S.Name D.Name)
         } deriving (Eq)
 
                 |]
 
 class Error e where
     errorTypecheck  :: e
-    errorNoAccess   :: e
-    errorNoFunction :: e
+    errorNoAccess   :: String -> [String] -> e
+    errorNoFunction :: String -> e
 
 type E e m = (Applicative m, MonadError e m, Error e)
 type G e m = (MonadNameGen m, E e m)
@@ -41,16 +41,19 @@ type R m = MonadReader ConvScope m
 
 convert :: G e m => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
 convert program = do
-    let initScope = ConvScope (TypeScope mempty mempty) mempty
+    let initScope = ConvScope (TypeScope mempty mempty)
+                              (M.fromList (liftA2(,)[True,False][mempty]))
     runReaderT (conv program) initScope
 
-nameV name = lookupName (False, name)
-nameF name = lookupName (True, name)
+nameV, nameF :: (E e m, R m) => S.Name -> m D.Name
+nameV = lookupName False
+nameF = lookupName True
 
-lookupName :: (E e m, R m) => (Bool, S.Name) -> m D.Name
-lookupName k = do
-    mname <- views csNames (M.lookup k)
-    maybe (throwError errorNoAccess) return mname
+lookupName :: (E e m, R m) => Bool -> S.Name -> m D.Name
+lookupName ct name = do
+    names <- views csNames (M.! ct)
+    let mname = M.lookup name names
+    maybe (throwError (errorNoAccess name (M.keys names))) return mname
 
 alias :: ( Applicative m , MonadNameGen m) => S.Name -> m D.Name
 alias name = D.NameGen <$> mkname (Just name)
@@ -64,9 +67,9 @@ instance Conv S.Program where
     conv (S.Program funcs vars body) = do
         (mconcat -> funcNames) <- for funcs $ \(S.Func name _ _ _) -> do
             funcName <- alias name
-            return $ M.singleton (True, name) funcName
+            return $ M.singleton name funcName
         local ( (csTypes . tsFunctions %~ mappend funcSigs)
-              . (csNames %~ mappend funcNames)
+              . (csNames %~ M.adjust (mappend funcNames) True)
               ) $ do
             clMain <- do
                 clBody <- convScope vars
@@ -83,19 +86,19 @@ convScope vardecls inner = do
     (mconcat -> varNames, scopeVars)
         <- unzip <$> traverse convVardecl (M.toList vardecls)
     scopeElem <- local ( (csTypes . tsVariables %~ mappend vardecls)
-                       . (csNames %~ mappend varNames)
+                       . (csNames %~ M.adjust (mappend varNames) False)
                        ) inner
     return $ D.Scope (D.scoping scopeVars) scopeElem
        where convVardecl (name, pasType) = do
                 varName <- alias name
                 ty <- conv pasType
-                return (M.singleton (False, name) varName, (varName, ty))
+                return (M.singleton name varName, (varName, ty))
 
 convScope' paramdecls inner = do
     (mconcat -> paramNames, scopeVars)
         <- unzip <$> traverse convParamdecl paramdecls
     scopeElem <- local ( (csTypes . tsVariables %~ mappend vardecls)
-                       . (csNames %~ mappend paramNames)
+                       . (csNames %~ M.adjust (mappend paramNames) False)
                        ) inner
     return $ D.Scope scopeVars scopeElem
        where paramDeclToTup (S.ParamDecl name (_, ty)) = (name, ty)
@@ -104,7 +107,7 @@ convScope' paramdecls inner = do
                 paramName <- alias name
                 r' <- conv r
                 ty <- conv pasType
-                return (M.singleton (False, name) paramName, (paramName, (r', ty)))
+                return (M.singleton name paramName, (paramName, (r', ty)))
 
 instance Conv S.Body where
     type Scalar S.Body = D.Statement D.Pattern D.Expression
@@ -180,8 +183,9 @@ typeOfLiteral = \case
 
 typeOfAccess :: (E e m, R m) => S.Name -> m S.Type
 typeOfAccess name = do
-    mtype <- views (csTypes.tsVariables) (M.lookup name)
-    maybe (throwError errorNoAccess) return mtype
+    types <- view (csTypes.tsVariables)
+    let mtype = M.lookup name types
+    maybe (throwError (errorNoAccess name (M.keys types))) return mtype
 
 typecasts :: (E e m, R m) => S.Expression -> m [S.Expression]
 typecasts expr@(S.Primary lit) = return $ typecasting (typeOfLiteral lit) expr
@@ -215,7 +219,7 @@ typecheck' = runMaybeT . \case
     S.Call (Right name) _ -> do -- TODO: check argument types
         mfuncsig <- views (csTypes.tsFunctions) (M.lookup name)
         case mfuncsig of
-            Nothing -> throwError errorNoFunction
+            Nothing -> throwError (errorNoFunction name)
             Just (S.FuncSig _ mtype) -> case mtype of
                 Nothing -> badType
                 Just t -> return t

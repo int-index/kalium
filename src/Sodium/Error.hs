@@ -39,6 +39,6 @@ instance T.Error Error where
     errorTypeMismatch name  = TypeError (show name)
 
 instance CP.Error Error where
-    errorTypecheck  = PasConvError
-    errorNoAccess   = PasConvError
-    errorNoFunction = PasConvError
+    errorTypecheck  = TypeError "" []
+    errorNoAccess   = NoAccess
+    errorNoFunction = NoFunction

@@ -32,6 +32,7 @@ data Token
     | KwElse
     | KwCase
     | KwOf
+    | KwArray
     | LParen
     | RParen
     | Semicolon
@@ -185,6 +186,7 @@ keywords = M.fromList
     , ("else"    , KwElse)
     , ("case"    , KwCase)
     , ("of"      , KwOf)
+    , ("array"   , KwArray)
     ]
 
 pQuote :: P u Token

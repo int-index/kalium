@@ -45,6 +45,7 @@ import qualified Text.Parsec as P
     else     { T.KwElse  }
     case     { T.KwCase  }
     of       { T.KwOf    }
+    array    { T.KwArray }
     '('      { T.LParen  }
     ')'      { T.RParen  }
     ';'      { T.Semicolon }
@@ -208,6 +209,7 @@ Atom : name  { Access $1 }
 Call : name Arguments { Call (Right $1) $2 }
 
 Type : name { match_type $1 }
+     | array of Type { TypeArray $3 }
 
 Arguments  : '(' Arguments_ ')' { reverse $2 }
 Arguments_ :                           {      [] }
