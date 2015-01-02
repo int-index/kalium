@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 from subprocess import check_output
 
 names = [b'', b'Simon Peyton Jones', b'Edward Kmett']
