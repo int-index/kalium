@@ -6,11 +6,12 @@ import Sodium.Nucleus.Vector.Program
 
 sanity_nameUniqueness :: Program -> Bool
 sanity_nameUniqueness program
-    = (\xs -> xs == nub xs) . execWriter
-    -- TODO: take function names into account (itraverse?)
-    $ (programFuncs . traversed . funcExpression) (\e -> e <$ snu e) program
-            
-snu :: MonadWriter [Name] m => Expression -> m ()
+    = liftA2 (==) nub id . execWriter
+    $ itraverse fnsnu (view programFuncs program)
+
+type W m = (Applicative m, MonadWriter [Name] m)
+
+snu :: W m => Expression -> m ()
 snu = \case
     Access  _ -> return ()
     Primary _ -> return ()
@@ -21,7 +22,7 @@ snu = \case
         snu e1
         snu e2
 
-psnu :: MonadWriter [Name] m => Pattern -> m ()
+psnu :: W m => Pattern -> m ()
 psnu = \case
     PTuple p1 p2 -> do
         psnu p1
@@ -30,3 +31,8 @@ psnu = \case
         tell [name]
     PWildCard -> return ()
     PUnit -> return ()
+
+fnsnu :: W m => Name -> Func -> m ()
+fnsnu name fn = do
+    tell [name]
+    snu (view funcExpression fn)
