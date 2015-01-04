@@ -17,6 +17,7 @@ import Data.Traversable as Exports
 import Data.List as Exports hiding (concat, foldr, foldl1, maximum, minimum, product, sum, all, and, any, concatMap, elem, foldl, foldr1, notElem, or, find, maximumBy, minimumBy, mapAccumL, mapAccumR, foldl')
 import Data.Bool as Exports
 import Data.Ratio as Exports
+import Data.Maybe as Exports
 
 import Control.Lens.Getter as Exports
 import Control.Lens.Setter as Exports
