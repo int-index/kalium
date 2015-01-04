@@ -24,7 +24,7 @@ patClean :: Pattern -> Pairs Pattern (EndoKleisli' Maybe Expression)
 patClean p@PWildCard = return (p, \_ -> return LitUnit)
 patClean (PTuple PWildCard p) = return (p, Just . AppOp1 OpSnd)
 patClean (PTuple p PWildCard) = return (p, Just . AppOp1 OpFst)
-patClean (PTuple p1 p2) = fstClean ++ sndClean where
+patClean (PTuple p1 p2) = fstClean ++ sndClean ++ swapClean where
     fstClean = do
         (p, c) <- patClean p1
         let cln (AppOp2 OpPair e1 e2) = AppOp2 OpPair <$> c e1 <*> pure e2
@@ -35,4 +35,8 @@ patClean (PTuple p1 p2) = fstClean ++ sndClean where
         let cln (AppOp2 OpPair e1 e2) = AppOp2 OpPair <$> pure e1 <*> c e2
             cln _ = Nothing
         return (PTuple p1 p, cln)
+    swapClean = do
+        let cln (AppOp1 OpSwap e) = pure e
+            cln _ = Nothing
+        return (PTuple p2 p1, cln)
 patClean _ = []
