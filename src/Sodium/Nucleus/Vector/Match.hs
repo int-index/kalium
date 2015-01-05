@@ -15,6 +15,7 @@ match = over recmapped
       . lambdaReduce
       . etaReduce
       . pairReduce
+      . listReduce
       . foldMatch
       . booleanCompute
       . numericCompute
@@ -167,6 +168,20 @@ pairReduce = \case
             | preciseMatch p1 a2
             , preciseMatch p2 a1
             -> Just (AppOp1 OpSwap e)
+        _ -> Nothing
+
+listReduce :: Endo' Expression
+listReduce = \case
+    AppOp2 OpConcat (OpAccess OpNil) e -> e
+    AppOp2 OpConcat e (OpAccess OpNil) -> e
+
+    AppOp2 OpConcat (unlist -> Just es) e@(unlist -> Just _)
+        -> foldr (AppOp2 OpCons) e es
+    e -> e
+  where
+    unlist = \case
+        AppOp2 OpCons e es -> (e:) <$> unlist es
+        OpAccess OpNil -> pure []
         _ -> Nothing
 
 -- TODO: typecheck
