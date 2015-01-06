@@ -6,20 +6,19 @@ import Sodium.Util
 
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Graph as G
+import Data.Tree (flatten)
 
 import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
 import Sodium.Nucleus.Vector.Name
-
-import Sodium.Nucleus.Vector.Show ()
-import Debug.Trace
 
 purify :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
 purify program = do
     p1s <- execWriterT $ itraverse funcPurify (program ^. programFuncs)
     let p2s = resolve p1s
         infoGroups = fulfil p2s
-    traceShow infoGroups (return (foldr substitute program infoGroups))
+    return (foldr substitute program infoGroups)
 
 substitute :: [PurifyInfo] -> Endo' Program
 substitute infoGroup program =
@@ -32,6 +31,7 @@ substitute infoGroup program =
         withPure = replacedCalls & programFuncs %~ M.union pureFuncs
         pureFuncs = M.unions [ M.singleton name' func | PurifyInfo _ _ name' func <- infoGroup ]
     in if dangling then program else program'
+        -- TODO: stop further substitutions
   where
     purifyExpression :: Endo' Expression
     purifyExpression = foldr (.) id $ map (tryApply.appPurify) infoGroup
@@ -43,10 +43,6 @@ data P2 = P2 Name Int Name Func (Set Request)
 
 data PurifyInfo = PurifyInfo Name Int Name Func
 
-instance Show PurifyInfo where
-    show (PurifyInfo name arity name' _) =
-        show name ++ "[" ++ show arity ++ "] -> " ++ show name'
-
 resolve :: [P1] -> [P2]
 resolve p1s =
     let cell (P1 name _ name' _) = M.singleton name name'
@@ -57,17 +53,19 @@ resolve1 :: Map Name Name -> P1 -> [P2]
 resolve1 table (P1 name arity name' gen)
     = maybeToList $ uncurry (P2 name arity name') `fmap` gen table
 
--- TODO: recursive groups
 fulfil :: [P2] -> [[PurifyInfo]]
-fulfil p2s = [p2s >>= fulfil1] where
-    -- FIXME: this algorithm does NOT work properly
-    --        and sometimes results in groups with unsatisfied requests
-    cell (P2 _ arity name' _ _) = S.singleton (Request name' arity)
-    table = S.unions (map cell p2s)
-    satisfied reqs = reqs `S.isSubsetOf` table
-    fulfil1 (P2 name arity name' func reqs)
-        | satisfied reqs = [PurifyInfo name arity name' func]
-        | otherwise = []
+fulfil p2s = groups where
+
+    (graph, lookupVertex, _) = G.graphFromEdges
+        $ flip map p2s
+        $ \(P2 name arity name' func reqs) ->
+            ( PurifyInfo name arity name' func
+            , Request name arity
+            , S.toList reqs )
+
+    groups = (fmap.fmap) (view _1 . lookupVertex)
+           $  fmap flatten
+           $ G.scc graph
 
 funcPurify
     :: ( Applicative m
