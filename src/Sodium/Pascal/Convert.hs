@@ -159,19 +159,23 @@ convReadLn [e@(S.Access name')] = do
 convReadLn _ = error "IOMagic supports only single-value read operations"
 
 convWriteLn ln exprs = do
-    let convArg expr = do
-          ty <- typecheck expr
-          let wrap = case ty of
-                S.TypeString -> id
-                S.TypeChar -> \e -> D.Call (D.NameSpecial D.OpSingleton) [] [e]
-                _ -> \e -> D.Call (D.NameSpecial D.OpShow) [] [e]
-          wrap <$> conv expr
-        op | ln = D.NameSpecial D.OpPutLn
-           | otherwise = D.NameSpecial D.OpPut
     arg <- traverse convArg exprs <&> \case
         [] -> D.expression ""
         args -> foldr1 (binary (D.NameSpecial D.OpConcat)) args
+    let op | ln = D.NameSpecial D.OpPutLn
+           | otherwise = D.NameSpecial D.OpPut
     return $ D.Exec D.PUnit op [] [arg]
+  where
+    convArg expr = do
+        tcs <- typecasts expr
+        tc <- listToMaybe <$> filterM (\tc -> (==) S.TypeString <$> typecheck tc) tcs
+        case tc of
+            Just e  -> convExpr e
+            Nothing -> case tcs of
+                expr':_ -> do
+                    e <- convExpr expr'
+                    return $ D.Call (D.NameSpecial D.OpShow) [] [e]
+                _ -> throwError errorTypecheck
 
 typeOfLiteral :: S.Literal -> S.Type
 typeOfLiteral = \case
@@ -216,13 +220,18 @@ typecheck' :: (E e m, R m) => S.Expression -> m (Maybe S.Type)
 typecheck' = runMaybeT . \case
     S.Primary lit -> return (typeOfLiteral lit)
     S.Access name -> typeOfAccess name
-    S.Call (Right name) _ -> do -- TODO: check argument types
+    S.Call (Right name) args -> do
         mfuncsig <- views (csTypes.tsFunctions) (M.lookup name)
         case mfuncsig of
             Nothing -> throwError (errorNoFunction name)
-            Just (S.FuncSig _ mtype) -> case mtype of
+            Just (S.FuncSig params mtype) -> case mtype of
                 Nothing -> badType
-                Just t -> return t
+                Just t -> do
+                    let tys = params & map (\(S.ParamDecl _ (_, ty)) -> ty)
+                    (sequenceA -> mtyArgs) <- traverse typecheck' args
+                    case mtyArgs of
+                        Just tyArgs | tyArgs == tys -> return t
+                        _ -> badType
     S.Call (Left op) args -> do
         tys <- traverse typecheck args
         let isNumeric = liftA2 (||) (== S.TypeInteger) (== S.TypeReal)
@@ -259,7 +268,7 @@ typecastConv ty expr = do
     tc <- filterM (\tc -> (==) ty <$> typecheck tc) tcs >>= \case
         [] -> throwError errorTypecheck
         tc:_ -> return tc
-    conv tc
+    convExpr tc
 
 instance Conv S.Statement where
     type Scalar S.Statement = D.Statement D.Pattern D.Expression
@@ -275,12 +284,12 @@ instance Conv S.Statement where
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn True  exprs
         S.Execute name' exprs' -> do
             name <- nameF name'
-            exprs <- traverse conv exprs'
+            exprs <- traverse convExpr exprs'
             return $ D.statement $ D.Exec D.PWildCard name [] exprs
         S.ForCycle name fromExpr toExpr statement -> do
             clName <- nameV name
-            clFromExpr <- conv fromExpr
-            clToExpr   <- conv toExpr
+            clFromExpr <- convExpr fromExpr
+            clToExpr   <- convExpr toExpr
             let clRange = binary (D.NameSpecial D.OpRange) clFromExpr clToExpr
             clAction <- conv statement
             let clForCycle = D.statement (D.ForCycle clName clRange clAction)
@@ -293,14 +302,17 @@ instance Conv S.Statement where
             <*> (D.statements <$> traverse conv mBodyElse)
         S.CaseBranch expr leafs mBodyElse -> do
             clType <- typecheck expr >>= conv
-            clExpr <- conv expr
+            clExpr <- convExpr expr
             clName <- alias "case"
             let clCaseExpr = D.expression clName
             let instRange = \case
                     Right (exprFrom, exprTo)
                          ->  binary (D.NameSpecial D.OpElem) clCaseExpr
-                        <$> (binary (D.NameSpecial D.OpRange) <$> conv exprFrom <*> conv exprTo)
-                    Left expr -> binary (D.NameSpecial D.OpEquals) clCaseExpr <$> conv expr
+                        <$> (binary (D.NameSpecial D.OpRange)
+                            <$> convExpr exprFrom <*> convExpr exprTo)
+                    Left expr
+                         -> binary (D.NameSpecial D.OpEquals) clCaseExpr
+                        <$> convExpr expr
             let instLeaf (exprs, body)
                      =  (,)
                     <$> (foldr1 (binary (D.NameSpecial D.OpOr)) <$> traverse instRange exprs)
@@ -315,17 +327,16 @@ instance Conv S.Statement where
                         (M.singleton clName clType)
                         (D.follow [D.assign clName clExpr, statement])
 
-instance Conv S.Expression where
-    type Scalar S.Expression = D.Expression
-    -- TODO: use typecastConv everywhere
-    conv = \case
-        S.Access name -> D.expression <$> nameV name
-        S.Call name' exprs -> do
-            name <- case name' of
-                Left op -> conv op
-                Right name -> nameF name
-            D.Call name [] <$> traverse conv exprs
-        S.Primary lit -> conv lit
+-- TODO: use typecastConv everywhere
+convExpr :: (R m, G e m) => Kleisli' m S.Expression D.Expression
+convExpr = \case
+    S.Access name -> D.expression <$> nameV name
+    S.Call name' exprs -> do
+        name <- case name' of
+            Left op -> conv op
+            Right name -> nameF name
+        D.Call name [] <$> traverse convExpr exprs
+    S.Primary lit -> conv lit
 
 instance Conv S.Literal where
     type Scalar S.Literal = D.Expression
