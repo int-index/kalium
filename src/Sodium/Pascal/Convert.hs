@@ -332,10 +332,35 @@ convExpr :: (R m, G e m) => Kleisli' m S.Expression D.Expression
 convExpr = \case
     S.Access name -> D.expression <$> nameV name
     S.Call name' exprs -> do
-        name <- case name' of
-            Left op -> conv op
-            Right name -> nameF name
-        D.Call name [] <$> traverse convExpr exprs
+        let direct op = D.Call (D.NameSpecial op) [] <$> traverse convExpr exprs
+        case name' of
+            Left S.OpAdd -> do
+                traverse typecheck' exprs >>= \case
+                    Just S.TypeString : _ -> direct D.OpConcat
+                    _ -> direct D.OpAdd
+            Left S.OpSubtract -> direct D.OpSubtract
+            Left S.OpMultiply -> direct D.OpMultiply
+            Left S.OpDivide -> direct D.OpDivide
+            Left S.OpDiv  -> direct D.OpDiv
+            Left S.OpMod  -> direct D.OpMod
+            Left S.OpLess -> direct D.OpLess
+            Left S.OpMore -> direct D.OpMore
+            Left S.OpLessEquals -> direct D.OpLessEquals
+            Left S.OpMoreEquals -> direct D.OpMoreEquals
+            Left S.OpNotEquals  -> direct D.OpNotEquals
+            Left S.OpEquals -> direct D.OpEquals
+            Left S.OpAnd -> direct D.OpAnd
+            Left S.OpOr  -> direct D.OpOr
+            Left S.OpXor -> direct D.OpXor
+            Left S.OpPlus   -> direct D.OpId
+            Left S.OpNegate -> direct D.OpNegate
+            Left S.OpNot    -> direct D.OpNot
+            Left S.OpCharToString -> direct D.OpSingleton
+            Left S.OpIntToReal    -> direct D.OpIntToDouble
+            Right name  -> D.Call
+                       <$> nameF name
+                       <*> pure []
+                       <*> traverse convExpr exprs
     S.Primary lit -> conv lit
 
 instance Conv S.Literal where
@@ -346,27 +371,3 @@ instance Conv S.Literal where
         S.LitStr  x -> return (D.expression x)
         S.LitChar x -> return (D.expression x)
         S.LitBool x -> return (D.expression x)
-
-instance Conv S.Operator where
-    type Scalar S.Operator = D.Name
-    conv = return . D.NameSpecial . \case
-        S.OpAdd -> D.OpAdd
-        S.OpSubtract -> D.OpSubtract
-        S.OpMultiply -> D.OpMultiply
-        S.OpDivide -> D.OpDivide
-        S.OpDiv  -> D.OpDiv
-        S.OpMod  -> D.OpMod
-        S.OpLess -> D.OpLess
-        S.OpMore -> D.OpMore
-        S.OpLessEquals -> D.OpLessEquals
-        S.OpMoreEquals -> D.OpMoreEquals
-        S.OpNotEquals  -> D.OpNotEquals
-        S.OpEquals -> D.OpEquals
-        S.OpAnd -> D.OpAnd
-        S.OpOr  -> D.OpOr
-        S.OpXor -> D.OpXor
-        S.OpPlus   -> D.OpId
-        S.OpNegate -> D.OpNegate
-        S.OpNot    -> D.OpNot
-        S.OpCharToString -> D.OpSingleton
-        S.OpIntToReal    -> D.OpIntToDouble
