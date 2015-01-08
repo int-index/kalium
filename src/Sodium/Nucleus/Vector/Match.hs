@@ -30,6 +30,7 @@ matchExpression :: Endo' Expression
 matchExpression = \case
 
     AppOp1 OpId a -> a
+    Lambda p a | preciseMatch p a -> OpAccess OpId
 
     Bind (Taint a) x -> App1 x a
     Bind x (OpAccess OpTaint) -> x

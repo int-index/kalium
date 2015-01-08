@@ -72,15 +72,17 @@ funcPurify
        , MonadNameGen m
        , MonadWriter [P1] m )
     => Name -> Func -> m ()
+funcPurify (NameSpecial _) _ = return ()
 funcPurify name (Func ty a) = do
-    name' <- alias name
-    let (ps, b) = unlambda a
-        arity = length ps
-    case tyPurify arity ty of
-        Just ty' | name /= NameSpecial OpMain -> do
-            let b' = expForcePurify' b
-                func' = b' & mapped . mapped . _1 %~ (Func ty' . lambda ps)
-            tell [P1 name arity name' func']
+    ( (ps,tys) , (a',ty') ) <- typeDrivenUnlambda ty a
+    case ty' of
+        TypeTaint ty'' -> do
+            let ty1 = tyfun tys ty''
+                arity = length tys
+                gen = expForcePurify' a'
+                    & mapped . mapped . _1 %~ (Func ty1 . lambda ps)
+            name' <- alias name
+            tell [P1 name arity name' gen]
         _ -> return ()
 
 expForcePurify
@@ -110,11 +112,23 @@ expForcePurify'
 expForcePurify' = fmap runError . runReaderT . runWriterT . expForcePurify
     where runError = either (const Nothing) Just . runExcept
 
-tyPurify :: Int -> Type -> Maybe Type
-tyPurify 0 (TypeTaint ty) = Just ty
-tyPurify n (TypeFunction ty1 ty2)
-    = TypeFunction ty1 <$> tyPurify (pred n) ty2
-tyPurify _ _ = Nothing
+typeDrivenUnlambda
+    :: (Applicative m, MonadNameGen m)
+    => Type -> Expression -> m ( ([Pattern],[Type]) , (Expression,Type) )
+typeDrivenUnlambda ty a =
+  let (tys, ty') = untyfun ty
+      ( ps,  a') = unlambda a
+      tysLength = length tys
+      psLength = length  ps
+  in if | tysLength < psLength -> do
+            error "lambda-abstraction with non-function type"
+
+        | tysLength > psLength -> do
+            let tys' = drop psLength tys
+            b <- etaExpand tys' a'
+            typeDrivenUnlambda ty b
+
+        | otherwise -> return ( (ps,tys) , (a',ty') )
 
 appPurify :: PurifyInfo -> Expression -> Maybe Expression
 appPurify (PurifyInfo name arity name' _) e

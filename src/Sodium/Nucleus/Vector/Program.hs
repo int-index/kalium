@@ -133,6 +133,16 @@ unlambda = \case
     Lambda p a -> let (ps, b) = unlambda a in (p:ps, b)
     e -> ([], e)
 
+tyfun :: [Type] -> Type -> Type
+tyfun = flip (foldr TypeFunction)
+
+untyfun :: Type -> ([Type], Type)
+untyfun = \case
+    TypeFunction tyArg tyRes ->
+        let (tyArgs, tyRes') = untyfun tyRes
+        in (tyArg:tyArgs, tyRes')
+    ty -> ([], ty)
+
 beta :: [Expression] -> Expression
 beta = foldl1 Beta
 
@@ -141,6 +151,14 @@ unbeta = reverse . go where
     go = \case
         Beta a b -> b : go a
         e -> [e]
+
+etaExpand
+    :: (Applicative m, MonadNameGen m)
+    => [Type] -> EndoKleisli' m Expression
+etaExpand [] = return
+etaExpand (ty:tys) = \e -> do
+    name <- NameGen <$> mkname Nothing
+    Eta (PAccess name ty) <$> etaExpand tys e <*> pure (Access name)
 
 data Pattern
     = PTuple Pattern Pattern
