@@ -120,6 +120,10 @@ expMatchInfix = \case
 
 expStripParen outerLevel = \case
     Paren exp | expLevel exp `lesserLevel` outerLevel -> exp
+
+    App (Paren x) y | expLevel x `lesserLevel` ParensApp -> App x y
+    App x (Paren y) | expLevel y `lesserLevel` ParensApp -> App x y
+
     InfixApp (Paren (InfixApp l_lhs l_op l_rhs)) op rhs
         | (Leftfix, l_n) <- whatfix l_op
         , (Leftfix,   n) <- whatfix   op
