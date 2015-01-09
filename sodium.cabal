@@ -5,7 +5,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Index Int
 build-type:          Simple
-cabal-version:       >=1.18
+cabal-version:       >=1.22
 
 library
   exposed-modules:     Sodium
