@@ -13,6 +13,7 @@ data Options = Options
     { filenameIn  :: String
     , filenameOut :: String
     , logSwitch :: Bool
+    , patSigSwitch :: Bool
     }
 
 pOptions :: Parser Options
@@ -20,19 +21,18 @@ pOptions = Options
     <$> strArgument (metavar "FILENAME.PAS" <> help "Source Pascal program")
     <*> strArgument (metavar "FILENAME.HS"  <> help "Target Haskell program")
     <*> switch (long "log" <> help "Print intermediate results")
+    <*> switch (long "pat" <> help "Generate pattern signatures")
 
 handleOptions :: ParserInfo Options
-handleOptions = info (helper <*> pOptions) (header "sodium")
+handleOptions = info (helper <*> pOptions) (header "Sodium")
 
 main :: IO ()
-main = do
-    Options {..} <- execParser handleOptions
-    processFiles filenameIn filenameOut logSwitch
+main = execParser handleOptions >>= processFiles
 
-processFiles :: String -> String -> Bool -> IO ()
-processFiles filenameIn filenameOut logSwitch = do
+processFiles :: Options -> IO ()
+processFiles Options{..} = do
     content <- readFile filenameIn
-    case runExcept (Sodium.translate content) of
+    case runExcept (Sodium.translate patSigSwitch content) of
         Left e -> print e
         Right (log, r) -> do
             when logSwitch $ do

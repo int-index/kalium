@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-module Sodium.Haskell.Convert (convert) where
+module Sodium.Haskell.Convert (convert, Config(..)) where
 
 import Sodium.Prelude
 
@@ -11,18 +11,24 @@ import qualified Sodium.Nucleus.Vector.Program as S
 import qualified Language.Haskell.Exts        as H
 import qualified Language.Haskell.Exts.SrcLoc as H
 
-convert :: Map Integer String -> S.Program -> H.Module
+convert :: Config -> Map Integer String -> S.Program -> H.Module
 convert = convProgram
 
-type T m = (Applicative m, MonadState (Map Integer (Either String H.Name)) m)
+data Config = Config
+    { configPatSig :: Bool
+    }
 
-convProgram :: Map Integer String -> S.Program -> H.Module
-convProgram nameTags (S.Program funcs) = (`evalState` fmap Left nameTags) $ do
+type T m = (Applicative m, MonadState (Map Integer (Either String H.Name)) m)
+type C m = (Applicative m, MonadReader Config m)
+
+convProgram :: Config -> Map Integer String -> S.Program -> H.Module
+convProgram config nameTags (S.Program funcs) = run $ do
     (concat -> hsDecls) <- traverse (uncurry convFunc) (itoList funcs)
     let hsExts = extensions ["MultiWayIf", "ScopedTypeVariables"]
         hsMod = H.Module H.noLoc H.main_mod hsExts Nothing Nothing [] hsDecls
     pure hsMod
   where extensions names = [H.LanguagePragma H.noLoc (map H.Ident names)]
+        run = (`evalState` fmap Left nameTags) . (`runReaderT` config)
 
 keywords :: [String]
 keywords = words
@@ -63,7 +69,7 @@ convType = \case
     S.TypeTaint t -> H.TyApp (H.TyCon (HsIdent "Prelude" "IO")) (convType t)
 
 
-convExpression :: T m => S.Expression -> m H.Exp
+convExpression :: (T m, C m) => S.Expression -> m H.Exp
 convExpression = \case
     S.Lambda pat act
          -> H.Lambda H.noLoc
@@ -75,7 +81,7 @@ convExpression = \case
         S.NameSpecial op -> pure $ convOp op
         S.NameGen n -> nameGen n <&> \hsName -> H.Var (H.UnQual hsName)
 
-convFunc :: T m => S.Name -> S.Func -> m [H.Decl]
+convFunc :: (T m, C m) => S.Name -> S.Func -> m [H.Decl]
 convFunc name (S.Func ty expression) = do
     hsName <- case name of
         S.NameSpecial S.OpMain -> pure H.main_name
@@ -86,7 +92,7 @@ convFunc name (S.Func ty expression) = do
     let funBind = H.FunBind [H.Match H.noLoc hsName [] Nothing hsRhs (H.BDecls [])]
     pure [sig, funBind]
 
-convPattern :: T m => S.Pattern -> m H.Pat
+convPattern :: (T m, C m) => S.Pattern -> m H.Pat
 convPattern = \case
     S.PUnit -> pure $ H.PTuple H.Boxed []
     S.PWildCard -> pure $ H.PWildCard
@@ -94,7 +100,10 @@ convPattern = \case
         hsName <- case name of
             S.NameGen n -> nameGen n
             _ -> error "convPattern: incorrect name"
-        let annotate pat = H.PatTypeSig H.noLoc pat (convType ty)
+        configPatSig <- asks configPatSig
+        let annotate
+             | configPatSig = \pat -> H.PatTypeSig H.noLoc pat (convType ty)
+             | otherwise = id
         pure $ annotate (H.PVar hsName)
     S.PTuple pat1 pat2 -> H.PTuple H.Boxed <$> traverse convPattern [pat1, pat2]
 

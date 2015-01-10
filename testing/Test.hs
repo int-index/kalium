@@ -74,7 +74,7 @@ testStage0 = catch' handler action
 
 testStage1 :: (Bool, String) -> ExceptT TestGen IO String
 testStage1 (shouldfail, source)
-        = withExceptT handle (snd <$> Sodium.translate source)
+        = withExceptT handle (snd <$> Sodium.translate True source)
     where handle _ | shouldfail = Success
           handle e = TG_Sodium (assertFailure (show e))
 

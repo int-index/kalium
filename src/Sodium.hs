@@ -18,7 +18,7 @@ import qualified Sodium.Pascal.Parse   as P (parse)
 import qualified Sodium.Pascal.Convert as P (convert)
 import qualified Sodium.Haskell.Sugar   as H (sugarcoat)
 import qualified Sodium.Haskell.Imports as H (imports)
-import qualified Sodium.Haskell.Convert as H (convert)
+import qualified Sodium.Haskell.Convert as H (convert, Config(..))
 import qualified Sodium.Error as E
 import qualified Sodium.Nucleus.Scalar.Program as S
 import qualified Sodium.Nucleus.Vector.Program as V
@@ -41,12 +41,17 @@ nuclear
     >=> sanity_check "Name uniqueness" sanity_nameUniqueness
     >=> optimize
 
-translate :: (Applicative m, MonadError E.Error m) => String -> m ([String], String)
-translate src = do
+translate
+    :: (Applicative m, MonadError E.Error m)
+    => Bool -> String -> m ([String], String)
+translate configPatSig src = do
     pas <- P.parse src
     ((optimal, log), nameTags) <- (`runRenameT` 0) $ P.convert pas >>= nuclear
-    let sweet = (H.imports . H.sugarcoat . H.convert nameTags) optimal
-    return (map (prettyPrint . H.convert nameTags) log, prettyPrint sweet)
+    let hsConfig = H.Config { H.configPatSig = configPatSig }
+    let sweeten = H.imports . H.sugarcoat . H.convert hsConfig nameTags
+    return ( map (prettyPrint . sweeten) log
+           , prettyPrint (sweeten optimal)
+           )
 
 type TranslationLog = [V.Program]
 
