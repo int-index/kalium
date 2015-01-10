@@ -1,6 +1,7 @@
-function fib_(x: Integer; var fib_2: Integer): Integer;
+function fib_(x: LongInt
+    ; var fib_2: LongInt): LongInt;
 var
-    a, b, c, d: Integer;
+    a, b, c, d: LongInt;
 begin
     if x = 0 then
      begin
@@ -24,9 +25,9 @@ begin
      end;
 end;
 
-function fib(x: Integer): Integer;
+function fib(x: LongInt): LongInt;
 var
-    y: Integer;
+    y: LongInt;
 begin
     fib := fib_(x, y);
 end;
