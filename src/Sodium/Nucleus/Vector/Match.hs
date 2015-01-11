@@ -63,6 +63,10 @@ appIgnore = \case
         -> AppOp2 OpFmapIgnore a e
     AppOp2 OpFmapIgnore c (over propagate (AppOp2 OpFmapIgnore c) -> e) -> e
 
+    AppOp3 OpFoldTainted (Lambda2 PWildCard p2 a) _ x2
+         | Just a' <- propagate attemptIgnore a
+        -> AppOp2 OpMapTaintedIgnore (Lambda p2 a') x2
+
     Ignore (propagate attemptIgnore -> Just e) -> e
 
     e -> e
@@ -81,6 +85,9 @@ foldMatch = \case
 
     AppOp3 OpFoldTainted (Lambda2 PWildCard p2 a) LitUnit x2
         -> AppOp2 OpMapTaintedIgnore (Lambda p2 a) x2
+
+    AppOp3 OpFoldTainted (Lambda PWildCard a) _ x2
+        -> AppOp3 OpFoldTainted (Lambda PWildCard a) (OpAccess OpUndefined) x2
 
     AppOp3 OpFold (OpAccess OpMultiply) LitOne x -> AppOp1 OpProduct x
     AppOp3 OpFold (OpAccess OpAdd) LitZero x -> AppOp1 OpSum x
