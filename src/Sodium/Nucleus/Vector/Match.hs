@@ -37,6 +37,8 @@ matchExpression = \case
 
     AppOp1 OpPutLn (AppOp1 OpShow a) -> AppOp1 OpPrintLn a
 
+    AppOp3 OpIf (Taint LitUnit) xThen cond -> AppOp2 OpWhen cond xThen
+
     AppOp3 OpIf xElse xThen cond
         | AppOp1 opElse aElse <- xElse
         , AppOp1 opThen aThen <- xThen
@@ -200,6 +202,7 @@ isTaintedUnit = \case
     AppOp1 OpPut _ -> True
     AppOp1 OpPrintLn _ -> True
     AppOp1 OpIgnore _ -> True
+    AppOp2 OpWhen _ _ -> True
     AppOp2 OpMapTaintedIgnore _ _ -> True
     AppOp3 OpIf xElse xThen _ -> isTaintedUnit xElse && isTaintedUnit xThen
     _ -> False

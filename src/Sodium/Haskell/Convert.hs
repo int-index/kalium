@@ -163,6 +163,7 @@ convOp = \case
     S.OpBindIgnore-> H.Var (HsSymbol "Prelude" ">>")
     S.OpFmapIgnore-> H.Var (HsSymbol "Control.Applicative" "<$")
     S.OpIgnore    -> H.Var (HsIdent "Control.Monad" "void")
+    S.OpWhen      -> H.Var (HsIdent "Control.Monad" "when")
     S.OpTaint     -> H.Var (HsIdent "Prelude" "return")
     S.OpIntToDouble -> H.Var (HsIdent "Prelude" "fromIntegral")
     S.OpUndefined -> H.Var (HsIdent "Prelude" "undefined")

@@ -54,6 +54,7 @@ data NameSpecial
     | OpBindIgnore
     | OpFmapIgnore
     | OpIgnore
+    | OpWhen
     | OpConcat
     | OpIntToDouble
     | OpUndefined
