@@ -38,6 +38,8 @@ matchExpression = \case
     AppOp1 OpPutLn (AppOp1 OpShow a) -> AppOp1 OpPrintLn a
 
     AppOp3 OpIf (Taint LitUnit) xThen cond -> AppOp2 OpWhen cond xThen
+    AppOp2 OpWhen LitTrue a -> a
+    AppOp2 OpWhen LitFalse _ -> Taint LitUnit
 
     AppOp3 OpIf xElse xThen cond
         | AppOp1 opElse aElse <- xElse
