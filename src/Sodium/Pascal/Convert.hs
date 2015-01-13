@@ -254,6 +254,7 @@ typecheck' = runMaybeT . \case
             (S.OpNegate  , [t1]) | isNumeric t1 -> return t1
             (S.OpPlus    , [t1]) | isNumeric t1 -> return t1
             (S.OpNot     , [S.TypeBoolean]) -> return S.TypeBoolean
+            (S.OpIx      , [S.TypeArray t1, S.TypeInteger]) -> return t1
             (S.OpCharToString, [S.TypeChar   ]) -> return S.TypeString
             (S.OpIntToReal   , [S.TypeInteger]) -> return S.TypeReal
             _ -> badType
@@ -273,12 +274,29 @@ typecastConv ty expr = do
 instance Conv S.Statement where
     type Scalar S.Statement = D.Statement D.Pattern D.Expression
     conv = \case
+
         S.BodyStatement body -> D.statement <$> conv body
-        S.Assign name' expr' -> do
-            name <- nameV name'
-            tyW <- typecheck (S.Access name')
-            expr <- typecastConv tyW expr'
-            return $ D.assign name expr
+
+        S.Assign name' mIxExpr' expr' ->
+            case mIxExpr' of
+                Nothing -> do
+                    name <- nameV name'
+                    tyW <- typecheck (S.Access name')
+                    expr <- typecastConv tyW expr'
+                    return $ D.assign name expr
+                Just ixExpr' -> do
+                    ixExpr <- typecastConv S.TypeInteger ixExpr'
+                    name <- nameV name'
+                    tyW <- typecheck (S.Access name') >>= \case
+                        S.TypeString -> error "string-indexing"
+                        S.TypeArray ty -> return ty
+                        _ -> error "non-array indexing"
+                    elemExpr <- typecastConv tyW expr'
+                    let expr = D.Call (D.NameSpecial D.OpIxSet) []
+                                [ ixExpr, elemExpr
+                                , D.expression (D.Access name) ]
+                    return $ D.assign name expr
+
         S.Execute "readln"  exprs -> D.statement <$> convReadLn  exprs
         S.Execute "write"   exprs -> D.statement <$> convWriteLn False exprs
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn True  exprs
@@ -286,6 +304,7 @@ instance Conv S.Statement where
             name <- nameF name'
             exprs <- traverse convExpr exprs'
             return $ D.statement $ D.Exec D.PWildCard name [] exprs
+
         S.ForCycle name fromExpr toExpr statement -> do
             clName <- nameV name
             clFromExpr <- convExpr fromExpr
@@ -294,12 +313,14 @@ instance Conv S.Statement where
             clAction <- conv statement
             let clForCycle = D.statement (D.ForCycle clName clRange clAction)
             return $ D.follow [clForCycle, D.assign clName clToExpr]
+
         S.IfBranch expr bodyThen mBodyElse
              -> fmap D.statement
              $  D.If
             <$> typecastConv S.TypeBoolean expr
             <*> conv bodyThen
             <*> (D.statements <$> traverse conv mBodyElse)
+
         S.CaseBranch expr leafs mBodyElse -> do
             clType <- typecheck expr >>= conv
             clExpr <- convExpr expr
@@ -355,6 +376,7 @@ convExpr = \case
             Left S.OpPlus   -> direct D.OpId
             Left S.OpNegate -> direct D.OpNegate
             Left S.OpNot    -> direct D.OpNot
+            Left S.OpIx  -> direct D.OpIx
             Left S.OpCharToString -> direct D.OpSingleton
             Left S.OpIntToReal    -> direct D.OpIntToDouble
             Right name  -> D.Call

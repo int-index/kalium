@@ -106,6 +106,13 @@ builtinOpType op tyArgs args = case op of
             then return tys
             else panic
     OpSingleton-> TypeList <$> argMatch1
+    OpIx       -> argMatch2 >>= \case
+        (TypeList ty, TypeInteger) -> return ty
+        _ -> panic
+    OpIxSet    -> case args of
+        [TypeInteger, ty1, tys@(TypeList ty)]
+            | ty1 == ty -> return tys
+        _ -> panic
     OpConcat   -> argMatch2Same >>= require isList
     OpIntToDouble -> argMatch1 >>= require (==TypeInteger) >> return TypeDouble
     OpMain        -> return TypeUnit

@@ -49,6 +49,8 @@ data NameSpecial
     | OpNil
     | OpCons
     | OpSingleton
+    | OpIx
+    | OpIxSet
     | OpTaint
     | OpBind
     | OpBindIgnore

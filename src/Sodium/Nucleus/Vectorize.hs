@@ -170,6 +170,8 @@ getFuncName name = case name of
      OpNil -> Vec.OpNil
      OpCons -> Vec.OpCons
      OpSingleton -> Vec.OpSingleton
+     OpIx -> Vec.OpIx
+     OpIxSet -> Vec.OpIxSet
      OpConcat -> Vec.OpConcat
      OpIntToDouble -> Vec.OpIntToDouble
      OpMain -> Vec.OpMain

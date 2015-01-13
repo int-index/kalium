@@ -113,6 +113,8 @@ convLit = \case
     S.LitDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
     S.LitChar    c -> H.Lit $ H.Char c
 
+composeOp = H.Var (HsSymbol "Prelude" ".")
+
 convOp :: S.NameSpecial -> H.Exp
 convOp = \case
     S.OpSingleton -> H.RightSection (H.QConOp H.list_cons_name) (convOp S.OpNil)
@@ -120,6 +122,10 @@ convOp = \case
     S.OpCons     -> H.Con H.list_cons_name
     S.OpUnit     -> H.unit_con
     S.OpNil      -> H.List []
+    S.OpIx       -> H.Var (HsSymbol "Prelude" "!!")
+    S.OpIxSet    -> composeOp
+        `H.App` H.Var (HsSymbol "Control.Lens" "set")
+        `H.App` H.Var (HsSymbol "Control.Lens" "ix")
     S.OpNegate   -> H.Var (HsIdent "Prelude" "negate")
     S.OpShow     -> H.Var (HsIdent "Prelude" "show")
     S.OpIf       -> H.Var (HsIdent "Data.Bool" "bool")

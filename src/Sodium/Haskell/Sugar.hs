@@ -229,7 +229,9 @@ expLevel = \case
     _ -> ParensUniverse
 
 whatfix op = maybe (Leftfix, 9) id (lookup op fixtable)
-fixtable = [ (QVarOp $ HsSymbol "Prelude" "+", (Leftfix, 6))
+fixtable = [ (QVarOp $ HsSymbol "Prelude" ".",  (Rightfix, 9))
+           , (QVarOp $ HsSymbol "Prelude" "!!", (Leftfix,  9))
+           , (QVarOp $ HsSymbol "Prelude" "+", (Leftfix, 6))
            , (QVarOp $ HsSymbol "Prelude" "-", (Leftfix, 6))
            , (QVarOp $ HsSymbol "Prelude" "*", (Leftfix, 7))
            , (QVarOp $ HsSymbol "Prelude" "/", (Leftfix, 7))

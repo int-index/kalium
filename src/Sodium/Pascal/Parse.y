@@ -139,7 +139,10 @@ Statement  : AssignStatement  { $1 }
            | Body             { BodyStatement $1 }
 
 
-AssignStatement  : name ':=' Expression { Assign $1 $3 }
+AssignStatement  : name IxAccessor ':=' Expression { Assign $1 $2 $4 }
+
+IxAccessor :                    { Nothing }
+           | '[' Expression ']' { Just $2 }
 
 ExecuteStatement : name           { Execute $1 [] }
                  | name Arguments { Execute $1 $2 }
@@ -193,6 +196,8 @@ Expression_ : Expression '+' Expression { binary OpAdd      $1 $3 }
             | '-' Expression %prec NEG  { Call (Left OpNegate) [$2] }
             | '+' Expression %prec POS  { Call (Left OpPlus)   [$2] }
             | not Expression            { Call (Left OpNot)    [$2] }
+
+            | Expression '[' Expression ']' { binary OpIx $1 $3 }
 
             | '(' Expression ')' { $2 }
             |     Atom           { $1 }

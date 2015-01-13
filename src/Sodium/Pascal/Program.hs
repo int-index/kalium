@@ -31,7 +31,7 @@ data By
 type Leaf = ([Either Expression (Expression, Expression)], Statement)
 
 data Statement
-    = Assign Name Expression
+    = Assign Name (Maybe Expression) Expression
     | Execute Name [Expression]
     | ForCycle Name Expression Expression Statement
     | IfBranch Expression Statement (Maybe Statement)
@@ -72,6 +72,7 @@ data Operator
     | OpNegate
     | OpPlus
     | OpNot
+    | OpIx
     | OpCharToString
     | OpIntToReal
     deriving (Show)

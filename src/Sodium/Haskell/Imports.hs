@@ -152,6 +152,7 @@ instance Unqual Type where
         TyFun ty1 ty2 -> TyFun <$> unqual ty1 <*> unqual ty2
         TyApp ty1 ty2 -> TyApp <$> unqual ty1 <*> unqual ty2
         TyTuple boxed ty -> TyTuple boxed <$> unqual ty
+        TyList ty -> TyList <$> unqual ty
         TyCon qname -> TyCon <$> unqual qname
         ty -> error ("unsupported type: " ++ show ty)
 
