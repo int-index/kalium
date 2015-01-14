@@ -43,15 +43,23 @@ nameSafe = kwClash . startsNice . filter (liftA2 (||) isAlphaNum (=='_')) where
     kwClash cs | cs `elem` keywords = "_" ++ cs
                | otherwise = cs
 
--- TODO: handle name shadowing and other conflicts
--- (nameGenAccess and nameGenBind?)
+resolveConflict :: H.Name -> [H.Name] -> H.Name
+resolveConflict name names
+    | name `notElem` names = name
+    | otherwise = resolveConflict (change name) names
+  where
+    change (H.Ident str)  = H.Ident (str ++ "'")
+    change _ = error "impossible happened: H.Ident expected"
+
 nameGen :: T m => Integer -> m H.Name
 nameGen n = gets (M.lookup n) >>= \case
     Nothing -> do
         modify $ M.insert n (Left (show n))
         nameGen n
     Just (Left str) -> do
-        modify $ M.insert n (Right (H.Ident (nameSafe str)))
+        let name = H.Ident (nameSafe str)
+        names <- gets $ \m -> M.elems m >>= either (const empty) pure
+        modify $ M.insert n (Right $ resolveConflict name names)
         nameGen n
     Just (Right name) -> pure name
 
