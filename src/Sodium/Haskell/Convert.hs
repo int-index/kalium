@@ -126,6 +126,7 @@ convOp = \case
     S.OpIxSet    -> composeOp
         `H.App` H.Var (HsSymbol "Control.Lens" "set")
         `H.App` H.Var (HsSymbol "Control.Lens" "ix")
+    S.OpLength   -> H.Var (HsIdent "Prelude" "length")
     S.OpNegate   -> H.Var (HsIdent "Prelude" "negate")
     S.OpShow     -> H.Var (HsIdent "Prelude" "show")
     S.OpIf       -> H.Var (HsIdent "Data.Bool" "bool")

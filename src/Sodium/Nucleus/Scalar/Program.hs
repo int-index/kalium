@@ -47,6 +47,7 @@ data NameSpecial
     | OpSingleton
     | OpIx
     | OpIxSet
+    | OpLength
     | OpConcat
     | OpIntToDouble
     | OpMain

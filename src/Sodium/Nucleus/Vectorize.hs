@@ -172,6 +172,7 @@ getFuncName name = case name of
      OpSingleton -> Vec.OpSingleton
      OpIx -> Vec.OpIx
      OpIxSet -> Vec.OpIxSet
+     OpLength -> Vec.OpLength
      OpConcat -> Vec.OpConcat
      OpIntToDouble -> Vec.OpIntToDouble
      OpMain -> Vec.OpMain

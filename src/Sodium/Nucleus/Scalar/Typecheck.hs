@@ -113,6 +113,9 @@ builtinOpType op tyArgs args = case op of
         [TypeInteger, ty1, tys@(TypeList ty)]
             | ty1 == ty -> return tys
         _ -> panic
+    OpLength   -> argMatch1 >>= \case
+        TypeList _ -> return TypeInteger
+        _ -> panic
     OpConcat   -> argMatch2Same >>= require isList
     OpIntToDouble -> argMatch1 >>= require (==TypeInteger) >> return TypeDouble
     OpMain        -> return TypeUnit

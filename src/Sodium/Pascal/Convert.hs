@@ -353,7 +353,8 @@ convExpr :: (R m, G e m) => Kleisli' m S.Expression D.Expression
 convExpr = \case
     S.Access name -> D.expression <$> nameV name
     S.Call name' exprs -> do
-        let direct op = D.Call (D.NameSpecial op) [] <$> traverse convExpr exprs
+        let direct' op = D.Call op [] <$> traverse convExpr exprs
+        let direct = direct' . D.NameSpecial
         case name' of
             Left S.OpAdd -> do
                 traverse typecheck' exprs >>= \case
@@ -379,10 +380,8 @@ convExpr = \case
             Left S.OpIx  -> direct D.OpIx
             Left S.OpCharToString -> direct D.OpSingleton
             Left S.OpIntToReal    -> direct D.OpIntToDouble
-            Right name  -> D.Call
-                       <$> nameF name
-                       <*> pure []
-                       <*> traverse convExpr exprs
+            Right "length" -> direct D.OpLength
+            Right name  -> nameF name >>= direct'
     S.Primary lit -> conv lit
 
 instance Conv S.Literal where

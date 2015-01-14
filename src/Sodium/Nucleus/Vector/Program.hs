@@ -51,6 +51,7 @@ data NameSpecial
     | OpSingleton
     | OpIx
     | OpIxSet
+    | OpLength
     | OpTaint
     | OpBind
     | OpBindIgnore
