@@ -10,6 +10,7 @@ import Sodium.Util
 import qualified Data.Map as M
 
 import Sodium.Nucleus.Scalar.Program
+import qualified Sodium.Nucleus.Scalar.Operator as Op
 
 class Error e where
     errorNoAccess :: Name -> Vars -> e
@@ -56,88 +57,13 @@ lookupFuncSig name = do
 
 instance Typecheck Expression where
     typecheck (Atom atom) = typecheck atom
-    typecheck (Call name tyArgs args)
-        | NameSpecial op <- name = do
-            traverse typecheck args >>= builtinOpType op tyArgs
-        | otherwise = funcSigType <$> lookupFuncSig name
-
-builtinOpType :: TypeEnv e m => NameSpecial -> [Type] -> [Type] -> m Type
-builtinOpType op tyArgs args = case op of
-    OpAdd      -> argMatch2Same >>= require isNumeric
-    OpSubtract -> argMatch2Same >>= require isNumeric
-    OpMultiply -> argMatch2Same >>= require isNumeric
-    OpDivide   -> argMatch2Same >>= require (==TypeDouble)
-    OpDiv      -> argMatch2Same >>= require (==TypeInteger)
-    OpMod      -> argMatch2Same >>= require (==TypeInteger)
-    OpLess     -> argMatch2Same >>= require isOrd >> return TypeBoolean
-    OpMore     -> argMatch2Same >>= require isOrd >> return TypeBoolean
-    OpLessEquals -> argMatch2Same >>= require isOrd >> return TypeBoolean
-    OpMoreEquals -> argMatch2Same >>= require isOrd >> return TypeBoolean
-    OpEquals   -> argMatch2Same >>= require isEq  >> return TypeBoolean
-    OpNotEquals-> argMatch2Same >>= require isEq  >> return TypeBoolean
-    OpAnd      -> argMatch2Same >>= require (==TypeBoolean)
-    OpOr       -> argMatch2Same >>= require (==TypeBoolean)
-    OpNot      -> argMatch1 >>= require (==TypeBoolean)
-    OpXor      -> argMatch2Same >>= require (==TypeBoolean)
-    OpTrue     -> return TypeBoolean
-    OpFalse    -> return TypeBoolean
-    OpRange    -> TypeList <$> argMatch2Same
-    OpElem     -> do
-        (ty, tys) <- argMatch2
-        if tys == TypeList ty
-            then return TypeBoolean
-            else panic
-    OpShow     -> return (TypeList TypeChar)
-    OpNegate   -> argMatch1 >>= require isNumeric
-    OpPrintLn  -> argMatch1 >> return TypeUnit
-    OpReadLn   -> return (tyArgs !! 0)
-    OpPutLn    -> argMatch1 >>= require (==TypeList TypeChar) >> return TypeUnit
-    OpPut      -> argMatch1 >>= require (==TypeList TypeChar) >> return TypeUnit
-    OpGetLn    -> return (TypeList TypeChar)
-    OpUnit     -> return TypeUnit
-    OpId       -> argMatch1
-    OpPair     -> uncurry TypePair <$> argMatch2
-    OpFst      -> fst <$> argMatch2
-    OpSnd      -> snd <$> argMatch2
-    OpNil      -> return $ TypeList (tyArgs !! 0)
-    OpCons     -> do
-        (ty, tys) <- argMatch2
-        if tys == TypeList ty
-            then return tys
-            else panic
-    OpSingleton-> TypeList <$> argMatch1
-    OpIx       -> argMatch2 >>= \case
-        (TypeList ty, TypeInteger) -> return ty
-        _ -> panic
-    OpIxSet    -> case args of
-        [TypeInteger, ty1, tys@(TypeList ty)]
-            | ty1 == ty -> return tys
-        _ -> panic
-    OpLength   -> argMatch1 >>= \case
-        TypeList _ -> return TypeInteger
-        _ -> panic
-    OpConcat   -> argMatch2Same >>= require isList
-    OpIntToDouble -> argMatch1 >>= require (==TypeInteger) >> return TypeDouble
-    OpMain        -> return TypeUnit
-    where isNumeric ty = ty == TypeInteger || ty == TypeDouble
-          isEq  _ty = True -- for now
-          isOrd _ty = True -- ^^
-          isList = \case
-            TypeList _ -> True
-            _ -> False
-          argMatch1 = case args of
-            [ty] -> return ty
-            _ -> panic
-          argMatch2 = case args of
-            [ty1, ty2] -> return (ty1, ty2)
-            _ -> panic
-          argMatch2Same = argMatch2 >>= \case
-            (ty1, ty2) | ty1 == ty2 -> return ty1
-            _ -> panic
-          require p ty | p ty = return ty
-                       | otherwise = panic
-          panic :: TypeEnv e m => m a
-          panic = throwError (errorTypeMismatch (NameSpecial op) args)
+    typecheck (Call name tyArgs args) =
+        case M.lookup name Op.operators of
+            Just op -> do
+                argTys <- traverse typecheck args
+                let panic = throwError (errorTypeMismatch name argTys)
+                maybe panic return (Op.tc op tyArgs argTys)
+            Nothing -> funcSigType <$> lookupFuncSig name
 
 class TypeIntro a where
     typeIntro' :: a -> TypeScope -> TypeScope

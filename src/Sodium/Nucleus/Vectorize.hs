@@ -7,6 +7,7 @@ import Sodium.Util
 
 import qualified Data.Map as M
 import Sodium.Nucleus.Scalar.Program
+import qualified Sodium.Nucleus.Scalar.Operator as Op
 import qualified Sodium.Nucleus.Vector.Program as Vec
 
 data Index
@@ -47,7 +48,11 @@ alias _ = Vec.NameGen <$> mkname Nothing
 vectorize :: E e m => Program Type Pattern Atom -> m Vec.Program
 vectorize program = do
     (mconcat -> names') <- for (program ^. programFuncs . to M.keys)
-            $ \name -> M.singleton (name, Immutable) <$> (Just <$> alias name)
+        $ \name -> do
+            name' <- case name of
+                NameSpecial OpMain -> return (Vec.NameSpecial Vec.OpMain)
+                _ -> alias name
+            return $ M.singleton (name, Immutable) (Just name')
     flip runReaderT (VectorizeScope mempty mempty names') $ do
         vecFuncs <- traverse (uncurry vectorizeFunc) (program ^. programFuncs & M.toList)
         return $ Vec.Program (M.fromList vecFuncs)
@@ -56,7 +61,7 @@ vectorizeFunc :: V e m => Name -> Func Type Pattern Atom -> m (Vec.Name, Vec.Fun
 vectorizeFunc name func = do
     let zeroIndex = Index 0
     let params = func ^. funcScope . scopeVars
-    name' <- getFuncName name
+    name' <- fromJust <$> lookupName name Immutable
     initialScope <- initIndices zeroIndex (scoping params)
     local (initialScope <>) $ do
         (_, vecBody) <- vectorizeBody (func ^. funcScope . scopeElem)
@@ -133,53 +138,6 @@ vectorizeAgainst changed (map Access -> results)
     = updateLocalize changed
     $ Vec.Lambda <$> patTuple changed <*> vectorizeResults results
 
-getFuncName name = case name of
-    NameSpecial op -> return . Vec.NameSpecial $ case op of
-     OpAdd -> Vec.OpAdd
-     OpSubtract -> Vec.OpSubtract
-     OpMultiply -> Vec.OpMultiply
-     OpDivide -> Vec.OpDivide
-     OpDiv -> Vec.OpDiv
-     OpMod -> Vec.OpMod
-     OpLess -> Vec.OpLess
-     OpMore -> Vec.OpMore
-     OpLessEquals -> Vec.OpLessEquals
-     OpMoreEquals -> Vec.OpMoreEquals
-     OpEquals -> Vec.OpEquals
-     OpNotEquals -> Vec.OpNotEquals
-     OpAnd -> Vec.OpAnd
-     OpOr -> Vec.OpOr
-     OpNot -> Vec.OpNot
-     OpXor -> Vec.OpNotEquals
-     OpTrue -> Vec.OpTrue
-     OpFalse -> Vec.OpFalse
-     OpRange -> Vec.OpRange
-     OpElem -> Vec.OpElem
-     OpShow -> Vec.OpShow
-     OpNegate -> Vec.OpNegate
-     OpPrintLn -> Vec.OpPrintLn
-     OpReadLn -> Vec.OpReadLn
-     OpPutLn -> Vec.OpPutLn
-     OpPut -> Vec.OpPut
-     OpGetLn -> Vec.OpGetLn
-     OpId -> Vec.OpId
-     OpUnit -> Vec.OpUnit
-     OpPair -> Vec.OpPair
-     OpFst -> Vec.OpFst
-     OpSnd -> Vec.OpSnd
-     OpNil -> Vec.OpNil
-     OpCons -> Vec.OpCons
-     OpSingleton -> Vec.OpSingleton
-     OpIx -> Vec.OpIx
-     OpIxSet -> Vec.OpIxSet
-     OpLength -> Vec.OpLength
-     OpConcat -> Vec.OpConcat
-     OpIntToDouble -> Vec.OpIntToDouble
-     OpMain -> Vec.OpMain
-    NameGen _ -> do
-        Just name' <- lookupName name Immutable
-        return name'
-
 vectorizeLiteral :: Literal -> Vec.Literal
 vectorizeLiteral = \case
     LitInteger a -> Vec.LitInteger a
@@ -218,15 +176,6 @@ vectorizeStatement = \case
     ScopeStatement scope -> vectorizeScope (map Access) scope
 
     Execute (Exec pat name _tyArgs args) -> do
-        -- TODO: purity flag in function signature
-        let impure = case name of
-              NameSpecial OpReadLn -> True
-              NameSpecial OpGetLn -> True
-              NameSpecial OpPrintLn -> True
-              NameSpecial OpPutLn -> True
-              NameSpecial OpPut -> True
-              NameGen _ -> True
-              _ -> False
         vecArgs <- traverse vectorizeAtom args
         let patFlatten = \case
               PWildCard -> []
@@ -237,8 +186,12 @@ vectorizeStatement = \case
         updateLocalize changed $ do
             vecPattern <- vectorizePattern pat
             results <- vectorizeResults (map Access changed)
-            name' <- getFuncName name
-            let vecTaint = if impure then id else Vec.Taint
+            (name', isPure) <- case M.lookup name Op.operators of
+                Nothing -> do
+                    Just name' <- lookupName name Immutable
+                    return (name', False)
+                Just op -> return (Op.vecname op, Op.vecpure op)
+            let vecTaint = if isPure then Vec.Taint else id
                 vecCall = foldl1 Vec.Beta (Vec.Access name' : vecArgs)
                 vecExecute = vecTaint vecCall
                 vecBody = Vec.Follow vecPattern vecExecute results

@@ -19,6 +19,7 @@ library
                        Sodium.Haskell.Sugar
                        Sodium.Haskell.Imports
                        Sodium.Nucleus.Scalar.Program
+                       Sodium.Nucleus.Scalar.Operator
                        Sodium.Nucleus.Scalar.Build
                        Sodium.Nucleus.Scalar.Typecheck
                        Sodium.Nucleus.Scalar.Atomize
