@@ -151,6 +151,9 @@ expStripParen outerLevel = \case
 
     Tuple boxed exps -> Tuple boxed (expStripParen ParensUniverse `map` exps)
     List        exps -> List        (expStripParen ParensUniverse `map` exps)
+    EnumFromTo exp1 exp2 -> EnumFromTo
+        (expStripParen ParensUniverse exp1)
+        (expStripParen ParensUniverse exp2)
 
     If exp1 exp2 exp3 -> If
         (expStripParen ParensUniverse exp1)
