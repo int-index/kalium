@@ -40,8 +40,6 @@ data NameSpecial
     | OpId
     | OpUnit
     | OpPair
-    | OpFst
-    | OpSnd
     | OpNil
     | OpCons
     | OpSingleton

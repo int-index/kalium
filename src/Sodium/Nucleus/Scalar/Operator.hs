@@ -8,8 +8,7 @@ import qualified Data.Map as M
 
 data Operator = Operator
     { tc :: [Type] -> [Type] -> Maybe Type
-    , vecname :: Vec.Name
-    , vecpure :: Bool
+    , vec :: [Vec.Expression] -> Vec.Expression
     }
 
 listMatch1 :: [a] -> Maybe a
@@ -52,132 +51,119 @@ isListType = \case
     TypeList _ -> True
     _ -> False
 
+vecApp' :: Vec.Name -> [Vec.Expression] -> Vec.Expression
+vecApp' name = Vec.beta . (Vec.Access name :)
+
+vecApp :: Vec.Name -> [Vec.Expression] -> Vec.Expression
+vecApp name = Vec.Taint . vecApp' name
+
 operators :: Map Name Operator
 operators = M.fromList
     [ OpAdd # Operator
         { tc = nta $ \args -> listMatch2Same args >>= require isNumericType
-        , vecname = Vec.NameSpecial Vec.OpAdd
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpAdd)
         }
 
     , OpSubtract # Operator
         { tc = nta $ \args -> listMatch2Same args >>= require isNumericType
-        , vecname = Vec.NameSpecial Vec.OpSubtract
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpSubtract)
         }
 
     , OpMultiply # Operator
         { tc = nta $ \args -> listMatch2Same args >>= require isNumericType
-        , vecname = Vec.NameSpecial Vec.OpMultiply
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpMultiply)
         }
 
     , OpDivide # Operator
         { tc = nta $ \args -> listMatch2Same args >>= require (==TypeDouble)
-        , vecname = Vec.NameSpecial Vec.OpDivide
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpDivide)
         }
 
     , OpDiv # Operator
         { tc = nta $ \args -> listMatch2Same args >>= require (==TypeInteger)
-        , vecname = Vec.NameSpecial Vec.OpDiv
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpDiv)
         }
 
     , OpMod # Operator
         { tc = nta $ \args -> listMatch2Same args >>= require (==TypeInteger)
-        , vecname = Vec.NameSpecial Vec.OpMod
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpMod)
         }
 
     , OpLess # Operator
         { tc = nta $ \args -> do
             listMatch2Same args >>= require isOrdType
             return TypeBoolean
-        , vecname = Vec.NameSpecial Vec.OpLess
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpLess)
         }
 
     , OpMore # Operator
         { tc = nta $ \args -> do
             listMatch2Same args >>= require isOrdType
             return TypeBoolean
-        , vecname = Vec.NameSpecial Vec.OpMore
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpMore)
         }
 
     , OpLessEquals # Operator
         { tc = nta $ \args -> do
             listMatch2Same args >>= require isOrdType
             return TypeBoolean
-        , vecname = Vec.NameSpecial Vec.OpLessEquals
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpLessEquals)
         }
 
     , OpMoreEquals # Operator
         { tc = nta $ \args -> do
             listMatch2Same args >>= require isOrdType
             return TypeBoolean
-        , vecname = Vec.NameSpecial Vec.OpMoreEquals
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpMoreEquals)
         }
 
     , OpEquals # Operator
         { tc = nta $ \args -> do
             listMatch2Same args >>= require isEqType
             return TypeBoolean
-        , vecname = Vec.NameSpecial Vec.OpEquals
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpEquals)
         }
 
     , OpNotEquals # Operator
         { tc = nta $ \args -> do
             listMatch2Same args >>= require isEqType
             return TypeBoolean
-        , vecname = Vec.NameSpecial Vec.OpNotEquals
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpNotEquals)
         }
 
     , OpAnd # Operator
         { tc = nta $ \args -> listMatch2Same args >>= require (==TypeBoolean)
-        , vecname = Vec.NameSpecial Vec.OpAnd
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpAnd)
         }
 
     , OpOr # Operator
         { tc = nta $ \args -> listMatch2Same args >>= require (==TypeBoolean)
-        , vecname = Vec.NameSpecial Vec.OpOr
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpOr)
         }
 
     , OpXor # Operator
         { tc = nta $ \args -> listMatch2Same args >>= require (==TypeBoolean)
-        , vecname = Vec.NameSpecial Vec.OpNotEquals
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpNotEquals)
         }
 
     , OpNot # Operator
         { tc = nta $ \args -> listMatch1 args >>= require (==TypeBoolean)
-        , vecname = Vec.NameSpecial Vec.OpNot
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpNot)
         }
 
     , OpTrue # Operator
         { tc = nta $ \args -> guard (null args) >> return TypeBoolean
-        , vecname = Vec.NameSpecial Vec.OpTrue
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpTrue)
         }
 
     , OpFalse # Operator
         { tc = nta $ \args -> guard (null args) >> return TypeBoolean
-        , vecname = Vec.NameSpecial Vec.OpFalse
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpFalse)
         }
 
     , OpRange # Operator
         { tc = nta $ \args -> TypeList <$> listMatch2Same args
-        , vecname = Vec.NameSpecial Vec.OpRange
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpRange)
         }
 
     , OpElem # Operator
@@ -185,30 +171,26 @@ operators = M.fromList
             (ty, tys) <- listMatch2 args
             guard (tys == TypeList ty)
             return TypeBoolean
-        , vecname = Vec.NameSpecial Vec.OpElem
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpElem)
         }
 
     , OpShow # Operator
         { tc = nta $ \args -> do
             listMatch1 args >>= require isShowType
             return (TypeList TypeChar)
-        , vecname = Vec.NameSpecial Vec.OpShow
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpShow)
         }
 
     , OpNegate # Operator
         { tc = nta $ \args -> listMatch1 args >>= require isNumericType
-        , vecname = Vec.NameSpecial Vec.OpNegate
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpNegate)
         }
 
     , OpPrintLn # Operator
         { tc = nta $ \args -> do
             listMatch1 args >>= require isShowType
             return TypeUnit
-        , vecname = Vec.NameSpecial Vec.OpPrintLn
-        , vecpure = False
+        , vec = vecApp' (Vec.NameSpecial Vec.OpPrintLn)
         }
 
     , OpReadLn # Operator
@@ -216,60 +198,41 @@ operators = M.fromList
             [ty] <- return tyArgs
             [  ] <- return args
             return ty
-        , vecname = Vec.NameSpecial Vec.OpReadLn
-        , vecpure = False
+        , vec = vecApp' (Vec.NameSpecial Vec.OpReadLn)
         }
 
     , OpPutLn # Operator
         { tc = nta $ \args -> do
             listMatch1 args >>= require (==TypeList TypeChar)
             return TypeUnit
-        , vecname = Vec.NameSpecial Vec.OpPutLn
-        , vecpure = False
+        , vec = vecApp' (Vec.NameSpecial Vec.OpPutLn)
         }
 
     , OpPut # Operator
         { tc = nta $ \args -> do
             listMatch1 args >>= require (==TypeList TypeChar)
             return TypeUnit
-        , vecname = Vec.NameSpecial Vec.OpPut
-        , vecpure = False
+        , vec = vecApp' (Vec.NameSpecial Vec.OpPut)
         }
 
     , OpGetLn # Operator
         { tc = nta $ \args -> guard (null args) >> return (TypeList TypeChar)
-        , vecname = Vec.NameSpecial Vec.OpGetLn
-        , vecpure = False
+        , vec = vecApp' (Vec.NameSpecial Vec.OpGetLn)
         }
 
     , OpUnit # Operator
         { tc = nta $ \args -> guard (null args) >> return TypeUnit
-        , vecname = Vec.NameSpecial Vec.OpUnit
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpUnit)
         }
 
     , OpId # Operator
         { tc = nta listMatch1
-        , vecname = Vec.NameSpecial Vec.OpId
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpId)
         }
 
     , OpPair # Operator
         { tc = nta $ \args -> uncurry TypePair <$> listMatch2 args
-        , vecname = Vec.NameSpecial Vec.OpPair
-        , vecpure = True
-        }
-
-    , OpFst # Operator
-        { tc = error "OpFst"
-        , vecname = Vec.NameSpecial Vec.OpFst
-        , vecpure = True
-        }
-
-    , OpSnd # Operator
-        { tc = error "OpSnd"
-        , vecname = Vec.NameSpecial Vec.OpSnd
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpPair)
         }
 
     , OpNil # Operator
@@ -277,8 +240,7 @@ operators = M.fromList
             [ty] <- return tyArgs
             [  ] <- return args
             return (TypeList ty)
-        , vecname = Vec.NameSpecial Vec.OpNil
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpNil)
         }
 
     , OpCons # Operator
@@ -286,22 +248,19 @@ operators = M.fromList
             (ty, tys) <- listMatch2 args
             guard (tys == TypeList ty)
             return tys
-        , vecname = Vec.NameSpecial Vec.OpCons
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpCons)
         }
 
     , OpSingleton # Operator
         { tc = nta $ \args -> TypeList <$> listMatch1 args
-        , vecname = Vec.NameSpecial Vec.OpSingleton
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpSingleton)
         }
 
     , OpIx # Operator
         { tc = nta $ \case
             [TypeList ty, TypeInteger] -> return ty
             _ -> mzero
-        , vecname = Vec.NameSpecial Vec.OpIx
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpIx)
         }
 
     , OpIxSet # Operator
@@ -309,30 +268,26 @@ operators = M.fromList
             [TypeInteger, ty1, tys@(TypeList ty)]
                 | ty1 == ty -> return tys
             _ -> mzero
-        , vecname = Vec.NameSpecial Vec.OpIxSet
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpIxSet)
         }
 
     , OpLength # Operator
         { tc = nta $ \args -> do
             listMatch1 args >>= require isListType
             return TypeInteger
-        , vecname = Vec.NameSpecial Vec.OpLength
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpLength)
         }
 
     , OpConcat # Operator
         { tc = nta $ \args -> listMatch2Same args >>= require isListType
-        , vecname = Vec.NameSpecial Vec.OpConcat
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpConcat)
         }
 
     , OpIntToDouble # Operator
         { tc = nta $ \args -> do
             listMatch1 args >>= require (==TypeInteger)
             return TypeDouble
-        , vecname = Vec.NameSpecial Vec.OpIntToDouble
-        , vecpure = True
+        , vec = vecApp (Vec.NameSpecial Vec.OpIntToDouble)
         }
     ]
   where

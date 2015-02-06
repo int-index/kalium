@@ -186,15 +186,12 @@ vectorizeStatement = \case
         updateLocalize changed $ do
             vecPattern <- vectorizePattern pat
             results <- vectorizeResults (map Access changed)
-            (name', isPure) <- case M.lookup name Op.operators of
+            vecCall <- case M.lookup name Op.operators of
                 Nothing -> do
                     Just name' <- lookupName name Immutable
-                    return (name', False)
-                Just op -> return (Op.vecname op, Op.vecpure op)
-            let vecTaint = if isPure then Vec.Taint else id
-                vecCall = foldl1 Vec.Beta (Vec.Access name' : vecArgs)
-                vecExecute = vecTaint vecCall
-                vecBody = Vec.Follow vecPattern vecExecute results
+                    return (Vec.beta . (Vec.Access name':))
+                Just op -> return (Op.vec op)
+            let vecBody = Vec.Follow vecPattern (vecCall vecArgs)results
             return (changed, vecBody)
 
     ForStatement forCycle -> do
