@@ -171,38 +171,36 @@ CaseClause : Ranges ':' Statement_ ';' { (reverse $1, $3) }
 Ranges : Range            { $1 : [] }
        | Ranges ',' Range { $3 : $1 }
 
-Range :                  Expression_ { Left $1 }
-      | Expression_ '..' Expression_ { Right ($1, $3) }
+Range :                 Expression { Left $1 }
+      | Expression '..' Expression { Right ($1, $3) }
 
-Expression : Expression '<' Expression { binary OpLess   $1 $3 }
+Expression : Expression '+' Expression { binary OpAdd      $1 $3 }
+           | Expression '<' Expression { binary OpLess   $1 $3 }
            | Expression '>' Expression { binary OpMore   $1 $3 }
            | Expression '=' Expression { binary OpEquals $1 $3 }
            | Expression '>=' Expression { binary OpMoreEquals $1 $3 }
            | Expression '<=' Expression { binary OpLessEquals $1 $3 }
            | Expression '<>' Expression { binary OpNotEquals $1 $3 }
-           | Expression_ { $1 }
+           | Expression '-' Expression { binary OpSubtract $1 $3 }
+           | Expression  or Expression { binary OpOr       $1 $3 }
+           | Expression xor Expression { binary OpXor      $1 $3 }
 
-Expression_ : Expression '+' Expression { binary OpAdd      $1 $3 }
-            | Expression '-' Expression { binary OpSubtract $1 $3 }
-            | Expression  or Expression { binary OpOr       $1 $3 }
-            | Expression xor Expression { binary OpXor      $1 $3 }
+           | Expression '*' Expression { binary OpMultiply $1 $3 }
+           | Expression '/' Expression { binary OpDivide   $1 $3 }
+           | Expression div Expression { binary OpDiv      $1 $3 }
+           | Expression mod Expression { binary OpMod      $1 $3 }
+           | Expression and Expression { binary OpAnd      $1 $3 }
 
-            | Expression '*' Expression { binary OpMultiply $1 $3 }
-            | Expression '/' Expression { binary OpDivide   $1 $3 }
-            | Expression div Expression { binary OpDiv      $1 $3 }
-            | Expression mod Expression { binary OpMod      $1 $3 }
-            | Expression and Expression { binary OpAnd      $1 $3 }
+           | '-' Expression %prec NEG  { Call (Left OpNegate) [$2] }
+           | '+' Expression %prec POS  { Call (Left OpPlus)   [$2] }
+           | not Expression            { Call (Left OpNot)    [$2] }
 
-            | '-' Expression %prec NEG  { Call (Left OpNegate) [$2] }
-            | '+' Expression %prec POS  { Call (Left OpPlus)   [$2] }
-            | not Expression            { Call (Left OpNot)    [$2] }
+           | Expression '[' Expression ']' { binary OpIx $1 $3 }
 
-            | Expression '[' Expression ']' { binary OpIx $1 $3 }
+           | '(' Expression ')' { $2 }
+           |     Atom           { $1 }
 
-            | '(' Expression ')' { $2 }
-            |     Atom           { $1 }
-
-            | Call { $1 }
+           | Call { $1 }
 
 Atom : name  { Access $1 }
      | true  { Primary (LitBool True)  }
