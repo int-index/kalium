@@ -174,6 +174,8 @@ convOp = \case
     S.OpReadLn   -> H.Var (HsIdent "Prelude" "readLn")
     S.OpPrintLn  -> H.Var (HsIdent "Prelude" "print")
     S.OpConcat   -> H.Var (HsSymbol "Prelude" "++")
+    S.OpTake     -> H.Var (HsIdent "Prelude" "take")
+    S.OpRepeat   -> H.Var (HsIdent "Prelude" "repeat")
     S.OpBind      -> H.Var (HsSymbol "Prelude" ">>=")
     S.OpBindIgnore-> H.Var (HsSymbol "Prelude" ">>")
     S.OpFmapIgnore-> H.Var (HsSymbol "Control.Applicative" "<$")

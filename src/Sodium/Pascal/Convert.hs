@@ -149,6 +149,13 @@ instance Conv S.Type where
 
 binary op a b = D.Call op [] [a,b]
 
+convSetLength [S.Access name', lenExpr'] = do
+    name <- nameV name'
+    lenExpr <- typecastConv (==S.TypeInteger) lenExpr'
+    return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpSetLength) []
+        [D.expression name, lenExpr]
+convSetLength _ = error "convSetLength: argument mismatch"
+
 convReadLn [e@(S.Access name')] = do
     name <- nameV name'
     typecheck e >>= \case
@@ -314,6 +321,7 @@ instance Conv S.Statement where
         S.Execute "readln"  exprs -> D.statement <$> convReadLn  exprs
         S.Execute "write"   exprs -> D.statement <$> convWriteLn False exprs
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn True  exprs
+        S.Execute "setlength" exprs -> D.statement <$> convSetLength exprs
         S.Execute name' exprs' -> do
             name <- nameF name'
             exprs <- traverse typecastConv' exprs'

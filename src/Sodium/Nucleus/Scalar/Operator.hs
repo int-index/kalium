@@ -278,6 +278,21 @@ operators = M.fromList
         , vec = vecApp (Vec.NameSpecial Vec.OpLength)
         }
 
+    , OpSetLength # Operator
+        { tc = error "tc: OpSetLength"
+        , vec = \case
+            [listExpr, lengthExpr] ->
+                let vecUndefined  = Vec.OpAccess Vec.OpUndefined
+                    vecUndefineds = Vec.AppOp1 Vec.OpRepeat vecUndefined
+                    vecPrepend = case listExpr of
+                        Vec.OpAccess Vec.OpUndefined -> id
+                        _ -> Vec.AppOp2 Vec.OpConcat listExpr
+                    vecList = Vec.AppOp2 Vec.OpTake lengthExpr
+                        (vecPrepend vecUndefineds)
+                in Vec.Taint vecList
+            _ -> error "vec: OpSetLength"
+        }
+
     , OpConcat # Operator
         { tc = nta $ \args -> listMatch2Same args >>= require isListType
         , vec = vecApp (Vec.NameSpecial Vec.OpConcat)

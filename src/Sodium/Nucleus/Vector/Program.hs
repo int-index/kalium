@@ -59,6 +59,8 @@ data NameSpecial
     | OpIgnore
     | OpWhen
     | OpConcat
+    | OpTake
+    | OpRepeat
     | OpIntToDouble
     | OpUndefined
     | OpMain
