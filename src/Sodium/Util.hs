@@ -29,4 +29,7 @@ zipFilter (keep:keeps) (a:as)
 zipFilter [] [] = Just []
 zipFilter _ _ = Nothing
 
+keepByFst :: (b -> Bool) -> Pairs b a -> [a]
+keepByFst p = map snd . filter (p . fst)
+
 type MonadNameGen m = MonadRename Integer String m
