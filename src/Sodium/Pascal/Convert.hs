@@ -224,6 +224,10 @@ typecheck' :: (E e m, R m) => S.Expression -> m (Maybe S.Type)
 typecheck' = runMaybeT . \case
     S.Primary lit -> return (typeOfLiteral lit)
     S.Access name -> typeOfAccess name
+    S.Call (Right "length") args -> do
+        traverse typecheck args >>= \case
+            [S.TypeArray _] -> return S.TypeInteger
+            _ -> badType
     S.Call (Right name) args -> do
         mfuncsig <- views (csTypes.tsFunctions) (M.lookup name)
         case mfuncsig of
