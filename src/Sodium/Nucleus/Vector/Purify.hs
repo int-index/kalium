@@ -18,10 +18,13 @@ purify program = do
     p1s <- execWriterT $ itraverse funcPurify (program ^. programFuncs)
     let p2s = resolve p1s
         infoGroups = fulfil p2s
-    return (foldr substitute program infoGroups)
+    return (substitute infoGroups program)
 
-substitute :: [PurifyInfo] -> Endo' Program
-substitute infoGroup program =
+substitute :: [[PurifyInfo]] -> Endo' Program
+substitute = tryApply . (flip.foldM.flip) substituteSCC
+
+substituteSCC :: [PurifyInfo] -> EndoKleisli' Maybe Program
+substituteSCC infoGroup program =
     let impureNames = S.unions [ S.singleton name | PurifyInfo name _ _ _ <- infoGroup ]
         program' = withPure
         dangling = program' `mentions` impureNames
@@ -30,8 +33,7 @@ substitute infoGroup program =
         replacedCalls = withoutImpure & over recmapped purifyExpression
         withPure = replacedCalls & programFuncs %~ M.union pureFuncs
         pureFuncs = M.unions [ M.singleton name' func | PurifyInfo _ _ name' func <- infoGroup ]
-    in if dangling then program else program'
-        -- TODO: stop further substitutions
+    in if dangling then Nothing else Just program'
   where
     purifyExpression :: Endo' Expression
     purifyExpression = foldr (.) id $ map (tryApply.appPurify) infoGroup
