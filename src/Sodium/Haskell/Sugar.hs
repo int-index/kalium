@@ -26,16 +26,15 @@ instance Sugar Decl where
         FunBind matches -> FunBind <$> sugar matches
         PatBind srcLoc pat rhs binds
             -> PatBind srcLoc pat <$> sugar rhs <*> sugar binds
-        decl@TypeSig{} -> pure decl
+        TypeSig srcLoc names ty -> TypeSig srcLoc names <$> sugar ty
         decl -> error ("unsupported decl: " ++ show decl)
 
 instance Sugar Match where
-    sugar (Match srcLoc name pats ty rhs binds) = do
-        (pats', rhs') <- sugar rhs <&> \case
-            UnGuardedRhs (Lambda _ pats' exp)
-                 -> (pats ++ pats', UnGuardedRhs exp)
-            rhs' -> (pats, rhs')
-        Match srcLoc name pats' ty rhs' <$> sugar binds
+    sugar (Match srcLoc name pats ty rhs binds)
+        | UnGuardedRhs (Lambda _ pats' exp) <- rhs
+        = sugar $ Match srcLoc name (pats ++ pats') ty (UnGuardedRhs exp) binds
+    sugar (Match srcLoc name pats ty rhs binds)
+        = Match srcLoc name <$> sugar pats <*> sugar ty <*> sugar rhs <*> sugar binds
 
 instance Sugar Binds where
     sugar = \case
@@ -57,10 +56,33 @@ instance Sugar GuardedRhs where
 instance Sugar Stmt where
     sugar = \case
         Generator srcLoc pat exp
-            -> Generator srcLoc pat <$> sugarUniverseStrip exp
+            -> Generator srcLoc <$> sugar pat <*> sugarUniverseStrip exp
         Qualifier exp -> Qualifier <$> sugarUniverseStrip exp
         LetStmt binds -> LetStmt <$> sugar binds
         RecStmt stmts -> RecStmt <$> sugar stmts
+
+instance Sugar Pat where
+    sugar = \case
+        PatTypeSig srcLoc pat ty -> PatTypeSig srcLoc <$> sugar pat <*> sugar ty
+        PTuple boxed pats -> PTuple boxed <$> sugar pats
+        pat@PVar{} -> pure pat
+        pat@PWildCard{} -> pure pat
+        pat -> error ("unsupported pat: " ++ show pat)
+
+instance Sugar Type where
+    sugar = \case
+        TyCon (Special (TupleCon boxed 2)) `TyApp` ty1 `TyApp` ty2
+            -> pure $ TyTuple boxed [ty1, ty2]
+        TyCon (Special FunCon) `TyApp` ty1 `TyApp` ty2 -> pure $ TyFun ty1 ty2
+        TyCon (Special ListCon) `TyApp` ty -> pure $ TyList ty
+        TyList (TyCon (HsIdent "Prelude" "Char"))
+            -> pure $ TyCon (HsIdent "Prelude" "String")
+        TyApp ty1 ty2 -> TyApp <$> sugar ty1 <*> sugar ty2
+        ty@TyCon{} -> pure ty
+        TyTuple boxed tys -> TyTuple boxed <$> sugar tys
+        TyFun ty1 ty2 -> TyFun <$> sugar ty1 <*> sugar ty2
+        TyList ty -> TyList <$> sugar ty
+        ty -> error ("unsupported type: " ++ show ty)
 
 pattern App2 op x y = op `App` x `App` y
 pattern App3 op x y z = op `App` x `App` y `App` z
@@ -77,7 +99,7 @@ instance Sugar Exp where
         Tuple boxed exps -> Tuple boxed <$> sugar exps
         Paren exp  -> Paren <$> sugar exp
         App x y -> App <$> sugar x <*> sugar y
-        Lambda srcLoc pats exp -> Lambda srcLoc pats <$> sugar exp
+        Lambda srcLoc pats exp -> Lambda srcLoc <$> sugar pats <*> sugar exp
         InfixApp x op y -> InfixApp <$> sugar x <*> pure op <*> sugar y
         RightSection op exp -> RightSection op <$> sugar exp
         Do stmts -> Do <$> sugar stmts
