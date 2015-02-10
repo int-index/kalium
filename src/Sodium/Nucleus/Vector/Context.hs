@@ -47,9 +47,9 @@ extractCtxExpression = \case
 hackish_typeApp :: NameSpecial -> Type -> Maybe Type
 hackish_typeApp = \case
     OpFst -> \case
-        TypePair ty _ -> pure ty
+        TypeApp2 TypePair ty _ -> pure ty
         _ -> empty
     OpSnd -> \case
-        TypePair _ ty -> pure ty
+        TypeApp2 TypePair _ ty -> pure ty
         _ -> empty
     _ -> \_ -> empty

@@ -68,7 +68,7 @@ valueficateFunc referenceInfo name
 
           params' = params & map (\(name, (_by, ty)) -> (name, ty))
 
-          ty' = foldr1 TypePair (ty : tys)
+          ty' = foldr1 (TypeApp2 TypePair) (ty : tys)
           result' = foldr1 (\x y -> Call (NameSpecial OpPair) [] [x, y])
                   $ Atom result : map (Atom . Access) results
 

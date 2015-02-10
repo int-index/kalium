@@ -64,7 +64,16 @@ data NameSpecial
     | OpIntToDouble
     | OpUndefined
     | OpMain
-    deriving (Eq, Ord, Show)
+    | OpTypeInteger
+    | OpTypeDouble
+    | OpTypeBoolean
+    | OpTypeChar
+    | OpTypeUnit
+    | OpTypeList
+    | OpTypePair
+    | OpTypeFunction
+    | OpTypeTaint
+    deriving (Eq, Ord)
 
 data Name = NameSpecial NameSpecial
           | NameGen Integer
@@ -75,22 +84,25 @@ alias (NameGen m) = NameGen <$> rename m
 alias _ = NameGen <$> mkname Nothing
 
 data Type
-    = TypeInteger
-    | TypeDouble
-    | TypeBoolean
-    | TypeChar
-    | TypeUnit
-    | TypeList Type
-    | TypePair Type Type
-    | TypeFunction Type Type
-    | TypeTaint Type
-    deriving (Eq, Ord, Show)
+    = TypeBeta Type Type
+    | TypeAccess Name
+    deriving (Eq, Ord)
+
+pattern TypeInteger = TypeAccess (NameSpecial OpTypeInteger)
+pattern TypeDouble  = TypeAccess (NameSpecial OpTypeDouble)
+pattern TypeBoolean = TypeAccess (NameSpecial OpTypeBoolean)
+pattern TypeChar    = TypeAccess (NameSpecial OpTypeChar)
+pattern TypeUnit    = TypeAccess (NameSpecial OpTypeUnit)
+pattern TypeList    = TypeAccess (NameSpecial OpTypeList)
+pattern TypePair    = TypeAccess (NameSpecial OpTypePair)
+pattern TypeFunction= TypeAccess (NameSpecial OpTypeFunction)
+pattern TypeTaint   = TypeAccess (NameSpecial OpTypeTaint)
 
 data Literal
     = LitInteger Integer
     | LitDouble  Rational
     | LitChar    Char
-    deriving (Eq, Show)
+    deriving (Eq)
 
 data Program
     = Program
@@ -139,12 +151,15 @@ unlambda = \case
     Lambda p a -> let (ps, b) = unlambda a in (p:ps, b)
     e -> ([], e)
 
+pattern TypeApp1 t t1    = t `TypeBeta` t1
+pattern TypeApp2 t t1 t2 = t `TypeBeta` t1 `TypeBeta` t2
+
 tyfun :: [Type] -> Type -> Type
-tyfun = flip (foldr TypeFunction)
+tyfun = flip (foldr (TypeApp2 TypeFunction))
 
 untyfun :: Type -> ([Type], Type)
 untyfun = \case
-    TypeFunction tyArg tyRes ->
+    TypeApp2 TypeFunction tyArg tyRes ->
         let (tyArgs, tyRes') = untyfun tyRes
         in (tyArg:tyArgs, tyRes')
     ty -> ([], ty)

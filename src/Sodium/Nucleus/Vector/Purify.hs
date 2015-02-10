@@ -78,7 +78,7 @@ funcPurify (NameSpecial _) _ = return ()
 funcPurify name (Func ty a) = do
     ( (ps,tys) , (a',ty') ) <- typeDrivenUnlambda ty a
     case ty' of
-        TypeTaint ty'' -> do
+        TypeApp1 TypeTaint ty'' -> do
             let ty1 = tyfun tys ty''
                 arity = length tys
                 gen = expForcePurify' a'

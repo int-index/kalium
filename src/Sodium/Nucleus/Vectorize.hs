@@ -66,7 +66,7 @@ vectorizeFunc name func = do
     local (initialScope <>) $ do
         (_, vecBody) <- vectorizeBody (func ^. funcScope . scopeElem)
         let FuncSig (vectorizeType -> tyResult) (map vectorizeType -> tyArgs) = funcSig func
-            vecFuncType = foldr1 Vec.TypeFunction (tyArgs `snoc` Vec.TypeTaint tyResult)
+            vecFuncType = Vec.tyfun tyArgs (Vec.TypeApp1 Vec.TypeTaint tyResult)
         vecParams <- traverse mkPAccess (map fst params)
         let vecFuncLambda = Vec.lambda vecParams vecBody
         return (name', Vec.Func vecFuncType vecFuncLambda)
@@ -82,7 +82,7 @@ tryPAccess ty (Just name) = Vec.PAccess name ty
 
 -- TODO: default values for other types
 tryAccess ty Nothing = case ty of
-    Vec.TypeList _ -> Vec.OpAccess Vec.OpNil
+    Vec.TypeApp1 Vec.TypeList _ -> Vec.OpAccess Vec.OpNil
     _ -> Vec.OpAccess Vec.OpUndefined
 tryAccess _ (Just name) = Vec.Access name
 
@@ -155,8 +155,11 @@ vectorizeType = \case
     TypeBoolean -> Vec.TypeBoolean
     TypeChar -> Vec.TypeChar
     TypeUnit -> Vec.TypeUnit
-    TypeList ty -> Vec.TypeList (vectorizeType ty)
-    TypePair ty1 ty2 -> Vec.TypePair (vectorizeType ty1) (vectorizeType ty2)
+    TypeList -> Vec.TypeList
+    TypePair -> Vec.TypePair
+    TypeBeta ty1 ty2 -> Vec.TypeBeta
+        (vectorizeType ty1) (vectorizeType ty2)
+    _ -> error "vectorizeType: unknown type"
 
 vectorizeStatement :: V e m => Statement Pattern Atom -> m ([Name], Vec.Expression)
 vectorizeStatement = \case

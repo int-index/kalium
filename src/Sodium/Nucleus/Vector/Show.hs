@@ -1,7 +1,11 @@
+{-# LANGUAGE StandaloneDeriving #-}
 module Sodium.Nucleus.Vector.Show where
 
 import Sodium.Prelude
 import Sodium.Nucleus.Vector.Program
+
+deriving instance Show NameSpecial
+deriving instance Show Literal
 
 instance Show Name where
     show = \case

@@ -48,7 +48,7 @@ isShowType _ = True -- for now
 
 isListType :: Type -> Bool
 isListType = \case
-    TypeList _ -> True
+    TypeApp1 TypeList _ -> True
     _ -> False
 
 vecApp' :: Vec.Name -> [Vec.Expression] -> Vec.Expression
@@ -162,14 +162,14 @@ operators = M.fromList
         }
 
     , OpRange # Operator
-        { tc = nta $ \args -> TypeList <$> listMatch2Same args
+        { tc = nta $ \args -> TypeApp1 TypeList <$> listMatch2Same args
         , vec = vecApp (Vec.NameSpecial Vec.OpRange)
         }
 
     , OpElem # Operator
         { tc = nta $ \args -> do
             (ty, tys) <- listMatch2 args
-            guard (tys == TypeList ty)
+            guard (tys == TypeApp1 TypeList ty)
             return TypeBoolean
         , vec = vecApp (Vec.NameSpecial Vec.OpElem)
         }
@@ -177,7 +177,7 @@ operators = M.fromList
     , OpShow # Operator
         { tc = nta $ \args -> do
             listMatch1 args >>= require isShowType
-            return (TypeList TypeChar)
+            return TypeString
         , vec = vecApp (Vec.NameSpecial Vec.OpShow)
         }
 
@@ -203,20 +203,20 @@ operators = M.fromList
 
     , OpPutLn # Operator
         { tc = nta $ \args -> do
-            listMatch1 args >>= require (==TypeList TypeChar)
+            listMatch1 args >>= require (==TypeString)
             return TypeUnit
         , vec = vecApp' (Vec.NameSpecial Vec.OpPutLn)
         }
 
     , OpPut # Operator
         { tc = nta $ \args -> do
-            listMatch1 args >>= require (==TypeList TypeChar)
+            listMatch1 args >>= require (==TypeString)
             return TypeUnit
         , vec = vecApp' (Vec.NameSpecial Vec.OpPut)
         }
 
     , OpGetLn # Operator
-        { tc = nta $ \args -> guard (null args) >> return (TypeList TypeChar)
+        { tc = nta $ \args -> guard (null args) >> return TypeString
         , vec = vecApp' (Vec.NameSpecial Vec.OpGetLn)
         }
 
@@ -231,7 +231,7 @@ operators = M.fromList
         }
 
     , OpPair # Operator
-        { tc = nta $ \args -> uncurry TypePair <$> listMatch2 args
+        { tc = nta $ \args -> uncurry (TypeApp2 TypePair) <$> listMatch2 args
         , vec = vecApp (Vec.NameSpecial Vec.OpPair)
         }
 
@@ -239,33 +239,33 @@ operators = M.fromList
         { tc = \tyArgs args -> do
             [ty] <- return tyArgs
             [  ] <- return args
-            return (TypeList ty)
+            return (TypeApp1 TypeList ty)
         , vec = vecApp (Vec.NameSpecial Vec.OpNil)
         }
 
     , OpCons # Operator
         { tc = nta $ \args -> do
             (ty, tys) <- listMatch2 args
-            guard (tys == TypeList ty)
+            guard (tys == TypeApp1 TypeList ty)
             return tys
         , vec = vecApp (Vec.NameSpecial Vec.OpCons)
         }
 
     , OpSingleton # Operator
-        { tc = nta $ \args -> TypeList <$> listMatch1 args
+        { tc = nta $ \args -> TypeApp1 TypeList <$> listMatch1 args
         , vec = vecApp (Vec.NameSpecial Vec.OpSingleton)
         }
 
     , OpIx # Operator
         { tc = nta $ \case
-            [TypeList ty, TypeInteger] -> return ty
+            [TypeApp1 TypeList ty, TypeInteger] -> return ty
             _ -> mzero
         , vec = vecApp (Vec.NameSpecial Vec.OpIx)
         }
 
     , OpIxSet # Operator
         { tc = nta $ \case
-            [TypeInteger, ty1, tys@(TypeList ty)]
+            [TypeInteger, ty1, tys@(TypeApp1 TypeList ty)]
                 | ty1 == ty -> return tys
             _ -> mzero
         , vec = vecApp (Vec.NameSpecial Vec.OpIxSet)

@@ -28,7 +28,7 @@ patType = \case
     PWildCard -> Nothing
     PUnit -> return TypeUnit
     PAccess _ ty -> return ty
-    PTuple p1 p2 -> liftM2 TypePair (patType p1) (patType p2)
+    PTuple p1 p2 -> liftM2 (TypeApp2 TypePair) (patType p1) (patType p2)
 
 patIsAccess (PAccess _ _) = True
 patIsAccess _ = False

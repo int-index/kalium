@@ -50,6 +50,13 @@ data NameSpecial
     | OpConcat
     | OpIntToDouble
     | OpMain
+    | OpTypeInteger
+    | OpTypeDouble
+    | OpTypeBoolean
+    | OpTypeChar
+    | OpTypeUnit
+    | OpTypeList
+    | OpTypePair
     deriving (Eq, Ord, Show)
 
 data Name = NameSpecial NameSpecial
@@ -57,14 +64,21 @@ data Name = NameSpecial NameSpecial
     deriving (Eq, Ord, Show)
 
 data Type
-    = TypeInteger
-    | TypeDouble
-    | TypeBoolean
-    | TypeChar
-    | TypeUnit
-    | TypeList Type
-    | TypePair Type Type
+    = TypeAccess Name
+    | TypeBeta Type Type
     deriving (Eq, Ord, Show)
+
+pattern TypeApp1 t t1    = t `TypeBeta` t1
+pattern TypeApp2 t t1 t2 = t `TypeBeta` t1 `TypeBeta` t2
+
+pattern TypeString  = TypeApp1 TypeList TypeChar
+pattern TypeInteger = TypeAccess (NameSpecial OpTypeInteger)
+pattern TypeDouble  = TypeAccess (NameSpecial OpTypeDouble)
+pattern TypeBoolean = TypeAccess (NameSpecial OpTypeBoolean)
+pattern TypeChar = TypeAccess (NameSpecial OpTypeChar)
+pattern TypeUnit = TypeAccess (NameSpecial OpTypeUnit)
+pattern TypeList = TypeAccess (NameSpecial OpTypeList)
+pattern TypePair = TypeAccess (NameSpecial OpTypePair)
 
 data Literal
     = LitInteger Integer

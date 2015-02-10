@@ -143,8 +143,8 @@ instance Conv S.Type where
         S.TypeReal    -> return D.TypeDouble
         S.TypeBoolean -> return D.TypeBoolean
         S.TypeChar    -> return D.TypeChar
-        S.TypeString  -> return (D.TypeList D.TypeChar)
-        S.TypeArray t -> D.TypeList <$> conv t
+        S.TypeString  -> return D.TypeString
+        S.TypeArray t -> D.TypeApp1 D.TypeList <$> conv t
         S.TypeCustom _  -> error "Custom types are not implemented"
 
 binary op a b = D.Call op [] [a,b]

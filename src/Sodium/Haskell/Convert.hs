@@ -84,12 +84,13 @@ convType = \case
     Vec.TypeDouble  -> H.TyCon (HsIdent "Prelude" "Double")
     Vec.TypeBoolean -> H.TyCon (HsIdent "Prelude" "Bool")
     Vec.TypeChar    -> H.TyCon (HsIdent "Prelude" "Char")
+    Vec.TypeTaint   -> H.TyCon (HsIdent "Prelude" "IO")
     Vec.TypeUnit    -> H.TyCon (H.Special H.UnitCon)
-    Vec.TypePair t1 t2 -> H.TyTuple H.Boxed [convType t1, convType t2]
-    Vec.TypeList Vec.TypeChar -> H.TyCon (HsIdent "Prelude" "String")
-    Vec.TypeList ts -> H.TyList (convType ts)
-    Vec.TypeFunction t1 t2 -> H.TyFun (convType t1) (convType t2)
-    Vec.TypeTaint t -> H.TyApp (H.TyCon (HsIdent "Prelude" "IO")) (convType t)
+    Vec.TypePair    -> H.TyCon (H.Special (H.TupleCon H.Boxed 2))
+    Vec.TypeFunction-> H.TyCon (H.Special H.FunCon)
+    Vec.TypeList    -> H.TyCon (H.Special H.ListCon)
+    Vec.TypeBeta t1 t2 -> H.TyApp (convType t1) (convType t2)
+    _ -> error "convType: unknown type"
 
 
 convExpression :: (T m, C m) => Vec.Expression -> m H.Exp

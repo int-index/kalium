@@ -53,8 +53,8 @@ patsArgClean (p:ps) =
 
 tyArgClean :: [Bool] -> Type -> Maybe Type
 tyArgClean [] ty = Just ty
-tyArgClean (n:ns) (TypeFunction ty1 ty2) = wrap <$> tyArgClean ns ty2
-    where wrap | n = TypeFunction ty1
+tyArgClean (n:ns) (TypeApp2 TypeFunction ty1 ty2) = wrap <$> tyArgClean ns ty2
+    where wrap | n = TypeApp2 TypeFunction ty1
                | otherwise = id
 tyArgClean _ _ = Nothing
 
