@@ -173,9 +173,12 @@ expJoinList = \case
         -> Lit (String (c:cs))
     exp -> exp
 
-charList = traverse $ \case
-    Lit (Char c) -> Just c
-    _ -> Nothing
+charList [] = Nothing
+charList xs = traverse exChar xs
+  where
+    exChar = \case
+        Lit (Char c) -> Just c
+        _ -> Nothing
 
 expAppSection = \case
     App (RightSection (QVarOp op) y) x -> App2 (Var op) x y

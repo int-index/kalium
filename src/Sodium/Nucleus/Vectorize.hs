@@ -80,8 +80,11 @@ mkExpTuple exps = foldr1 (Vec.AppOp2 Vec.OpPair) exps
 tryPAccess _  Nothing     = Vec.PWildCard
 tryPAccess ty (Just name) = Vec.PAccess name ty
 
-tryAccess Nothing     = Vec.Access (Vec.NameSpecial Vec.OpUndefined)
-tryAccess (Just name) = Vec.Access name
+-- TODO: default values for other types
+tryAccess ty Nothing = case ty of
+    Vec.TypeList _ -> Vec.OpAccess Vec.OpNil
+    _ -> Vec.OpAccess Vec.OpUndefined
+tryAccess _ (Just name) = Vec.Access name
 
 mkPAccess :: V e m => Name -> m Vec.Pattern
 mkPAccess name = do
@@ -92,7 +95,8 @@ mkPAccess name = do
 mkAccess :: V e m => Name -> m Vec.Expression
 mkAccess name = do
     index <- lookupIndex name
-    tryAccess <$> lookupName name index
+    ty    <- lookupType  name
+    tryAccess (vectorizeType ty) <$> lookupName name index
 
 expTuple :: V e m => [Name] -> m Vec.Expression
 expTuple names = mkExpTuple <$> traverse mkAccess names

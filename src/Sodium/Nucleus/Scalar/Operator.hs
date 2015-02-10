@@ -284,9 +284,7 @@ operators = M.fromList
             [listExpr, lengthExpr] ->
                 let vecUndefined  = Vec.OpAccess Vec.OpUndefined
                     vecUndefineds = Vec.AppOp1 Vec.OpRepeat vecUndefined
-                    vecPrepend = case listExpr of
-                        Vec.OpAccess Vec.OpUndefined -> id
-                        _ -> Vec.AppOp2 Vec.OpConcat listExpr
+                    vecPrepend = Vec.AppOp2 Vec.OpConcat listExpr
                     vecList = Vec.AppOp2 Vec.OpTake lengthExpr
                         (vecPrepend vecUndefineds)
                 in Vec.Taint vecList
