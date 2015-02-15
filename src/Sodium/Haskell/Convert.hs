@@ -10,6 +10,7 @@ import qualified Data.Set as S
 import Sodium.Haskell.Common
 import qualified Sodium.Nucleus.Vector.Program as Vec
 import qualified Sodium.Nucleus.Vector.Pattern as Vec
+import qualified Sodium.Nucleus.Vector.Operator as VecOp
 import qualified Language.Haskell.Exts        as H
 import qualified Language.Haskell.Exts.SrcLoc as H
 
@@ -66,7 +67,6 @@ nameGen n = gets (M.lookup n) >>= \case
         nameGen n
     Just (Left str) -> do
         let name = H.Ident (nameSafe str)
-        -- TODO: take only names in current scope
         names <- do
             dict <- get
             let assocName (Vec.NameGen n)
@@ -101,9 +101,11 @@ convExpression = \case
         <*> local (Vec.patBound pat <>) (convExpression act)
     Vec.Beta a1 a2 -> H.App <$> convExpression a1 <*> convExpression a2
     Vec.Primary lit -> pure $ convLit lit
-    Vec.Access name -> case name of
-        Vec.NameSpecial op -> pure $ convOp op
-        Vec.NameGen n -> nameGen n <&> \hsName -> H.Var (H.UnQual hsName)
+    Vec.Access name -> case M.lookup name VecOp.operators of
+        Just op -> pure (VecOp.hs op)
+        Nothing -> case name of
+            Vec.NameGen n -> nameGen n <&> \hsName -> H.Var (H.UnQual hsName)
+            _ -> error "convExpression: unsupported special name"
 
 convFunc :: (T m, C m) => Vec.Name -> Vec.Func -> m [H.Decl]
 convFunc name (Vec.Func ty expression) = do
@@ -136,70 +138,3 @@ convLit = \case
     Vec.LitInteger n -> (if n < 0 then H.Paren else id) $ H.Lit (H.Int  n)
     Vec.LitDouble  x -> (if x < 0 then H.Paren else id) $ H.Lit (H.Frac x)
     Vec.LitChar    c -> H.Lit $ H.Char c
-
-composeOp = H.Var (HsSymbol "Prelude" ".")
-
-convOp :: Vec.NameSpecial -> H.Exp
-convOp = \case
-    Vec.OpSingleton -> H.RightSection
-        (H.QConOp H.list_cons_name)
-        (convOp Vec.OpNil)
-    Vec.OpPair     -> H.tuple_con H.Boxed 1
-    Vec.OpCons     -> H.Con H.list_cons_name
-    Vec.OpUnit     -> H.unit_con
-    Vec.OpNil      -> H.List []
-    Vec.OpIx       -> H.Var (HsSymbol "Prelude" "!!")
-    Vec.OpIxSet    -> composeOp
-        `H.App` H.Var (HsSymbol "Control.Lens" "set")
-        `H.App` H.Var (HsSymbol "Control.Lens" "ix")
-    Vec.OpLength   -> H.Var (HsIdent "Prelude" "length")
-    Vec.OpNegate   -> H.Var (HsIdent "Prelude" "negate")
-    Vec.OpShow     -> H.Var (HsIdent "Prelude" "show")
-    Vec.OpIf       -> H.Var (HsIdent "Data.Bool" "bool")
-    Vec.OpFold     -> H.Var (HsIdent "Prelude" "foldl")
-    Vec.OpFoldTainted -> H.Var (HsIdent "Control.Monad" "foldM")
-    Vec.OpMapTaintedIgnore -> H.Var (HsIdent "Data.Foldable" "traverse_")
-    Vec.OpProduct  -> H.Var (HsIdent "Prelude" "product")
-    Vec.OpSum      -> H.Var (HsIdent "Prelude" "sum")
-    Vec.OpAnd'     -> H.Var (HsIdent "Prelude" "and")
-    Vec.OpOr'      -> H.Var (HsIdent "Prelude" "or")
-    Vec.OpAdd      -> H.Var (HsSymbol "Prelude" "+")
-    Vec.OpSubtract -> H.Var (HsSymbol "Prelude" "-")
-    Vec.OpMultiply -> H.Var (HsSymbol "Prelude" "*")
-    Vec.OpDivide   -> H.Var (HsSymbol "Prelude" "/")
-    Vec.OpDiv      -> H.Var (HsIdent "Prelude" "div")
-    Vec.OpMod      -> H.Var (HsIdent "Prelude" "mod")
-    Vec.OpMore     -> H.Var (HsSymbol "Prelude" ">")
-    Vec.OpLess     -> H.Var (HsSymbol "Prelude" "<")
-    Vec.OpMoreEquals -> H.Var (HsSymbol "Prelude" ">=")
-    Vec.OpLessEquals -> H.Var (HsSymbol "Prelude" "<=")
-    Vec.OpEquals   -> H.Var (HsSymbol "Prelude" "==")
-    Vec.OpNotEquals-> H.Var (HsSymbol "Prelude" "/=")
-    Vec.OpTrue     -> H.Con (HsIdent "Prelude" "True")
-    Vec.OpFalse    -> H.Con (HsIdent "Prelude" "False")
-    Vec.OpAnd      -> H.Var (HsSymbol "Prelude" "&&")
-    Vec.OpOr       -> H.Var (HsSymbol "Prelude" "||")
-    Vec.OpNot      -> H.Var (HsIdent "Prelude" "not")
-    Vec.OpElem     -> H.Var (HsIdent "Prelude" "elem")
-    Vec.OpRange    -> H.Var (HsIdent "Prelude" "enumFromTo")
-    Vec.OpId       -> H.Var (HsIdent "Prelude" "id")
-    Vec.OpFst      -> H.Var (HsIdent "Prelude" "fst")
-    Vec.OpSnd      -> H.Var (HsIdent "Prelude" "snd")
-    Vec.OpSwap     -> H.Var (HsIdent "Data.Tuple" "swap")
-    Vec.OpPutLn    -> H.Var (HsIdent "Prelude" "putStrLn")
-    Vec.OpPut      -> H.Var (HsIdent "Prelude" "putStr")
-    Vec.OpGetLn    -> H.Var (HsIdent "Prelude" "getLine")
-    Vec.OpReadLn   -> H.Var (HsIdent "Prelude" "readLn")
-    Vec.OpPrintLn  -> H.Var (HsIdent "Prelude" "print")
-    Vec.OpConcat   -> H.Var (HsSymbol "Prelude" "++")
-    Vec.OpTake     -> H.Var (HsIdent "Prelude" "take")
-    Vec.OpRepeat   -> H.Var (HsIdent "Prelude" "repeat")
-    Vec.OpBind      -> H.Var (HsSymbol "Prelude" ">>=")
-    Vec.OpBindIgnore-> H.Var (HsSymbol "Prelude" ">>")
-    Vec.OpFmapIgnore-> H.Var (HsSymbol "Control.Applicative" "<$")
-    Vec.OpIgnore    -> H.Var (HsIdent "Control.Monad" "void")
-    Vec.OpWhen      -> H.Var (HsIdent "Control.Monad" "when")
-    Vec.OpTaint     -> H.Var (HsIdent "Prelude" "return")
-    Vec.OpIntToDouble -> H.Var (HsIdent "Prelude" "fromIntegral")
-    Vec.OpUndefined -> H.Var (HsIdent "Prelude" "undefined")
-    Vec.OpMain -> H.Var (H.UnQual (H.main_name))

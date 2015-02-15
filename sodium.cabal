@@ -25,6 +25,7 @@ library
                        Sodium.Nucleus.Scalar.Atomize
                        Sodium.Nucleus.Scalar.Valueficate
                        Sodium.Nucleus.Vector.Program
+                       Sodium.Nucleus.Vector.Operator
                        Sodium.Nucleus.Vector.Name
                        Sodium.Nucleus.Vector.Recmap
                        Sodium.Nucleus.Vector.Pattern
