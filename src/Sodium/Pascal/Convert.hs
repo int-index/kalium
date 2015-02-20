@@ -8,6 +8,7 @@ module Sodium.Pascal.Convert (convert, Error(..)) where
 import Sodium.Prelude
 import Sodium.Util
 
+import Control.Lens (ix)
 import qualified Data.Map as M
 
 import Control.Monad.Trans.Maybe
@@ -233,6 +234,7 @@ typecheck' = runMaybeT . \case
     S.Access name -> typeOfAccess name
     S.Call (Right "length") args -> do
         traverse typecheck args >>= \case
+            [S.TypeString ] -> return S.TypeInteger
             [S.TypeArray _] -> return S.TypeInteger
             _ -> badType
     S.Call (Right name) args -> do
@@ -269,6 +271,7 @@ typecheck' = runMaybeT . \case
             (S.OpNegate  , [t1]) | isNumeric t1 -> return t1
             (S.OpPlus    , [t1]) | isNumeric t1 -> return t1
             (S.OpNot     , [S.TypeBoolean]) -> return S.TypeBoolean
+            (S.OpIx      , [S.TypeString  , S.TypeInteger]) -> return S.TypeChar
             (S.OpIx      , [S.TypeArray t1, S.TypeInteger]) -> return t1
             (S.OpCharToString, [S.TypeChar   ]) -> return S.TypeString
             (S.OpIntToReal   , [S.TypeInteger]) -> return S.TypeReal
@@ -399,7 +402,13 @@ convExpr = \case
             Left S.OpPlus   -> direct D.OpId
             Left S.OpNegate -> direct D.OpNegate
             Left S.OpNot    -> direct D.OpNot
-            Left S.OpIx  -> direct D.OpIx
+            Left S.OpIx  -> do
+                let sub e a = D.Call (D.NameSpecial D.OpSubtract) [] [a, e]
+                    one = D.expression (1 :: Integer)
+                traverse typecheck' exprs >>= \case
+                    Just S.TypeString : _ -> D.Call (D.NameSpecial D.OpIx) []
+                       <$> (traverse convExpr exprs <&> ix 1 %~ sub one)
+                    _  -> direct D.OpIx
             Left S.OpCharToString -> direct D.OpSingleton
             Left S.OpIntToReal    -> direct D.OpIntToDouble
             Right "length" -> direct D.OpLength
