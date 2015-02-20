@@ -56,6 +56,7 @@ appIgnore :: Endo' Expression
 appIgnore = \case
 
     Follow PWildCard x a -> AppOp2 OpBindIgnore x a
+    AppOp2 OpBindIgnore (Taint LitUnit) a -> a
     AppOp2 OpBindIgnore x (Taint a) -> AppOp2 OpFmapIgnore a x
     AppOp2 OpBindIgnore (propagate attemptIgnore -> Just x) a
         -> AppOp2 OpBindIgnore x a

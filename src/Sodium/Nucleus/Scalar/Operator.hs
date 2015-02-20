@@ -215,6 +215,13 @@ operators = M.fromList
         , vec = vecApp' (Vec.NameSpecial Vec.OpPut)
         }
 
+    , OpChr # Operator
+        { tc = nta $ \args -> do
+            listMatch1 args >>= require (==TypeInteger)
+            return TypeChar
+        , vec = vecApp (Vec.NameSpecial Vec.OpChr)
+        }
+
     , OpGetLn # Operator
         { tc = nta $ \args -> guard (null args) >> return TypeString
         , vec = vecApp' (Vec.NameSpecial Vec.OpGetLn)

@@ -178,11 +178,15 @@ convWriteLn ln exprs = do
         tcs <- typecasts expr
         case keepByFst (==S.TypeString) tcs of
             tc:_ -> convExpr tc
-            [] -> case listToMaybe (map snd tcs) of
-                Nothing -> throwError errorTypecheck
-                Just expr' -> do
-                    e <- convExpr expr'
-                    return $ D.Call (D.NameSpecial D.OpShow) [] [e]
+            [] -> case keepByFst (==S.TypeChar) tcs of
+                tc:_ -> do
+                    e <- convExpr tc
+                    return $ D.Call (D.NameSpecial D.OpSingleton) [] [e]
+                [] -> case listToMaybe (map snd tcs) of
+                    Nothing -> throwError errorTypecheck
+                    Just expr' -> do
+                        e <- convExpr expr'
+                        return $ D.Call (D.NameSpecial D.OpShow) [] [e]
 
 typeOfLiteral :: S.Literal -> S.Type
 typeOfLiteral = \case
@@ -232,6 +236,10 @@ typecheck' :: (E e m, R m) => S.Expression -> m (Maybe S.Type)
 typecheck' = runMaybeT . \case
     S.Primary lit -> return (typeOfLiteral lit)
     S.Access name -> typeOfAccess name
+    S.Call (Right "chr") args -> do
+        traverse typecheck args >>= \case
+            [S.TypeInteger] -> return S.TypeChar
+            _ -> badType
     S.Call (Right "length") args -> do
         traverse typecheck args >>= \case
             [S.TypeString ] -> return S.TypeInteger
@@ -412,6 +420,7 @@ convExpr = \case
             Left S.OpCharToString -> direct D.OpSingleton
             Left S.OpIntToReal    -> direct D.OpIntToDouble
             Right "length" -> direct D.OpLength
+            Right "chr" -> direct D.OpChr
             Right name  -> nameF name >>= direct'
     S.Primary lit -> conv lit
 

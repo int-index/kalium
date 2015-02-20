@@ -146,6 +146,9 @@ operators = M.fromList
     , OpPut # Operator
         { hs = H.Var (HsIdent "Prelude" "putStr")
         }
+    , OpChr # Operator
+        { hs = H.Var (HsIdent "Data.Char" "chr")
+        }
     , OpGetLn # Operator
         { hs = H.Var (HsIdent "Prelude" "getLine")
         }

@@ -36,6 +36,7 @@ data NameSpecial
     | OpReadLn
     | OpPutLn
     | OpPut
+    | OpChr
     | OpGetLn
     | OpId
     | OpUnit

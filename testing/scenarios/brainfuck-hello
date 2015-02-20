@@ -1,0 +1,8 @@
+#!/usr/bin/python3
+from subprocess import check_output
+
+code = b'++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.\n'
+
+program = input()
+if check_output(program, input=code, timeout=3) != b'Hello World!\n':
+    print('output mismatch')
