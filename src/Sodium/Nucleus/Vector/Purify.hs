@@ -127,7 +127,7 @@ typeDrivenUnlambda ty a =
 
         | tysLength > psLength -> do
             let tys' = drop psLength tys
-            b <- etaExpand tys' a'
+            b <- etaExpand tys' a -- TODO: or is it a'?
             typeDrivenUnlambda ty b
 
         | otherwise -> return ( (ps,tys) , (a',ty') )

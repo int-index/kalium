@@ -174,12 +174,13 @@ unbeta = reverse . go where
         e -> [e]
 
 etaExpand
-    :: (Applicative m, MonadNameGen m)
-    => [Type] -> EndoKleisli' m Expression
-etaExpand [] = return
-etaExpand (ty:tys) = \e -> do
-    name <- NameGen <$> mkname Nothing
-    Eta (PAccess name ty) <$> etaExpand tys e <*> pure (Access name)
+     :: (Applicative m, MonadNameGen m)
+     => [Type] -> EndoKleisli' m Expression
+etaExpand tys e = do
+    (unzip -> (exps, pats)) <- forM tys $ \ty -> do
+        name <- NameGen <$> mkname Nothing
+        return (Access name, PAccess name ty)
+    return $ lambda pats $ beta (e:exps)
 
 data Pattern
     = PTuple Pattern Pattern
