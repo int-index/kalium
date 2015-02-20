@@ -35,8 +35,8 @@ operators = M.fromList
         }
     , OpIxSet # Operator
         { hs = (H.Var (HsSymbol "Prelude" "."))
-            `H.App` H.Var (HsSymbol "Control.Lens" "set")
-            `H.App` H.Var (HsSymbol "Control.Lens" "ix")
+            `H.App` H.Var (HsIdent "Control.Lens" "set")
+            `H.App` H.Var (HsIdent "Control.Lens" "ix")
         }
     , OpLength # Operator
         { hs = H.Var (HsIdent "Prelude" "length")

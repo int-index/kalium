@@ -6,25 +6,28 @@ import Sodium.Prelude
 import Sodium.Util
 import Data.Data
 import qualified Data.Set as S
+import qualified Data.Map as M
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.SrcLoc (noLoc)
 
 imports :: Module -> Module
 imports (Module srcLoc name pragmas wtext exportSpec importDecls decls) =
     let importDecls' = importDecls ++ map importDecl
-            (toList (ModuleName "Prelude" `S.delete` modules))
+            (itoList (ModuleName "Prelude" `M.delete` modules))
         modules = gcollect decls
     in unqual (Module srcLoc name pragmas wtext exportSpec importDecls' decls)
         `runReader` mempty
 
-importDecl moduleName =
+importDecl (moduleName, names) =
     ImportDecl noLoc moduleName
-    False False False Nothing Nothing Nothing
+    False False False Nothing Nothing (Just (False, IAbs <$> toList names))
 
-gcollect :: Data a => a -> Set ModuleName
-gcollect = execWriter . go where
-  go :: (Data d, Applicative m, MonadWriter (Set ModuleName) m) => d -> m d
-  go a | Just (Qual moduleName _) <- cast a = a <$ tell (S.singleton moduleName)
+gcollect :: Data a => a -> Map ModuleName (Set Name)
+gcollect = (`execState` mempty) . go where
+  go :: (Data d, Applicative m, MonadState (Map ModuleName (Set Name)) m)
+     => EndoKleisli' m d
+  go a | Just (Qual moduleName name) <- cast a
+       = a <$ modify (M.insertWith S.union moduleName (S.singleton name))
        | otherwise = gmapM go a
 
 class Unqual a where
