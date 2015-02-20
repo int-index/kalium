@@ -55,11 +55,20 @@ resolve1 :: Map Name Name -> P1 -> [P2]
 resolve1 table (P1 name arity name' gen)
     = maybeToList $ uncurry (P2 name arity name') `fmap` gen table
 
+sift :: [P2] -> [P2]
+sift p2s
+    | all satisfied p2s = p2s
+    | otherwise = sift (filter satisfied p2s)
+  where
+    available = S.unions
+        [ S.singleton (Request name' arity) | P2 _ arity name' _ _ <- p2s ]
+    satisfied (P2 _ _ _ _ reqs) = reqs `S.isSubsetOf` available
+
 fulfil :: [P2] -> [[PurifyInfo]]
 fulfil p2s = groups where
 
     (graph, lookupVertex, _) = G.graphFromEdges
-        $ flip map p2s
+        $ flip map (sift p2s)
         $ \(P2 name arity name' func reqs) ->
             ( PurifyInfo name arity name' func
             , Request name arity

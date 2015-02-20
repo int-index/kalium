@@ -72,4 +72,4 @@ optimizeStep = closureM (logging f) >=> logging reorder
             >=> return . bindClean
             >=> extractCtx
             >=> argClean
-         -- >=> purify
+            >=> purify
