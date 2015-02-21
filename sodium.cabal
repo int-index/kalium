@@ -42,6 +42,7 @@ library
                        Sodium.Nucleus.Vectorize
                        Control.Monad.Rename
                        Control.Monad.Config
+                       Control.Dependent
 
   build-depends:       base
                ,       transformers

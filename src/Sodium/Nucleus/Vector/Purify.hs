@@ -1,4 +1,6 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Sodium.Nucleus.Vector.Purify where
 
 import Sodium.Prelude
@@ -6,8 +8,7 @@ import Sodium.Util
 
 import qualified Data.Map as M
 import qualified Data.Set as S
-import qualified Data.Graph as G
-import Data.Tree (flatten)
+import qualified Control.Dependent as Dep
 
 import Sodium.Nucleus.Vector.Program
 import Sodium.Nucleus.Vector.Recmap
@@ -16,8 +17,8 @@ import Sodium.Nucleus.Vector.Name
 purify :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
 purify program = do
     p1s <- execWriterT $ itraverse funcPurify (program ^. programFuncs)
-    let p2s = resolve p1s
-        infoGroups = fulfil p2s
+    let p2s = resolve' p1s
+        infoGroups = (map.map) fst (Dep.group p2s)
     return (substitute infoGroups program)
 
 substitute :: [[PurifyInfo]] -> Endo' Program
@@ -40,43 +41,24 @@ substituteSCC infoGroup program =
 
 data Request = Request Name Int
     deriving (Eq, Ord)
-data P1 = P1 Name Int Name (Map Name Name -> Maybe (Func, Set Request))
-data P2 = P2 Name Int Name Func (Set Request)
+data P1 = P1 Name Int Name (Pairs Name Name -> Maybe (Func, Set Request))
 
 data PurifyInfo = PurifyInfo Name Int Name Func
 
-resolve :: [P1] -> [P2]
-resolve p1s =
-    let cell (P1 name _ name' _) = M.singleton name name'
-        table = p1s & map cell & M.unions
-    in p1s >>= resolve1 table
+instance Dep.Dependent (PurifyInfo, Set Request) where
+    type Name (PurifyInfo, Set Request) = Request
+    provides (fst -> PurifyInfo _ arity name' _) = Request name' arity
+    depends = snd
 
-resolve1 :: Map Name Name -> P1 -> [P2]
-resolve1 table (P1 name arity name' gen)
-    = maybeToList $ uncurry (P2 name arity name') `fmap` gen table
+resolve :: Monad m => (m a -> a -> m b) -> m a -> m b
+resolve f ma = ma >>= f ma
 
-sift :: [P2] -> [P2]
-sift p2s
-    | all satisfied p2s = p2s
-    | otherwise = sift (filter satisfied p2s)
+resolve' = resolve getGen
   where
-    available = S.unions
-        [ S.singleton (Request name' arity) | P2 _ arity name' _ _ <- p2s ]
-    satisfied (P2 _ _ _ _ reqs) = reqs `S.isSubsetOf` available
-
-fulfil :: [P2] -> [[PurifyInfo]]
-fulfil p2s = groups where
-
-    (graph, lookupVertex, _) = G.graphFromEdges
-        $ flip map (sift p2s)
-        $ \(P2 name arity name' func reqs) ->
-            ( PurifyInfo name arity name' func
-            , Request name arity
-            , S.toList reqs )
-
-    groups = (fmap.fmap) (view _1 . lookupVertex)
-           $  fmap flatten
-           $ G.scc graph
+    getGen ps (P1 name arity name' gen) = maybeToList $ do
+        (func, reqs) <- gen (map getNames ps)
+        return (PurifyInfo name arity name' func, reqs)
+    getNames = \(P1 name _ name' _) -> (name, name')
 
 funcPurify
     :: ( Applicative m
@@ -98,7 +80,7 @@ funcPurify name (Func ty a) = do
 
 expForcePurify
     :: ( Applicative m
-       , MonadReader (Map Name Name) m
+       , MonadReader (Pairs Name Name) m
        , MonadError () m
        , MonadWriter (Set Request) m)
     => EndoKleisli' m Expression
@@ -113,13 +95,13 @@ expForcePurify = \case
         <*> pure cond
     (unbeta -> (Access name : es)) -> do
         let arity = length es
-        name' <- asks (M.lookup name) >>= maybe (throwError ()) return
+        name' <- asks (lookup name) >>= maybe (throwError ()) return
         tell (S.singleton (Request name' arity))
         return (beta (Access name' : es))
     _ -> throwError ()
 
 expForcePurify'
-    :: Expression -> Map Name Name -> Maybe (Expression, Set Request)
+    :: Expression -> Pairs Name Name -> Maybe (Expression, Set Request)
 expForcePurify' = fmap runError . runReaderT . runWriterT . expForcePurify
     where runError = either (const Nothing) Just . runExcept
 
