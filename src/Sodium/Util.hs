@@ -32,4 +32,24 @@ zipFilter _ _ = Nothing
 keepByFst :: (b -> Bool) -> Pairs b a -> [a]
 keepByFst p = map snd . filter (p . fst)
 
+far k f = foldr (\h go -> k go (f h)) id
+
+asfar :: (h -> a -> Maybe a) -> [h] -> (a -> a)
+asfar = far $ \go -> toEndoWith id go id
+
+sofar :: (h -> a -> Maybe a) -> [h] -> (a -> a)
+sofar = far $ \go -> toEndoWith id id go
+
+nofar :: (h -> a -> Maybe a) -> [h] -> (a -> a)
+nofar = far $ \go -> toEndoWith go id id
+
+toEndoWith
+    :: (a -> a) -- failure
+    -> (a -> a) -- success
+    -> (a -> a) -- both
+    -> (a -> Maybe a)
+    -> (a -> a)
+toEndoWith failure success both f = \a -> both (maybe (failure a) success (f a))
+
+
 type MonadNameGen m = MonadRename Integer String m

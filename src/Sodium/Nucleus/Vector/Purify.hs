@@ -1,6 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 module Sodium.Nucleus.Vector.Purify where
 
 import Sodium.Prelude
@@ -17,38 +16,34 @@ import Sodium.Nucleus.Vector.Name
 purify :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
 purify program = do
     p1s <- execWriterT $ itraverse funcPurify (program ^. programFuncs)
-    let p2s = resolve' p1s
-        infoGroups = (map.map) fst (Dep.group p2s)
-    return (substitute infoGroups program)
-
-substitute :: [[PurifyInfo]] -> Endo' Program
-substitute = tryApply . (flip.foldM.flip) substituteSCC
+    return $ Dep.restructure substituteSCC (resolve' p1s) program
 
 substituteSCC :: [PurifyInfo] -> EndoKleisli' Maybe Program
 substituteSCC infoGroup program =
-    let impureNames = S.unions [ S.singleton name | PurifyInfo name _ _ _ <- infoGroup ]
+    let impureNames = S.fromList [ name | PurifyInfo name _ _ _ _ <- infoGroup ]
         program' = withPure
         dangling = program' `mentions` impureNames
         withoutImpure = S.foldr
             (\name -> programFuncs %~ M.delete name) program impureNames
         replacedCalls = withoutImpure & over recmapped purifyExpression
         withPure = replacedCalls & programFuncs %~ M.union pureFuncs
-        pureFuncs = M.unions [ M.singleton name' func | PurifyInfo _ _ name' func <- infoGroup ]
+        pureFuncs = M.fromList $ do
+            PurifyInfo _ _ name' func _ <- infoGroup
+            return (name', func)
     in if dangling then Nothing else Just program'
   where
     purifyExpression :: Endo' Expression
     purifyExpression = foldr (.) id $ map (tryApply.appPurify) infoGroup
 
-data Request = Request Name Int
-    deriving (Eq, Ord)
+type Request = (Name, Int)
 data P1 = P1 Name Int Name (Pairs Name Name -> Maybe (Func, Set Request))
 
-data PurifyInfo = PurifyInfo Name Int Name Func
+data PurifyInfo = PurifyInfo Name Int Name Func (Set Request)
 
-instance Dep.Dependent (PurifyInfo, Set Request) where
-    type Name (PurifyInfo, Set Request) = Request
-    provides (fst -> PurifyInfo _ arity name' _) = Request name' arity
-    depends = snd
+instance Dep.Dependent PurifyInfo where
+    type Name PurifyInfo = Request
+    provides (PurifyInfo _ arity name' _ _) = (name', arity)
+    depends (PurifyInfo _ _ _ _ reqs) = reqs
 
 resolve :: Monad m => (m a -> a -> m b) -> m a -> m b
 resolve f ma = ma >>= f ma
@@ -57,7 +52,7 @@ resolve' = resolve getGen
   where
     getGen ps (P1 name arity name' gen) = maybeToList $ do
         (func, reqs) <- gen (map getNames ps)
-        return (PurifyInfo name arity name' func, reqs)
+        return (PurifyInfo name arity name' func reqs)
     getNames = \(P1 name _ name' _) -> (name, name')
 
 funcPurify
@@ -96,7 +91,7 @@ expForcePurify = \case
     (unbeta -> (Access name : es)) -> do
         let arity = length es
         name' <- asks (lookup name) >>= maybe (throwError ()) return
-        tell (S.singleton (Request name' arity))
+        tell (S.singleton (name', arity))
         return (beta (Access name' : es))
     _ -> throwError ()
 
@@ -124,7 +119,7 @@ typeDrivenUnlambda ty a =
         | otherwise -> return ( (ps,tys) , (a',ty') )
 
 appPurify :: PurifyInfo -> Expression -> Maybe Expression
-appPurify (PurifyInfo name arity name' _) e
+appPurify (PurifyInfo name arity name' _ _) e
     | (Access op:es) <- unbeta e, op == name
     , arity == length es
     = Just $ Taint . beta $ (Access name' : es)
