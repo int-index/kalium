@@ -14,16 +14,16 @@ argClean :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
 argClean program = do
     let funcs = program ^. programFuncs
     info <- execWriterT (itraverse funcArgClean funcs)
-    return (foldr substitute program info)
+    return (sofar substitute info program)
 
-substitute :: CleanInfo -> Endo' Program
-substitute info program
-    | program' <- (recmapped %~ tryApply (appArgClean info))
-                  (programReplaceFunc info program)
-    , CleanInfo name _ _ _ <- info
-    , False <- program' `mentions` name
-    = program'
-substitute _ program = program
+substitute :: CleanInfo -> EndoKleisli' Maybe Program
+substitute info@(CleanInfo name _ _ _) program
+    | program' `mentions` name = Nothing
+    | otherwise = Just program'
+  where
+    program'
+        = programReplaceFunc info program
+        & recmapped %~ tryApply (appArgClean info)
 
 data CleanInfo = CleanInfo Name [Bool] Name Func
 
@@ -31,8 +31,9 @@ programReplaceFunc :: CleanInfo -> Endo' Program
 programReplaceFunc (CleanInfo name _  name' func)
     = programFuncs %~ M.insert name' func . M.delete name
 
-funcArgClean :: (Applicative m, MonadWriter [CleanInfo] m, MonadNameGen m)
-             => Name -> Func -> m ()
+funcArgClean
+    :: (Applicative m, MonadWriter [CleanInfo] m, MonadNameGen m)
+    => Name -> Func -> m ()
 funcArgClean name (Func ty a) = do
     name' <- alias name
     let (ps, b) = unlambda a

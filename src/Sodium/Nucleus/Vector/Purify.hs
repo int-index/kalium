@@ -33,7 +33,7 @@ substituteSCC infoGroup program =
     in if dangling then Nothing else Just program'
   where
     purifyExpression :: Endo' Expression
-    purifyExpression = foldr (.) id $ map (tryApply.appPurify) infoGroup
+    purifyExpression = sofar appPurify infoGroup
 
 type Request = (Name, Int)
 data P1 = P1 Name Int Name (Pairs Name Name -> Maybe (Func, Set Request))
