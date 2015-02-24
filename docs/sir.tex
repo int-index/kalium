@@ -16,14 +16,31 @@ internal and their specifications are provided in this document.
 
 \section { The Scalar Representation }
 
-The scalar representation comes in two flavors: non-atomic and atomic.
-Translation of the former to the latter is called \emph{atomization}. The only
-difference between the two is that in the atomic scalar representation every
-expression is atomic, whereas in the non-atomic one some are not. It can also be
-with or without reference parameters. Removal of reference parameters is called
-\emph{valuefication}.
+The scalar representation is a minimalistic formal system designed to represent
+programs in procedural style. It comes in multiple flavors, defined by the
+following properties (which it may or may not have):
+
+\begin {description}
+
+\item [Atomicity] means that all expressions in a program are atomic. Atomic
+expressions are limited to literals and accessing variables, and thus their
+evaluation is guaranteed to have no side effects. This is an important property
+used during vectorization.
+
+\item [Referencing] means that functions are allowed to use pass-by-reference
+mechanism for some of their parameters. Aliasing is not allowed, though.
+
+\end {description}
+
+The scalar representation is statically typed. There are some built-in
+polymorphic operations, but all user-defined functions and variables have a
+concrete monomorphic type.
 
 \subsection { Program Structure }
+
+Below we describe the non-atomic referencing flavor of the scalar
+representation. The other three (atomic referencing, non-atomic non-referencing,
+atomic non-referencing) are the restricted versions of it.
 
 \begin {description}
 
@@ -61,7 +78,7 @@ semantics.
 
 \item [Statement \emph{exec}] calls a function with some specific values. It
 optionally binds the return value to a variable. Thus, it consists of a name of
-the function to be called, a list of arguments, and an optional variable name.
+the function to be called, a list of arguments, and a variable binding pattern.
 An argument is an expression which is evaluated in order to provide a function
 with a value of its parameter. The arguments are evaluated left-to-right before
 the call.
