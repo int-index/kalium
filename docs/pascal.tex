@@ -1,0 +1,85 @@
+\documentclass [a4paper] {article}
+\title { Sodium Pascal Subset }
+\author { Index Int }
+
+\usepackage{indentfirst}
+\usepackage{listings}
+
+\begin {document}
+
+\maketitle
+
+\lstset{language=Pascal}
+
+\emph{Sodium} supports only a subset of Pascal. It also relies heavily on FPC
+(Free Pascal Compiler) for error detection---if your program does not compile
+with FPC, \emph{Sodium} does not promise to detect an error. Instead, it is
+allowed to generate arbitrary code.
+
+Even if your program compiles, the implemented subset of Pascal is quite limited
+right now, but will be extended over time.
+
+\section { The Implemented Subset }
+
+\begin {itemize}
+
+\item Data types: \texttt{String}, \texttt{Char}, \texttt{Integer},
+\texttt{LongInt}, \texttt{Real}, \texttt{Boolean}. The size and lower/upper
+bounds of both \texttt{Integer} and \texttt{LongInt} are the same as those of
+the \texttt{Int} type in Haskell. \texttt{Char} is Unicode-aware.
+
+\item Basic arithmetics (\texttt{+}, \texttt{-}, \texttt{*}, \texttt{mod},
+\texttt{div}), logic (\texttt{and}, \texttt{or}, \texttt{xor}, \texttt{not}),
+comparisons (\texttt{>}, \texttt{<}, \texttt{<>}, \texttt{>=}, \texttt{<=},
+\texttt{=}).
+
+\item The assignment statement (\texttt{:=}), the conditional statement
+(\texttt{if then else}), the for loop (\texttt{for to do}), the switch statement
+(\texttt{case of}), statement blocks (\texttt{begin end}).
+
+\item A variation of the \texttt{ReadLn} procedure that accepts exactly one
+parameter. The \texttt{Write} and \texttt{WriteLn} procedures.
+
+\item User-defined functions and procedures with full input/output support,
+direct and indirect recursion support, and partial reference parameters support
+(no aliasing). Local variables.
+
+\end {itemize}
+
+\section { Work in Progress }
+
+There is a limited support for dynamic arrays. The \texttt{SetLength} procedure
+is implemented. Indexing (\texttt{[]}) is partially implemented: it can be used
+to access an element of an array or to set it using the assignment statement,
+but it can't be used to pass an element as a reference parameter. The obvious
+workaround is to use a temporary variable.
+
+\section { The Problem with Aliasing }
+
+Though reference parameters in functions and procedures are supported, you must
+be careful to never introduce aliased variables. In their presence, the
+semantics of your program may change significantly.
+
+Aliasing happens when different names refer to the same variable. Consider the
+following function:
+
+\begin{lstlisting}
+function f(var a, b: Integer): Integer;
+begin
+    a := 0;
+    f := b;
+end.
+\end{lstlisting}
+
+It changes the value of \texttt{a} and returns \texttt{b} unchanged. But if you
+call it as \texttt{f(x,x)}, then inside the function both \texttt{a} and
+\texttt{b} refer to \texttt{x}, so changing the value of \texttt{a} changes the
+value of \texttt{b}! As of yet, \emph{Sodium} does not handle this behaviour
+properly. The rule of thumb to avoid aliasing: don't ever pass the same variable
+as different reference parameters.
+
+The solution to this problem would be to generate multiple versions of a
+function, one for every possible combination of aliased variables.
+Unfortunately, it also would lead to massive code duplication.
+
+\end {document}
