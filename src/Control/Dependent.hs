@@ -1,8 +1,8 @@
 {-# LANGUAGE TypeFamilies, FlexibleContexts #-}
 module Control.Dependent where
 
-import Sodium.Prelude hiding (group)
-import Sodium.Util (asfar)
+import Kalium.Prelude hiding (group)
+import Kalium.Util (asfar)
 import qualified Data.Set as S
 import qualified Data.Graph as G
 import Data.Tree (flatten)

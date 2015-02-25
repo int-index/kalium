@@ -1,4 +1,4 @@
-# Sodium
+# Kalium
 
 This is a Pascal to Haskell translator. The ultimate goal is to generate
 idiomatic functional code from imperative code. The project is under heavy
@@ -7,7 +7,7 @@ development, so nothing is documented.
 
 ## Building
 
-You need the following programs to build *Sodium*:
+You need the following programs to build *Kalium*:
 
 * ghc (7.8.4 or higher)
 * cabal-install (1.22 or higher)
@@ -40,12 +40,12 @@ a message to `STDOUT` if something is wrong.
 
 ## Structure
 
-*Sodium* consists of a library that contains all the functionality and an
+*Kalium* consists of a library that contains all the functionality and an
 extremely small command-line tool. There are three parts of the library:
 
-* Front-end: `Sodium.Pascal`
-* Core: `Sodium.Nucleus`
-* Back-end: `Sodium.Haskell`
+* Front-end: `Kalium.Pascal`
+* Core: `Kalium.Nucleus`
+* Back-end: `Kalium.Haskell`
 
 The distinction between these parts is kept clear to allow front/back-ends for
 other languages in the future. The command-line tool isn't ready for use yet,

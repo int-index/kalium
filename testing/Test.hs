@@ -20,7 +20,7 @@ import Test.Tasty.HUnit
 import Control.Concurrent (myThreadId)
 import Control.Exception
 
-import qualified Sodium
+import qualified Kalium
 
 main :: IO ()
 main = do
@@ -41,14 +41,14 @@ testRegroup = foldr (uncurry go) ([], [], [], [])
           go name = \case
             Success -> over _4 (testCase name success:)
             TG_Structure a -> over _1 (testCase name a:)
-            TG_Sodium a -> over _2 (testCase name a:)
+            TG_Kalium a -> over _2 (testCase name a:)
             TG_GHC    a -> over _3 (testCase name a:)
             TG_Scenarios as -> over _4 (tg:)
                 where tg = testGroup name (uncurry testCase `map` as)
 
 data TestGen = Success
              | TG_Structure Assertion
-             | TG_Sodium    Assertion
+             | TG_Kalium    Assertion
              | TG_GHC       Assertion
              | TG_Scenarios [(TestName, Assertion)]
 
@@ -74,9 +74,9 @@ testStage0 = catch' handler action
 
 testStage1 :: (Bool, String) -> ExceptT TestGen IO String
 testStage1 (shouldfail, source)
-        = withExceptT handle (snd <$> Sodium.translate True source)
+        = withExceptT handle (snd <$> Kalium.translate True source)
     where handle _ | shouldfail = Success
-          handle e = TG_Sodium (assertFailure (show e))
+          handle e = TG_Kalium (assertFailure (show e))
 
 testStage2 :: String -> ExceptT TestGen IO BS.ByteString
 testStage2 source = catch' handler action
