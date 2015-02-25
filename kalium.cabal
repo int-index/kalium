@@ -1,7 +1,9 @@
 name:                kalium
 version:             0.1.0.0
-synopsis:            A Pascal to Haskell translator.
-description:         A Pascal to Haskell translator.
+synopsis:            Translate Pascal into Haskell
+description:
+    Kalium is a Pascal to Haskell translator. The ultimate goal is to generate
+    idiomatic functional code from imperative code.
 category:            Code Generation
 license:             BSD3
 license-file:        LICENSE
