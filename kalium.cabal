@@ -1,11 +1,20 @@
 name:                kalium
 version:             0.1.0.0
 synopsis:            A Pascal to Haskell translator.
+description:         A Pascal to Haskell translator.
+category:            Code Generation
 license:             BSD3
 license-file:        LICENSE
 author:              Index Int
+maintainer:          Index Int <vlad.z.4096@gmail.com>
+homepage:            http://int-index.github.io/kalium/
+bug-reports:         http://github.com/int-index/kalium/issues
 build-type:          Simple
 cabal-version:       >=1.18
+
+source-repository head
+  type:                git
+  location:            git://github.com/int-index/kalium.git
 
 library
   exposed-modules:     Kalium
@@ -44,7 +53,7 @@ library
                        Control.Monad.Config
                        Control.Dependent
 
-  build-depends:       base
+  build-depends:       base < 5
                ,       transformers
                ,       mtl
                ,       containers
