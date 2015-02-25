@@ -1,5 +1,7 @@
 # Kalium
 
+[![Build status](https://secure.travis-ci.org/int-index/kalium.svg)](http://travis-ci.org/int-index/kalium)
+
 This is a Pascal to Haskell translator. The ultimate goal is to generate
 idiomatic functional code from imperative code. The project is under heavy
 development, so nothing is documented.
