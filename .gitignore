@@ -1,8 +1,6 @@
 dist
 .cabal-sandbox
 cabal.sandbox.config
-.idea
-sodium.iml
 docs/*.aux
 docs/*.log
 docs/*.pdf

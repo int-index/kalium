@@ -1,5 +1,5 @@
 \documentclass [a4paper] {article}
-\title { Sodium Pascal Subset }
+\title { Kalium Pascal Subset }
 \author { Index Int }
 
 \usepackage{indentfirst}
@@ -11,9 +11,9 @@
 
 \lstset{language=Pascal}
 
-\emph{Sodium} supports only a subset of Pascal. It also relies heavily on FPC
+\emph{Kalium} supports only a subset of Pascal. It also relies heavily on FPC
 (Free Pascal Compiler) for error detection---if your program does not compile
-with FPC, \emph{Sodium} does not promise to detect an error. Instead, it is
+with FPC, \emph{Kalium} does not promise to detect an error. Instead, it is
 allowed to generate arbitrary code.
 
 Even if your program compiles, the implemented subset of Pascal is quite limited
@@ -77,7 +77,7 @@ end.
 It changes the value of \texttt{a} and returns \texttt{b} unchanged. But if you
 call it as \texttt{f(x,x)}, then inside the function both \texttt{a} and
 \texttt{b} refer to \texttt{x}, so changing the value of \texttt{a} changes the
-value of \texttt{b}! As of yet, \emph{Sodium} does not handle this behaviour
+value of \texttt{b}! As of yet, \emph{Kalium} does not handle this behaviour
 properly. The rule of thumb to avoid aliasing: don't ever pass the same variable
 as different reference parameters.
 

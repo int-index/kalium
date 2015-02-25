@@ -30,7 +30,7 @@ main = do
 reifyTests :: [(String, TestGen)] -> TestTree
 reifyTests tests = testGroup "tests"
         [ testGroup "test structure" s0
-        , testGroup "sodium" s1
+        , testGroup "kalium" s1
         , testGroup "ghc"    s2
         , testGroup "scenarios" s3
         ]
