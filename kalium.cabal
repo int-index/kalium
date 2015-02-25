@@ -54,7 +54,7 @@ library
                        Control.Dependent
 
   build-depends:       base < 5
-               ,       transformers
+               ,       transformers >= 0.4
                ,       mtl
                ,       containers
                ,       unordered-containers
