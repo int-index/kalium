@@ -1,0 +1,220 @@
+<!doctype html>
+<html>
+    <head>
+        <link href='http://fonts.googleapis.com/css?family=Ubuntu:700|Droid+Serif:400,700&subset=latin,greek' rel='stylesheet' type='text/css'>
+        <style>
+            body {
+                font-family: 'Droid Serif', serif;
+            }
+            main {
+                width: 70%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            footer {
+                text-align: center;
+            }
+            table {
+                margin-left: auto;
+                margin-right: auto;
+                border-collapse: collapse;
+            }
+            .source {
+                padding: 1em;
+                border: thin solid #EEEEEE;
+                vertical-align: top;
+            }
+            tfoot {
+                font-size: x-small;
+                text-align: center;
+            }
+        </style>
+        <title>Kalium</title>
+    </head>
+    <body>
+    <main>
+        <table>
+            <thead>
+                <tr>
+                    <th> Pascal  </th>
+                    <th> Haskell </th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td class="source">
+<pre>
+function fib_(x: LongInt; var fib_2: LongInt): LongInt;
+var
+    a, b, c, d: LongInt;
+begin
+    if x = 0 then
+     begin
+        fib_  := 0;
+        fib_2 := 1;
+     end
+    else
+     begin
+        a := fib_(x div 2, b);
+        c := a * (2 * b - a);
+        d := b * b + a * a;
+        if x mod 2 = 0
+         then begin
+                 fib_  := c;
+                 fib_2 := d;
+              end
+         else begin
+                 fib_  := d;
+                 fib_2 := c + d;
+              end;
+     end;
+end;
+
+function fib(x: LongInt): LongInt;
+var
+    y: LongInt;
+begin
+    fib := fib_(x, y);
+end;
+
+var
+    x: LongInt;
+begin
+    ReadLn(x);
+    x := fib(x);
+    WriteLn(x);
+end.
+</pre>
+                    </td>
+                    <td class="source">
+<pre>
+main :: IO ()
+main
+  = do x &lt;- readLn
+       print (fib x)
+ 
+fib :: Int -&gt; Int
+fib x = fst (fib_ x)
+ 
+fib_ :: Int -&gt; (Int, Int)
+fib_ x
+  = if x == 0 then (0, 1) else
+      let (a, b) = fib_ (x `div` 2)
+          c = a * (2 * b - a)
+          d = b * b + a * a
+        in if x `mod` 2 == 0 then (c, d) else (d, c + d)
+</pre>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="source">
+<pre>
+(*
+function M(n: Integer): Integer; forward;
+*)
+
+function F(n: Integer): Integer;
+begin
+   if n = 0 then
+      F := 1
+   else
+      F := n - M(F(n-1));
+end;
+
+function M(n: Integer): Integer;
+begin
+   if n = 0 then
+      M := 0
+   else
+      M := n - F(M(n-1));
+end;
+
+var
+   i: Integer;
+
+begin
+   for i := 0 to 19 do
+      write(F(i), ' ');
+   writeln;
+   for i := 0 to 19 do
+      write(M(i), ' ');
+   writeln;
+end.
+</pre>
+                    </td>
+                    <td class="source">
+<pre>
+import Data.Foldable (traverse_)
+ 
+main :: IO ()
+main
+  = do traverse_ (\ i -&gt; putStr (show (f i) ++ " ")) [0 .. 19]
+       putStrLn []
+       traverse_ (\ i -&gt; putStr (show (m i) ++ " ")) [0 .. 19]
+       putStrLn []
+ 
+f :: Int -&gt; Int
+f n = if n == 0 then 1 else n - m (f (n - 1))
+ 
+m :: Int -&gt; Int
+m n = if n == 0 then 0 else n - f (m (n - 1))
+</pre>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="source">
+<pre>
+var
+    i, j, x: Integer;
+begin
+    WriteLn('Multiplication Table');
+    for i := 1 to 10 do begin
+        for j := 1 to 10 do begin
+            x := i*j;
+            Write(x);
+            if (x &gt;=  1) and (x &lt;=  9) then Write('   ');
+            if (x &gt;= 10) and (x &lt;= 99) then Write('  ');
+        end;
+        WriteLn();
+    end
+end.
+</pre>
+                    </td>
+                    <td class="source">
+<pre>
+import Control.Monad (when)
+import Data.Foldable (traverse_)
+ 
+main :: IO ()
+main
+  = do putStrLn "Multiplication Table"
+       traverse_
+         (\ i -&gt;
+            do traverse_
+                 (\ j -&gt;
+                    let x = i * j in
+                      do putStr (show x)
+                         when (x &gt;= 1 && x &lt;= 9) (putStr "   ")
+                         when (x &gt;= 10 && x &lt;= 99) (putStr "  "))
+                 [1 .. 10]
+               putStrLn [])
+         [1 .. 10]
+</pre>
+                    </td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2">
+                        the code above was translated using Kalium
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </main>
+    <footer>
+        <a href="https://github.com/int-index">Index Int</a>, 2015
+    </footer>
+    </body>
+</html>
