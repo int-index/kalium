@@ -164,7 +164,14 @@ convReadLn [e@(S.Access name')] = do
         ty' -> do
             ty <- conv ty'
             return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpReadLn) [ty] []
-convReadLn _ = error "IOMagic supports only single-value read operations"
+convReadLn _ = error "convReadLn: argument mismatch"
+
+convRead [e@(S.Access name')] = do
+    name <- nameV name'
+    typecheck e >>= \case
+        S.TypeChar -> return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpGetChar) [] []
+        _ -> error "convRead: type mismatch"
+convRead _ = error "convRead: argument mismatch"
 
 convWriteLn ln exprs = do
     arg <- traverse convArg exprs <&> \case
@@ -239,6 +246,10 @@ typecheck' = runMaybeT . \case
     S.Call (Right "chr") args -> do
         traverse typecheck args >>= \case
             [S.TypeInteger] -> return S.TypeChar
+            _ -> badType
+    S.Call (Right "ord") args -> do
+        traverse typecheck args >>= \case
+            [S.TypeChar] -> return S.TypeInteger
             _ -> badType
     S.Call (Right "length") args -> do
         traverse typecheck args >>= \case
@@ -329,6 +340,7 @@ instance Conv S.Statement where
                                 , D.expression (D.Access name) ]
                     return $ D.assign name expr
 
+        S.Execute "read"    exprs -> D.statement <$> convRead exprs
         S.Execute "readln"  exprs -> D.statement <$> convReadLn  exprs
         S.Execute "write"   exprs -> D.statement <$> convWriteLn False exprs
         S.Execute "writeln" exprs -> D.statement <$> convWriteLn True  exprs
@@ -421,6 +433,7 @@ convExpr = \case
             Left S.OpIntToReal    -> direct D.OpIntToDouble
             Right "length" -> direct D.OpLength
             Right "chr" -> direct D.OpChr
+            Right "ord" -> direct D.OpChrOrd
             Right name  -> nameF name >>= direct'
     S.Primary lit -> conv lit
 

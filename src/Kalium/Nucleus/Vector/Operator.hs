@@ -149,8 +149,14 @@ operators = M.fromList
     , OpChr # Operator
         { hs = H.Var (HsIdent "Data.Char" "chr")
         }
+    , OpChrOrd # Operator
+        { hs = H.Var (HsIdent "Data.Char" "ord")
+        }
     , OpGetLn # Operator
         { hs = H.Var (HsIdent "Prelude" "getLine")
+        }
+    , OpGetChar # Operator
+        { hs = H.Var (HsIdent "Prelude" "getChar")
         }
     , OpReadLn # Operator
         { hs = H.Var (HsIdent "Prelude" "readLn")

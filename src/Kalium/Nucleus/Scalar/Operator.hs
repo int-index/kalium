@@ -222,9 +222,21 @@ operators = M.fromList
         , vec = vecApp (Vec.NameSpecial Vec.OpChr)
         }
 
+    , OpChrOrd # Operator
+        { tc = nta $ \args -> do
+            listMatch1 args >>= require (==TypeChar)
+            return TypeInteger
+        , vec = vecApp (Vec.NameSpecial Vec.OpChrOrd)
+        }
+
     , OpGetLn # Operator
         { tc = nta $ \args -> guard (null args) >> return TypeString
         , vec = vecApp' (Vec.NameSpecial Vec.OpGetLn)
+        }
+
+    , OpGetChar # Operator
+        { tc = nta $ \args -> guard (null args) >> return TypeChar
+        , vec = vecApp' (Vec.NameSpecial Vec.OpGetChar)
         }
 
     , OpUnit # Operator

@@ -37,7 +37,9 @@ data NameSpecial
     | OpPutLn
     | OpPut
     | OpChr
+    | OpChrOrd
     | OpGetLn
+    | OpGetChar
     | OpId
     | OpUnit
     | OpPair

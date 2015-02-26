@@ -67,10 +67,10 @@ end;
 
 procedure interp_comma(s: String; var d: array of Integer; var p: Integer; i: Integer);
 var
-    x: Integer;
+    x: Char;
 begin
-  ReadLn(x);
-  d[p] := x;
+  Read(x);
+  d[p] := ord(x);
   interp(s, d, p, i+1);
 end;
 
