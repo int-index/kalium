@@ -46,6 +46,7 @@ import qualified Text.Parsec as P
     case     { T.KwCase  }
     of       { T.KwOf    }
     array    { T.KwArray }
+    forward  { T.KwForward }
     '('      { T.LParen  }
     ')'      { T.RParen  }
     ';'      { T.Semicolon }
@@ -82,11 +83,13 @@ import qualified Text.Parsec as P
 
 Program : Decls Vars Body '.' { Program (reverse $1) $2 $3 }
 
-Decls :            {      [] }
-      | Decls Decl { $2 : $1 }
+Decls :            {       [] }
+      | Decls Decl { $2 ++ $1 }
 
-Decl : Func { $1 }
-     | Proc { $1 }
+Decl : Func { [$1] }
+     | Proc { [$1] }
+     | FuncForward { $1 }
+     | ProcForward { $1 }
 
 Vars  :              { M.empty }
       | var VarDecls { M.fromList $2 }
@@ -106,6 +109,10 @@ Func : function  name         Params ':' Type ';' Vars Body ';'
 Proc : procedure name         Params          ';' Vars Body ';'
      { Func      $2  (FuncSig $3     Nothing   )  $5   $6    }
 
+FuncForward : function  name Params ':' Type ';' forward ';' { [] }
+ProcForward : procedure name Params          ';' forward ';' { [] }
+
+
 Params :                    { [] }
        | '('            ')' { [] }
        | '(' ParamDecls ')' { $2 }
@@ -117,7 +124,7 @@ ParamDecl : ParamIsVar ParamNames ':' Type
           { map (\name -> ParamDecl name ($1, $4)) (reverse $2) }
 
 ParamIsVar :     { ByValue     }
-ParamIsVar : var { ByReference }
+           | var { ByReference }
 
 ParamNames :                name { $1 : [] }
            | ParamNames ',' name { $3 : $1 }
@@ -174,16 +181,16 @@ Ranges : Range            { $1 : [] }
 Range :                 Expression { Left $1 }
       | Expression '..' Expression { Right ($1, $3) }
 
-Expression : Expression '+' Expression { binary OpAdd      $1 $3 }
-           | Expression '<' Expression { binary OpLess   $1 $3 }
-           | Expression '>' Expression { binary OpMore   $1 $3 }
-           | Expression '=' Expression { binary OpEquals $1 $3 }
+Expression : Expression '+'  Expression { binary OpAdd    $1 $3 }
+           | Expression '<'  Expression { binary OpLess   $1 $3 }
+           | Expression '>'  Expression { binary OpMore   $1 $3 }
+           | Expression '='  Expression { binary OpEquals $1 $3 }
            | Expression '>=' Expression { binary OpMoreEquals $1 $3 }
            | Expression '<=' Expression { binary OpLessEquals $1 $3 }
-           | Expression '<>' Expression { binary OpNotEquals $1 $3 }
-           | Expression '-' Expression { binary OpSubtract $1 $3 }
-           | Expression  or Expression { binary OpOr       $1 $3 }
-           | Expression xor Expression { binary OpXor      $1 $3 }
+           | Expression '<>' Expression { binary OpNotEquals  $1 $3 }
+           | Expression '-'  Expression { binary OpSubtract $1 $3 }
+           | Expression  or  Expression { binary OpOr       $1 $3 }
+           | Expression xor  Expression { binary OpXor      $1 $3 }
 
            | Expression '*' Expression { binary OpMultiply $1 $3 }
            | Expression '/' Expression { binary OpDivide   $1 $3 }

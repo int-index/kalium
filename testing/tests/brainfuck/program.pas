@@ -3,6 +3,8 @@ type
     IntArray = array of Integer;
 }
 
+procedure interp(s: String; var d: array of Integer; var p: Integer; i: Integer); forward;
+
 function matching(s: String; i: Integer; depth: Integer): Integer;
 begin
     if (i >= Length(s)) or (depth=0) then

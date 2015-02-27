@@ -1,5 +1,4 @@
-function fib_(x: LongInt
-    ; var fib_2: LongInt): LongInt;
+function fib_(x: LongInt; var fib_2: LongInt): LongInt;
 var
     a, b, c, d: LongInt;
 begin

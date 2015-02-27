@@ -1,6 +1,4 @@
-(*
 function M(n: Integer): Integer; forward;
-*)
 
 function F(n: Integer): Integer;
 begin
