@@ -59,6 +59,15 @@ lookupName ct name = do
 alias :: ( Applicative m , MonadNameGen m) => S.Name -> m D.Name
 alias name = D.NameGen <$> mkname (Just name)
 
+opUnit  = D.Call (D.NameSpecial D.OpUnit)  [] []
+opTrue  = D.Call (D.NameSpecial D.OpTrue)  [] []
+opFalse = D.Call (D.NameSpecial D.OpFalse) [] []
+opNil t = D.Call (D.NameSpecial D.OpNil)  [t] []
+opCons x xs = D.Call (D.NameSpecial D.OpCons) [] [x, xs]
+
+opAssign :: D.Name -> a -> D.Statement D.Pattern a
+opAssign name a = D.statement $ D.Exec (D.PAccess name) (D.NameSpecial D.OpId) [] [a]
+
 class Conv s where
     type Scalar s :: *
     conv :: (R m, G e m) => s -> m (Scalar s)
@@ -74,7 +83,7 @@ instance Conv S.Program where
               ) $ do
             clMain <- do
                 clBody <- convScope vars
-                    $ D.Body <$> conv body <*> pure (D.expression ())
+                    $ D.Body <$> conv body <*> pure opUnit
                 let noparams = D.Scope ([] :: Pairs D.Name D.ByType)
                 return $ D.Func D.TypeUnit (noparams clBody)
             clFuncs <- traverse conv funcs
@@ -120,7 +129,7 @@ instance Conv S.Func where
         Nothing -> do
             clScope <- convScope' params
                      $ convScope  vars
-                     $ D.Body <$> conv body <*> pure (D.expression ())
+                     $ D.Body <$> conv body <*> pure opUnit
             fname <- nameF name
             return $ (fname, D.Func D.TypeUnit clScope)
         Just ty -> do
@@ -175,7 +184,7 @@ convRead _ = error "convRead: argument mismatch"
 
 convWriteLn ln exprs = do
     arg <- traverse convArg exprs <&> \case
-        [] -> D.expression ""
+        [] -> opNil D.TypeChar
         args -> foldr1 (binary (D.NameSpecial D.OpConcat)) args
     let op | ln = D.NameSpecial D.OpPutLn
            | otherwise = D.NameSpecial D.OpPut
@@ -326,7 +335,7 @@ instance Conv S.Statement where
                     name <- nameV name'
                     tyW <- typecheck (S.Access name')
                     expr <- typecastConv (==tyW) expr'
-                    return $ D.assign name expr
+                    return $ opAssign name expr
                 Just ixExpr' -> do
                     ixExpr <- typecastConv (==S.TypeInteger) ixExpr'
                     name <- nameV name'
@@ -338,7 +347,7 @@ instance Conv S.Statement where
                     let expr = D.Call (D.NameSpecial D.OpIxSet) []
                                 [ ixExpr, elemExpr
                                 , D.expression (D.Access name) ]
-                    return $ D.assign name expr
+                    return $ opAssign name expr
 
         S.Execute "read"    exprs -> D.statement <$> convRead exprs
         S.Execute "readln"  exprs -> D.statement <$> convReadLn  exprs
@@ -357,7 +366,7 @@ instance Conv S.Statement where
             let clRange = binary (D.NameSpecial D.OpRange) clFromExpr clToExpr
             clAction <- conv statement
             let clForCycle = D.statement (D.ForCycle clName clRange clAction)
-            return $ D.follow [clForCycle, D.assign clName clToExpr]
+            return $ D.follow [clForCycle, opAssign clName clToExpr]
 
         S.IfBranch expr bodyThen mBodyElse
              -> fmap D.statement
@@ -391,7 +400,7 @@ instance Conv S.Statement where
                      leafElse leafs
             return $ D.statement $ D.Scope
                         (M.singleton clName clType)
-                        (D.follow [D.assign clName clExpr, statement])
+                        (D.follow [opAssign clName clExpr, statement])
 
 -- use typecastConv to get typecasting
 convExpr :: (R m, G e m) => Kleisli' m S.Expression D.Expression
@@ -424,7 +433,7 @@ convExpr = \case
             Left S.OpNot    -> direct D.OpNot
             Left S.OpIx  -> do
                 let sub e a = D.Call (D.NameSpecial D.OpSubtract) [] [a, e]
-                    one = D.expression (1 :: Integer)
+                    one = D.expression (D.LitInteger 1)
                 traverse typecheck' exprs >>= \case
                     Just S.TypeString : _ -> D.Call (D.NameSpecial D.OpIx) []
                        <$> (traverse convExpr exprs <&> ix 1 %~ sub one)
@@ -437,11 +446,13 @@ convExpr = \case
             Right name  -> nameF name >>= direct'
     S.Primary lit -> conv lit
 
+convLiteral = \case
+    S.LitInt  x -> D.expression (D.LitInteger x)
+    S.LitReal x -> D.expression (D.LitDouble x)
+    S.LitStr  x -> map (convLiteral . S.LitChar) x & foldr opCons (opNil D.TypeChar)
+    S.LitChar x -> D.expression (D.LitChar x)
+    S.LitBool x -> if x then opTrue else opFalse
+
 instance Conv S.Literal where
     type Scalar S.Literal = D.Expression
-    conv = \case
-        S.LitInt  x -> return (D.expression x)
-        S.LitReal x -> return (D.expression x)
-        S.LitStr  x -> return (D.expression x)
-        S.LitChar x -> return (D.expression x)
-        S.LitBool x -> return (D.expression x)
+    conv = return . convLiteral
