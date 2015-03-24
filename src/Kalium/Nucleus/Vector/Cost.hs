@@ -4,6 +4,7 @@
 module Kalium.Nucleus.Vector.Cost where
 
 import Prelude
+import Data.Void (absurd)
 import Data.Ord  (comparing)
 import Data.List (minimumBy)
 import Control.Applicative
@@ -33,6 +34,7 @@ estimate e = execWriter (recmapped w e) where
         Primary  _ -> tell (mempty { _countPrimary = 1# })
         Lambda _ _ -> tell (mempty { _countLambda  = 1# })
         Beta   _ _ -> tell (mempty { _countBeta    = 1# })
+        Ext ext -> absurd (getConst ext)
 
 estimateSimple :: Expression -> Int
 estimateSimple e =

@@ -52,4 +52,10 @@ toEndoWith
 toEndoWith failure success both f = \a -> both (maybe (failure a) success (f a))
 
 
+unionWithSame :: (Ord k, Eq v) => Map k v -> Map k v -> Maybe (Map k v)
+unionWithSame m1 m2 = sequenceA $ M.unionWith same (pure <$> m1) (pure <$> m2)
+  where
+    same (Just x) (Just y) | x == y = Just x
+    same _ _ = Nothing
+
 type MonadNameGen m = MonadRename Integer String m

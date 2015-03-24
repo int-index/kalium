@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Kalium.Nucleus.Vector.Recmap where
 
 import Kalium.Prelude
@@ -14,6 +15,7 @@ recmap outer = around where
         Access  a -> pure (Access  a)
         Lambda pat a -> liftA2 Lambda (pure pat) (around a)
         Beta a1 a2 -> liftA2 Beta (around a1) (around a2)
+        Ext ext -> absurd (getConst ext)
 
 class Recmappable a where
     recmapped :: (Applicative m, Monad m) => LensLike' m a Expression

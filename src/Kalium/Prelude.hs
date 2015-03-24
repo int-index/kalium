@@ -19,6 +19,7 @@ import Data.List as Exports hiding (concat, foldr, foldl1, maximum, minimum, pro
 import Data.Bool as Exports
 import Data.Ratio as Exports
 import Data.Maybe as Exports
+import Data.Void as Exports
 
 import Control.Lens.Getter as Exports
 import Control.Lens.Setter as Exports

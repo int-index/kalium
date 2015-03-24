@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Kalium.Nucleus.Vector.Program where
 
 import Kalium.Prelude
@@ -110,20 +111,35 @@ data Literal
 data Program
     = Program
     { _programFuncs :: Map Name Func
-    } deriving (Eq)
+    }
 
 data Func
     = Func
     { _funcType :: Type
     , _funcExpression :: Expression
-    } deriving (Eq)
+    }
 
-data Expression
+data Expression' ext
     = Access Name
     | Primary Literal
-    | Lambda Pattern Expression
-    | Beta Expression Expression
-    deriving (Eq)
+    | Lambda Pattern (Expression' ext)
+    | Beta (Expression' ext) (Expression' ext)
+    | Ext (ext (Expression' ext))
+
+type Expression = Expression' (Const Void)
+
+instance Eq Expression where
+    Access name1 == Access name2 = name1 == name2
+    Primary lit1 == Primary lit2 =  lit1 ==  lit2
+    Lambda p1 e1 == Lambda p2 e2 = p1 == p2 &&  e1 ==  e2
+    Beta  e1 ee1 == Beta  e2 ee2 = e1 == e2 && ee1 == ee2
+    Ext ext == _ = absurd (getConst ext)
+    _ == Ext ext = absurd (getConst ext)
+    _ == _ = False
+
+
+deriving instance Eq Func
+deriving instance Eq Program
 
 pattern OpAccess op = Access (NameSpecial op)
 pattern LitUnit = OpAccess OpUnit
@@ -146,10 +162,10 @@ pattern Taint  a     = AppOp1 OpTaint  a
 pattern Bind   a1 a2 = AppOp2 OpBind   a1 a2
 pattern Follow p x a = Bind x (Lambda p a)
 
-lambda :: [Pattern] -> Expression -> Expression
+lambda :: [Pattern] -> Expression' ext -> Expression' ext
 lambda = flip (foldr Lambda)
 
-unlambda :: Expression -> ([Pattern], Expression)
+unlambda :: Expression' ext -> ([Pattern], Expression' ext)
 unlambda = \case
     Lambda p a -> let (ps, b) = unlambda a in (p:ps, b)
     e -> ([], e)
@@ -167,10 +183,10 @@ untyfun = \case
         in (tyArg:tyArgs, tyRes')
     ty -> ([], ty)
 
-beta :: [Expression] -> Expression
+beta :: [Expression' ext] -> Expression' ext
 beta = foldl1 Beta
 
-unbeta :: Expression -> [Expression]
+unbeta :: Expression' ext -> [Expression' ext]
 unbeta = reverse . go where
     go = \case
         Beta a b -> b : go a
@@ -178,7 +194,7 @@ unbeta = reverse . go where
 
 etaExpand
      :: (Applicative m, MonadNameGen m)
-     => [Type] -> EndoKleisli' m Expression
+     => [Type] -> EndoKleisli' m (Expression' ext)
 etaExpand tys e = do
     (unzip -> (exps, pats)) <- forM tys $ \ty -> do
         name <- NameGen <$> mkname Nothing

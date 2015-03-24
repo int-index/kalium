@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Kalium.Nucleus.Vector.Match where
 
 import Kalium.Prelude
@@ -7,11 +8,12 @@ import Kalium.Nucleus.Vector.Recmap
 import Kalium.Nucleus.Vector.Pattern
 import Kalium.Nucleus.Vector.Name
 import Kalium.Nucleus.Vector.Attempt
+import Kalium.Nucleus.Vector.Template
 import Kalium.Util
 
 match :: Endo' Program
 match = over recmapped
-      $ matchExpression
+      $ commonReduce
       . lambdaReduce
       . etaReduce
       . pairReduce
@@ -26,8 +28,8 @@ pattern LitOne  = Primary (LitInteger 1)
 pattern LitTrue = OpAccess OpTrue
 pattern LitFalse = OpAccess OpFalse
 
-matchExpression :: Endo' Expression
-matchExpression = \case
+commonReduce :: Endo' Expression
+commonReduce = \case
 
     AppOp1 OpId a -> a
     Lambda p a | preciseMatch p a -> OpAccess OpId
@@ -102,28 +104,34 @@ foldMatch = \case
     e -> e
 
 booleanCompute :: Endo' Expression
-booleanCompute = \case
+booleanCompute = fire
+    [ AppOp1 OpNot LitTrue  := LitFalse
+    , AppOp1 OpNot LitFalse := LitTrue
 
-    AppOp1 OpNot LitTrue  -> LitFalse
-    AppOp1 OpNot LitFalse -> LitTrue
+    , AppOp2 OpAnd x x := x
+    , AppOp2 OpOr  x x := x
 
-    AppOp2 op x y | x == y, op == OpAnd || op == OpOr -> x
+    , AppOp2 OpAnd x (AppOp1 OpNot x) := LitFalse
+    , AppOp2 OpAnd (AppOp1 OpNot x) x := LitFalse
 
-    AppOp2 OpAnd x y | x == AppOp1 OpNot y || AppOp1 OpNot x == y -> LitFalse
-    AppOp2 OpOr  x y | x == AppOp1 OpNot y || AppOp1 OpNot x == y -> LitTrue
+    , AppOp2 OpOr x (AppOp1 OpNot x) := LitTrue
+    , AppOp2 OpOr (AppOp1 OpNot x) x := LitTrue
 
-    AppOp2 OpAnd (OpAccess OpTrue) a -> a
-    AppOp2 OpAnd a (OpAccess OpTrue) -> a
-    AppOp2 OpOr a (OpAccess OpFalse) -> a
-    AppOp2 OpOr (OpAccess OpFalse) a -> a
+    , AppOp2 OpAnd LitTrue x := x
+    , AppOp2 OpAnd x LitTrue := x
 
-    AppOp2 OpAnd x y | x == LitFalse || y == LitFalse -> LitFalse
-    AppOp2 OpOr  x y | x == LitTrue  || y == LitTrue  -> LitTrue
+    , AppOp2 OpOr x LitFalse := x
+    , AppOp2 OpOr LitFalse x := x
 
-    AppOp3 OpIf xElse _ LitFalse -> xElse
-    AppOp3 OpIf _ xThen LitTrue  -> xThen
+    , AppOp2 OpAnd LitFalse x := LitFalse
+    , AppOp2 OpAnd x LitFalse := LitFalse
 
-    e -> e
+    , AppOp2 OpOr LitTrue x := LitTrue
+    , AppOp2 OpOr x LitTrue := LitTrue
+
+    , AppOp3 OpIf x a LitFalse := x
+    , AppOp3 OpIf a x LitTrue  := x
+    ] where (x:a:_) = metaSource
 
 numericCompute :: Endo' Expression
 numericCompute = \case

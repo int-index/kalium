@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Kalium.Nucleus.Vector.Show where
 
 import Kalium.Prelude
@@ -19,6 +19,7 @@ instance Show Expression where
         Primary lit -> show lit
         Lambda p a -> "(λ" ++ show p ++ "." ++ show a ++ ")"
         Beta a b -> show a ++ "(" ++ show b ++ ")"
+        Ext ext -> absurd (getConst ext)
 
 instance Show Pattern where
     show = \case
