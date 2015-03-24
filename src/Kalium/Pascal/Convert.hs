@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Kalium.Pascal.Convert (convert, Error(..)) where
@@ -37,26 +38,26 @@ class Error e where
     errorNoFunction :: String -> e
 
 type E e m = (Applicative m, MonadError e m, Error e)
-type G e m = (MonadNameGen m, E e m)
-type R m = MonadReader ConvScope m
+type (~>)  a b = forall e m . (MonadReader ConvScope m, E e m) => Kleisli' m a b
+type (~>.) a b = forall e m . (MonadReader ConvScope m, E e m, MonadNameGen m) => Kleisli' m a b
 
-convert :: G e m => S.Program -> m (D.Program D.ByType D.Pattern D.Expression)
+convert :: (E e m, MonadNameGen m) => S.Program -> m (D.Complex D.Program)
 convert program = do
     let initScope = ConvScope (TypeScope mempty mempty)
                               (M.fromList (liftA2(,)[True,False][mempty]))
     runReaderT (conv program) initScope
 
-nameV, nameF :: (E e m, R m) => S.Name -> m D.Name
+nameV, nameF :: S.Name ~> D.Name
 nameV = lookupName False
 nameF = lookupName True
 
-lookupName :: (E e m, R m) => Bool -> S.Name -> m D.Name
+lookupName :: Bool -> S.Name ~> D.Name
 lookupName ct name = do
     names <- views csNames (M.! ct)
     let mname = M.lookup name names
     maybe (throwError (errorNoAccess name (M.keys names))) return mname
 
-alias :: ( Applicative m , MonadNameGen m) => S.Name -> m D.Name
+alias :: (Applicative m, MonadNameGen m) => Kleisli' m S.Name D.Name
 alias name = D.NameGen <$> mkname (Just name)
 
 opUnit  = D.Call (D.NameSpecial D.OpUnit)  [] []
@@ -65,15 +66,15 @@ opFalse = D.Call (D.NameSpecial D.OpFalse) [] []
 opNil t = D.Call (D.NameSpecial D.OpNil)  [t] []
 opCons x xs = D.Call (D.NameSpecial D.OpCons) [] [x, xs]
 
-opAssign :: D.Name -> a -> D.Statement D.Pattern a
+opAssign :: D.Name -> a -> D.Statement (D.Configuration param D.Pattern a)
 opAssign name a = D.statement $ D.Exec (D.PAccess name) (D.NameSpecial D.OpId) [] [a]
 
 class Conv s where
     type Scalar s :: *
-    conv :: (R m, G e m) => s -> m (Scalar s)
+    conv :: s ~>. Scalar s
 
 instance Conv S.Program where
-    type Scalar S.Program = D.Program D.ByType D.Pattern D.Expression
+    type Scalar S.Program = D.Complex D.Program
     conv (S.Program funcs vars body) = do
         (mconcat -> funcNames) <- for funcs $ \(S.Func name _ _ _) -> do
             funcName <- alias name
@@ -120,11 +121,11 @@ convScope' paramdecls inner = do
                 return (M.singleton name paramName, (paramName, (r', ty)))
 
 instance Conv S.Body where
-    type Scalar S.Body = D.Statement D.Pattern D.Expression
+    type Scalar S.Body = D.Complex D.Statement
     conv statements = D.follow <$> traverse conv statements
 
 instance Conv S.Func where
-    type Scalar S.Func = (D.Name, D.Func D.ByType D.Pattern D.Expression)
+    type Scalar S.Func = (D.Name, D.Complex D.Func)
     conv (S.Func name (S.FuncSig params pasType) vars body) = case pasType of
         Nothing -> do
             clScope <- convScope' params
@@ -212,13 +213,13 @@ typeOfLiteral = \case
     S.LitChar _ -> S.TypeChar
     S.LitStr  _ -> S.TypeString
 
-typeOfAccess :: (E e m, R m) => S.Name -> m S.Type
+typeOfAccess :: S.Name ~> S.Type
 typeOfAccess name = do
     types <- view (csTypes.tsVariables)
     let mtype = M.lookup name types
     maybe (throwError (errorNoAccess name (M.keys types))) return mtype
 
-typecasts :: (E e m, R m) => S.Expression -> m (Pairs S.Type S.Expression)
+typecasts :: S.Expression ~> Pairs S.Type S.Expression
 typecasts expr = case expr of
     S.Primary lit -> nice $ typecasting (typeOfLiteral lit) expr
     S.Access name -> do
@@ -229,11 +230,11 @@ typecasts expr = case expr of
         let calls = S.Call nameOp <$> sequenceA possibleArgs
         nice calls
   where
-    nice :: (E e m, R m) => [S.Expression] -> m (Pairs S.Type S.Expression)
+    nice :: [S.Expression] ~> Pairs S.Type S.Expression
     nice exprs = join <$> traverse typechecking exprs
     typecasts' expr = map snd <$> typecasts expr
 
-typechecking :: (E e m, R m) => S.Expression -> m (Pairs S.Type S.Expression)
+typechecking :: S.Expression ~> Pairs S.Type S.Expression
 typechecking expr = maybe empty (\ty -> pure (ty, expr)) <$> typecheck' expr
 
 typecasting :: S.Type -> S.Expression -> [S.Expression]
@@ -243,12 +244,12 @@ typecasting ty expr = expr : [op1App tc expr | tc <- tcs]
             S.TypeInteger -> [S.OpIntToReal]
             _ -> []
 
-typecheck :: (E e m, R m) => S.Expression -> m S.Type
+typecheck :: S.Expression ~> S.Type
 typecheck expr = do
     mty <- typecheck' expr
     maybe (throwError errorTypecheck) return mty
 
-typecheck' :: (E e m, R m) => S.Expression -> m (Maybe S.Type)
+typecheck' :: S.Expression ~> Maybe S.Type
 typecheck' = runMaybeT . \case
     S.Primary lit -> return (typeOfLiteral lit)
     S.Access name -> typeOfAccess name
@@ -309,10 +310,7 @@ typecheck' = runMaybeT . \case
 op1App :: S.Operator -> S.Expression -> S.Expression
 op1App op e = S.Call (Left op) [e]
 
-typecastConv
-    :: (R m, G e m)
-    => (S.Type -> Bool)
-    -> Kleisli' m S.Expression D.Expression
+typecastConv :: (S.Type -> Bool) -> S.Expression ~>. D.Expression
 typecastConv p expr = do
     tcs <- typecasts expr
     tc <- case keepByFst p tcs of
@@ -320,11 +318,11 @@ typecastConv p expr = do
         tc:_ -> return tc
     convExpr tc
 
-typecastConv' :: (R m, G e m) => Kleisli' m S.Expression D.Expression
+typecastConv' :: S.Expression ~>. D.Expression
 typecastConv' = typecastConv (const True)
 
 instance Conv S.Statement where
-    type Scalar S.Statement = D.Statement D.Pattern D.Expression
+    type Scalar S.Statement = D.Complex D.Statement
     conv = \case
 
         S.BodyStatement body -> D.statement <$> conv body
@@ -403,7 +401,7 @@ instance Conv S.Statement where
                         (D.follow [opAssign clName clExpr, statement])
 
 -- use typecastConv to get typecasting
-convExpr :: (R m, G e m) => Kleisli' m S.Expression D.Expression
+convExpr :: S.Expression ~>. D.Expression
 convExpr = \case
     S.Access name -> D.expression <$> nameV name
     S.Call name' exprs -> do

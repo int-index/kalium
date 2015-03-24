@@ -2,6 +2,8 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Kalium.Nucleus.Scalar.Program where
 
 import Kalium.Prelude
@@ -105,8 +107,30 @@ instance Typing t => Scoping (Map Name t) where
 instance Typing t => Scoping (Pairs Name t) where
     scoping = scoping . M.fromList
 
-data Program param pat expr = Program
-    { _programFuncs :: Map Name (Func param pat expr)
+
+-- Configuration
+
+data Configuration param pat expr
+
+type family GetParameter a where
+    GetParameter (Configuration param pat expr) = param
+
+type family GetPattern a where
+    GetPattern (Configuration param pat expr) = pat
+
+type family GetExpression a where
+    GetExpression (Configuration param pat expr) = expr
+
+type ComplexConfiguration = Configuration ByType Pattern Expression
+type PrimitiveConfiguration = Configuration Type Pattern Atom
+
+type Complex   a = a ComplexConfiguration
+type Primitive a = a PrimitiveConfiguration
+
+-- AST
+
+data Program config = Program
+    { _programFuncs :: Map Name (Func config)
     }
 
 data By
@@ -116,22 +140,24 @@ data By
 
 type ByType = (By, Type)
 
-data Func param pat expr = Func
+data Func config = Func
     { _funcType :: Type
-    , _funcScope :: Scope (Pairs Name param) (Scope Vars Body) pat expr
+    , _funcScope :: Scope
+        (Pairs Name (GetParameter config))
+        (Scope Vars Body) config
     }
 
-data Body pat expr = Body
-    { _bodyStatement :: Statement pat expr
-    , _bodyResult :: expr
+data Body config = Body
+    { _bodyStatement :: Statement config
+    , _bodyResult :: GetExpression config
     }
 
-data Statement pat expr
-    = Execute (Exec pat expr)
-    | ForStatement (ForCycle pat expr)
-    | IfStatement (If pat expr)
-    | forall vars . Scoping vars => ScopeStatement (Scope vars Statement pat expr)
-    | Follow (Statement pat expr) (Statement pat expr)
+data Statement config
+    = Execute (Exec config)
+    | ForStatement (ForCycle config)
+    | IfStatement (If config)
+    | forall vars . Scoping vars => ScopeStatement (Scope vars Statement config)
+    | Follow (Statement config) (Statement config)
     | Pass
 
 data Pattern
@@ -140,29 +166,29 @@ data Pattern
     | PAccess Name
     | PTuple Pattern Pattern
 
-data Exec pat expr = Exec
-    { _execRet :: pat
+data Exec config = Exec
+    { _execRet :: GetPattern config
     , _execOp :: Name
     , _execTyArgs :: [Type]
-    , _execArgs :: [expr]
+    , _execArgs :: [GetExpression config]
     }
 
-data ForCycle pat expr
+data ForCycle config
     = ForCycle
     { _forName :: Name
-    , _forRange :: expr
-    , _forStatement :: Statement pat expr
+    , _forRange :: GetExpression config
+    , _forStatement :: Statement config
     }
 
-data If pat expr = If
-    { _ifCond :: expr
-    , _ifThen :: Statement pat expr
-    , _ifElse :: Statement pat expr
+data If config = If
+    { _ifCond :: GetExpression config
+    , _ifThen :: Statement config
+    , _ifElse :: Statement config
     }
 
-data Scope vars obj pat expr = Scope
+data Scope vars obj config = Scope
     { _scopeVars :: vars
-    , _scopeElem :: obj pat expr
+    , _scopeElem :: obj config
     }
 
 data Expression
@@ -186,7 +212,7 @@ data FuncSig = FuncSig
     , funcSigParamTypes :: [Type]
     } deriving (Eq)
 
-funcSig :: Typing param => Func param a p -> FuncSig
+funcSig :: Typing (GetParameter config) => Func config -> FuncSig
 funcSig func = FuncSig
     (func ^. funcType)
     (func ^. funcScope . scopeVars & map (\(_name, ty) -> typing ty))

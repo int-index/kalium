@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Kalium.Nucleus.Scalar.Typecheck where
 
 import Kalium.Prelude
@@ -71,9 +72,9 @@ class TypeIntro a where
 typeIntro :: (TypeIntro a, TypeEnv e m) => Endo' (Kleisli' m a b)
 typeIntro k x = local (typeIntro' x) (k x)
 
-instance Typing param => TypeIntro (Program param expr pat) where
+instance Typing (GetParameter config) => TypeIntro (Program config) where
     typeIntro' program = tsFunctions
         %~ mappend (program ^. programFuncs & fmap funcSig)
 
-instance Scoping vars => TypeIntro (Scope vars obj expr pat) where
+instance Scoping vars => TypeIntro (Scope vars obj config) where
     typeIntro' scope = tsVariables %~ mappend (scope ^. scopeVars . to scoping)

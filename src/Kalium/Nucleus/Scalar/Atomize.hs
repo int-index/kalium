@@ -13,15 +13,18 @@ import Kalium.Nucleus.Scalar.Typecheck
 atomize a = runReaderT (atomizeProgram a) mempty
 
 type T e m = (TypeEnv e m, MonadNameGen m)
-type A e m h = T e m => Kleisli' m (h Expression) (h Atom)
+type Atomize a = forall e m param . (Typing param, T e m)
+    => Kleisli' m
+        (a (Configuration param Pattern Expression))
+        (a (Configuration param Pattern Atom))
 
-atomizeProgram :: Typing param => A e m (Program param Pattern)
+atomizeProgram :: Atomize Program
 atomizeProgram = typeIntro $ programFuncs (traverse atomizeFunc)
 
-atomizeFunc :: Typing param => A e m (Func param Pattern)
+atomizeFunc :: Atomize Func
 atomizeFunc = funcScope (atomizeScope atomizeBodyScope)
 
-atomizeBodyScope :: A e m (Scope Vars Body Pattern)
+atomizeBodyScope :: Atomize (Scope Vars Body)
 atomizeBodyScope = typeIntro $ \(Scope vars (Body stmt expr)) -> do
     (atom, (vardecls, statements)) <- runWriterT (atomizeExpression expr)
     statement <- atomizeStatement stmt
@@ -31,7 +34,7 @@ atomizeBodyScope = typeIntro $ \(Scope vars (Body stmt expr)) -> do
 
 atomizeScope atomize = typeIntro $ scopeElem atomize
 
-atomizeStatement :: A e m (Statement Pattern)
+atomizeStatement :: Atomize Statement
 atomizeStatement = \case
     Execute (Exec mname op tyArgs exprs) -> atomizeStatementW
         $ Exec mname op tyArgs <$> traverse atomizeExpression exprs
@@ -60,8 +63,13 @@ atomizeStatementW w = do
     return $ ScopeStatement
            $ Scope (scoping vardecls) (follow (statements `snoc` statement a))
 
-atomizeExpression :: T e m => Expression
-                  -> WriterT (Pairs Name Type, [Statement Pattern Atom]) m Atom
+atomizeExpression
+    :: T e m
+    => Expression
+    -> WriterT
+        ( Pairs Name Type
+        , [Statement (Configuration param Pattern Atom)]
+        ) m Atom
 atomizeExpression = \case
     Atom atom -> return atom
     e@(Call op tyArgs args) -> do

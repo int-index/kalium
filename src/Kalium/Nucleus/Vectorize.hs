@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
 module Kalium.Nucleus.Vectorize (vectorize, Error(..)) where
 
 import Kalium.Prelude
@@ -39,13 +40,13 @@ class Error e where
     errorInsane :: String -> e
 
 type E e m = (Applicative m, Error e, MonadError e m, MonadNameGen m)
-type V e m = (MonadReader VectorizeScope m, E e m)
+type (~>) a b = forall e m . (MonadReader VectorizeScope m, E e m) => Kleisli' m a b
 
 alias :: E e m => Name -> m Vec.Name
 alias (NameGen m) = Vec.NameGen <$> rename m
 alias _ = Vec.NameGen <$> mkname Nothing
 
-vectorize :: E e m => Program Type Pattern Atom -> m Vec.Program
+vectorize :: E e m => Primitive Program -> m (Vec.Program)
 vectorize program = do
     (mconcat -> names') <- for (program ^. programFuncs . to M.keys)
         $ \name -> do
@@ -57,7 +58,7 @@ vectorize program = do
         vecFuncs <- traverse (uncurry vectorizeFunc) (program ^. programFuncs & M.toList)
         return $ Vec.Program (M.fromList vecFuncs)
 
-vectorizeFunc :: V e m => Name -> Func Type Pattern Atom -> m (Vec.Name, Vec.Func)
+vectorizeFunc :: Name -> Primitive Func ~> (Vec.Name, Vec.Func)
 vectorizeFunc name func = do
     let zeroIndex = Index 0
     let params = func ^. funcScope . scopeVars
@@ -86,25 +87,25 @@ tryAccess ty Nothing = case ty of
     _ -> Vec.OpAccess Vec.OpUndefined
 tryAccess _ (Just name) = Vec.Access name
 
-mkPAccess :: V e m => Name -> m Vec.Pattern
+mkPAccess :: Name ~> Vec.Pattern
 mkPAccess name = do
     index <- lookupIndex name
     ty    <- lookupType  name
     tryPAccess (vectorizeType ty) <$> lookupName name index
 
-mkAccess :: V e m => Name -> m Vec.Expression
+mkAccess :: Name ~> Vec.Expression
 mkAccess name = do
     index <- lookupIndex name
     ty    <- lookupType  name
     tryAccess (vectorizeType ty) <$> lookupName name index
 
-expTuple :: V e m => [Name] -> m Vec.Expression
+expTuple :: [Name] ~> Vec.Expression
 expTuple names = mkExpTuple <$> traverse mkAccess names
 
-patTuple :: V e m => [Name] -> m Vec.Pattern
+patTuple :: [Name] ~> Vec.Pattern
 patTuple names = mkPatTuple <$> traverse mkPAccess names
 
-vectorizeBody :: (V e m, Scoping v) => Scope v Body Pattern Atom -> m ([Name], Vec.Expression)
+vectorizeBody :: Scoping v => Primitive (Scope v Body) ~> ([Name], Vec.Expression)
 vectorizeBody scope = do
     let vars = scope ^. scopeVars
     let Body statement result = scope ^. scopeElem
@@ -122,11 +123,10 @@ updateLocalize names action = do
           . (vsNames   %~ mappend (M.fromList names'))
           ) action
 
-vectorizeResults :: V e m => [Atom] -> m Vec.Expression
+vectorizeResults :: [Atom] ~> Vec.Expression
 vectorizeResults results = Vec.Taint . mkExpTuple <$> traverse vectorizeAtom results
 
-vectorizeScope :: (V e m, Scoping v) => ([Name] -> [Atom])
-    -> Scope v Statement Pattern Atom -> m ([Name], Vec.Expression)
+vectorizeScope :: Scoping v => ([Name] -> [Atom]) -> Primitive (Scope v Statement) ~> ([Name], Vec.Expression)
 vectorizeScope resulting (Scope (scoping -> vars) statement) = do
     localScope <- initIndices Uninitialized vars
     local (localScope <>) $ do
@@ -161,7 +161,7 @@ vectorizeType = \case
         (vectorizeType ty1) (vectorizeType ty2)
     _ -> error "vectorizeType: unknown type"
 
-vectorizeStatement :: V e m => Statement Pattern Atom -> m ([Name], Vec.Expression)
+vectorizeStatement :: Primitive Statement ~> ([Name], Vec.Expression)
 vectorizeStatement = \case
 
     Pass -> return ([], Vec.Taint Vec.LitUnit)
@@ -231,30 +231,30 @@ vectorizeStatement = \case
         let vecIf = Vec.AppOp3 Vec.OpIf vecBodyElse vecBodyThen vecCond
         return (changed, vecIf)
 
-vectorizeAtom :: V e m => Kleisli' m Atom Vec.Expression
+vectorizeAtom :: Atom ~> Vec.Expression
 vectorizeAtom = \case
     Primary a -> return (Vec.Primary (vectorizeLiteral a))
     Access name -> mkAccess name
 
-vectorizePattern :: V e m => Kleisli' m Pattern Vec.Pattern
+vectorizePattern :: Pattern ~> Vec.Pattern
 vectorizePattern = \case
     PUnit -> return Vec.PUnit
     PWildCard -> return Vec.PWildCard
     PAccess name -> mkPAccess name
     PTuple p1 p2 -> Vec.PTuple <$> vectorizePattern p1 <*> vectorizePattern p2
 
-lookupIndex :: V e m => Name -> m Index
+lookupIndex :: Name ~> Index
 lookupIndex = lookupX (view vsIndices)
 
-lookupType :: V e m => Name -> m Type
+lookupType :: Name ~> Type
 lookupType = lookupX (view vsTypes)
 
-lookupName :: V e m => Name -> Index -> m (Maybe Vec.Name)
+lookupName :: Name -> Index ~> Maybe Vec.Name
 lookupName name index =
     views vsNames (M.lookup (name, index))
        >>= maybe (throwError $ errorNoAccess name []) return
 
-lookupX :: V e m => (VectorizeScope -> Map Name x) -> Name -> m x
+lookupX :: (VectorizeScope -> Map Name x) -> Name ~> x
 lookupX f name = do
     xs <- asks f
     M.lookup name xs

@@ -10,9 +10,12 @@ import qualified Data.Map as M
 import Kalium.Nucleus.Scalar.Program
 
 class ValueficateSubstitute a where
-    valueficateSubstitute :: ReferenceInfo -> a Atom -> a Expression
+    valueficateSubstitute
+        :: ReferenceInfo
+        -> a (Configuration param0 Pattern Atom)
+        -> a (Configuration param1 Pattern Expression)
 
-instance ValueficateSubstitute (Exec Pattern) where
+instance ValueficateSubstitute Exec where
     valueficateSubstitute referenceInfo (Exec ret op tyArgs args) =
         let ret' = foldr1 PTuple (ret:rets)
             rets = case M.lookup op referenceInfo of
@@ -25,7 +28,7 @@ instance ValueficateSubstitute (Exec Pattern) where
                         Primary _ -> error "non-variables by-ref"
         in Exec ret' op tyArgs (map Atom args)
 
-instance ValueficateSubstitute (Statement Pattern) where
+instance ValueficateSubstitute Statement where
     valueficateSubstitute referenceInfo = \case
         Follow a1 a2 -> Follow (go a1) (go a2)
         ScopeStatement a -> ScopeStatement (go a)
@@ -35,24 +38,26 @@ instance ValueficateSubstitute (Statement Pattern) where
         Pass -> Pass
         where go = valueficateSubstitute referenceInfo
 
-instance   ValueficateSubstitute (obj pat)
-        => ValueficateSubstitute (Scope vars obj pat) where
+instance   ValueficateSubstitute obj
+        => ValueficateSubstitute (Scope vars obj) where
     valueficateSubstitute referenceInfo
        = scopeElem %~ valueficateSubstitute referenceInfo
 
-instance ValueficateSubstitute (If Pattern) where
+instance ValueficateSubstitute If where
     valueficateSubstitute referenceInfo
         (If       ifCond      ifThen      ifElse)
        = If (Atom ifCond) (go ifThen) (go ifElse)
        where go = valueficateSubstitute referenceInfo
 
-instance ValueficateSubstitute (ForCycle Pattern) where
+instance ValueficateSubstitute ForCycle where
     valueficateSubstitute referenceInfo
         (ForCycle forName       forRange      forStatement)
        = ForCycle forName (Atom forRange) (go forStatement)
        where go = valueficateSubstitute referenceInfo
 
-valueficate :: Program ByType Pattern Atom -> Program Type Pattern Expression
+valueficate
+    :: Program (Configuration ByType Pattern Atom)
+    -> Program (Configuration   Type Pattern Expression)
 valueficate program =
     let referenceInfo = gather program
     in program & programFuncs %~ imap (valueficateFunc referenceInfo)
@@ -60,8 +65,8 @@ valueficate program =
 valueficateFunc
     :: ReferenceInfo
     -> Name
-    -> Func ByType Pattern Atom
-    -> Func   Type Pattern Expression
+    -> Func (Configuration ByType Pattern Atom)
+    -> Func (Configuration   Type Pattern Expression)
 valueficateFunc referenceInfo name
     (Func ty (Scope params (Scope vars (Body statement result))))
     = let currentReferenceInfo = referenceInfo M.! name
@@ -83,7 +88,7 @@ valueficateFunc referenceInfo name
 
 type ReferenceInfo = Map Name [Bool]
 
-gather :: Program ByType pat expr -> ReferenceInfo
+gather :: Program (Configuration ByType pat expr) -> ReferenceInfo
 gather = fmap inspect . view programFuncs where
     inspect = map check . view (funcScope . scopeVars)
     check (_name, (by, _ty)) = by == ByReference

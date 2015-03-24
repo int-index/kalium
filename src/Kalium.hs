@@ -32,7 +32,7 @@ nuclear
     :: ( Applicative m
        , MonadError E.Error m
        , MonadNameGen m
-       ) => Kleisli' m (S.Program S.ByType S.Pattern S.Expression)
+       ) => Kleisli' m (S.Program (S.Configuration S.ByType S.Pattern S.Expression))
                        (V.Program, TranslationLog)
 nuclear
      =  atomize
