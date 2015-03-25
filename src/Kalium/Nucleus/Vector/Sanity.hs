@@ -21,7 +21,7 @@ snu = \case
     Beta e1 e2 -> do
         snu e1
         snu e2
-    Ext ext -> absurd (getConst ext)
+    Ext ext -> absurd ext
 
 psnu :: W m => Pattern -> m ()
 psnu = \case

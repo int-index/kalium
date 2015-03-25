@@ -111,35 +111,30 @@ data Literal
 data Program
     = Program
     { _programFuncs :: Map Name Func
-    }
+    } deriving (Eq)
 
 data Func
     = Func
     { _funcType :: Type
     , _funcExpression :: Expression
-    }
+    } deriving (Eq)
 
 data Expression' ext
     = Access Name
     | Primary Literal
     | Lambda Pattern (Expression' ext)
     | Beta (Expression' ext) (Expression' ext)
-    | Ext (ext (Expression' ext))
+    | Ext ext
+    deriving (Eq)
 
-type Expression = Expression' (Const Void)
+type Expression = Expression' Void
 
-instance Eq Expression where
-    Access name1 == Access name2 = name1 == name2
-    Primary lit1 == Primary lit2 =  lit1 ==  lit2
-    Lambda p1 e1 == Lambda p2 e2 = p1 == p2 &&  e1 ==  e2
-    Beta  e1 ee1 == Beta  e2 ee2 = e1 == e2 && ee1 == ee2
-    Ext ext == _ = absurd (getConst ext)
-    _ == Ext ext = absurd (getConst ext)
-    _ == _ = False
-
-
-deriving instance Eq Func
-deriving instance Eq Program
+data Pattern
+    = PTuple Pattern Pattern
+    | PAccess Name Type
+    | PWildCard
+    | PUnit
+    deriving (Eq)
 
 pattern OpAccess op = Access (NameSpecial op)
 pattern LitUnit = OpAccess OpUnit
@@ -200,13 +195,6 @@ etaExpand tys e = do
         name <- NameGen <$> mkname Nothing
         return (Access name, PAccess name ty)
     return $ lambda pats $ beta (e:exps)
-
-data Pattern
-    = PTuple Pattern Pattern
-    | PAccess Name Type
-    | PWildCard
-    | PUnit
-    deriving (Eq)
 
 makeLenses ''Func
 makeLenses ''Program

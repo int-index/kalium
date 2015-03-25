@@ -9,20 +9,16 @@ import Kalium.Nucleus.Vector.Program
 newtype MetaName = MetaName Int
     deriving (Eq, Ord)
 
-data MetaExt expr = MetaExt MetaName
-
-type MetaExpression = Expression' MetaExt
-
-pattern Meta n = Ext (MetaExt n)
+type MetaExpression = Expression' MetaName
 
 type MetaTable = Map MetaName Expression
 
 metaSource :: [MetaExpression]
-metaSource = Meta . MetaName <$> [0..]
+metaSource = Ext . MetaName <$> [0..]
 
 metaMatch :: MetaExpression -> Expression -> Maybe MetaTable
 
-metaMatch (Meta metaname) expr = pure (M.singleton metaname expr)
+metaMatch (Ext metaname) expr = pure (M.singleton metaname expr)
 
 metaMatch (Primary l') (Primary l) | l' == l = pure mempty
 metaMatch (Access  n') (Access  n) | n' == n = pure mempty
@@ -36,7 +32,7 @@ metaMatch (Lambda p' a') (Lambda p a)
     | p' == p
     = metaMatch a' a
 
-metaMatch _ (Ext ext) = absurd (getConst ext)
+metaMatch _ (Ext ext) = absurd ext
 metaMatch _ _ = empty
 
 
@@ -46,13 +42,7 @@ metaSubst = \case
     Access  n -> pure (Access  n)
     Lambda p a -> Lambda p <$> metaSubst a
     Beta f a -> Beta <$> metaSubst f <*> metaSubst a
-    Meta metaname -> asks (M.lookup metaname) >>= lift
-
-    _ -> error "impossible"
-    -- ^ this one is to silence GHC warning about non-exhaustive
-    --   pattern matching as it fails to see the exhaustiveness
-    --   due to pattern synonyms
-
+    Ext metaname -> asks (M.lookup metaname) >>= lift
 
 data Rule = MetaExpression := MetaExpression
 

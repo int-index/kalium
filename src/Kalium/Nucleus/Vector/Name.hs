@@ -53,7 +53,7 @@ instance Mask Expression where
         Beta a1 a2 -> Beta <$> mask a1 <*> mask a2
         Primary lit -> return (Primary lit)
         Access name -> Access <$> mask name
-        Ext ext -> absurd (getConst ext)
+        Ext ext -> absurd ext
 
 instance Mask Func where
     mask  =  funcType mask

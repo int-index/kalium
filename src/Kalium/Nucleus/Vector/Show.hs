@@ -19,7 +19,7 @@ instance Show Expression where
         Primary lit -> show lit
         Lambda p a -> "(λ" ++ show p ++ "." ++ show a ++ ")"
         Beta a b -> show a ++ "(" ++ show b ++ ")"
-        Ext ext -> absurd (getConst ext)
+        Ext ext -> absurd ext
 
 instance Show Pattern where
     show = \case

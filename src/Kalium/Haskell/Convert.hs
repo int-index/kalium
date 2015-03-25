@@ -106,7 +106,7 @@ convExpression = \case
         Nothing -> case name of
             Vec.NameGen n -> nameGen n <&> \hsName -> H.Var (H.UnQual hsName)
             _ -> error "convExpression: unsupported special name"
-    Vec.Ext ext -> absurd (getConst ext)
+    Vec.Ext ext -> absurd ext
 
 convFunc :: (T m, C m) => Vec.Name -> Vec.Func -> m [H.Decl]
 convFunc name (Vec.Func ty expression) = do
