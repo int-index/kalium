@@ -9,7 +9,7 @@ import Kalium.Nucleus.Vector.Program
 newtype MetaName = MetaName Int
     deriving (Eq, Ord)
 
-type MetaExpression = Expression' MetaName
+type MetaExpression = Expression' Void MetaName
 
 type MetaTable = Map MetaName Expression
 

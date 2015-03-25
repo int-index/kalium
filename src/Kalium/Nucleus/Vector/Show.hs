@@ -27,3 +27,4 @@ instance Show Pattern where
         PWildCard -> "_"
         PAccess name _ -> show name
         PTuple p1 p2 -> "(" ++ show p1 ++ "," ++ show p2 ++ ")"
+        PExt pext -> absurd pext

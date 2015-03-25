@@ -32,6 +32,7 @@ psnu = \case
         tell [name]
     PWildCard -> return ()
     PUnit -> return ()
+    PExt pext -> absurd pext
 
 fnsnu :: W m => Name -> Func -> m ()
 fnsnu name fn = do

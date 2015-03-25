@@ -119,22 +119,25 @@ data Func
     , _funcExpression :: Expression
     } deriving (Eq)
 
-data Expression' ext
+data Expression' pext ext
     = Access Name
     | Primary Literal
-    | Lambda Pattern (Expression' ext)
-    | Beta (Expression' ext) (Expression' ext)
+    | Lambda (Pattern' pext) (Expression' pext ext)
+    | Beta (Expression' pext ext) (Expression' pext ext)
     | Ext ext
     deriving (Eq)
 
-type Expression = Expression' Void
+type Expression = Expression' Void Void
 
-data Pattern
-    = PTuple Pattern Pattern
+data Pattern' pext
+    = PTuple (Pattern' pext) (Pattern' pext)
     | PAccess Name Type
     | PWildCard
     | PUnit
+    | PExt pext
     deriving (Eq)
+
+type Pattern = Pattern' Void
 
 pattern OpAccess op = Access (NameSpecial op)
 pattern LitUnit = OpAccess OpUnit
@@ -157,10 +160,10 @@ pattern Taint  a     = AppOp1 OpTaint  a
 pattern Bind   a1 a2 = AppOp2 OpBind   a1 a2
 pattern Follow p x a = Bind x (Lambda p a)
 
-lambda :: [Pattern] -> Expression' ext -> Expression' ext
+lambda :: [Pattern' pext] -> Expression' pext ext -> Expression' pext ext
 lambda = flip (foldr Lambda)
 
-unlambda :: Expression' ext -> ([Pattern], Expression' ext)
+unlambda :: Expression' pext ext -> ([Pattern' pext], Expression' pext ext)
 unlambda = \case
     Lambda p a -> let (ps, b) = unlambda a in (p:ps, b)
     e -> ([], e)
@@ -178,10 +181,10 @@ untyfun = \case
         in (tyArg:tyArgs, tyRes')
     ty -> ([], ty)
 
-beta :: [Expression' ext] -> Expression' ext
+beta :: [Expression' pext ext] -> Expression' pext ext
 beta = foldl1 Beta
 
-unbeta :: Expression' ext -> [Expression' ext]
+unbeta :: Expression' pext ext -> [Expression' pext ext]
 unbeta = reverse . go where
     go = \case
         Beta a b -> b : go a
@@ -189,7 +192,7 @@ unbeta = reverse . go where
 
 etaExpand
      :: (Applicative m, MonadNameGen m)
-     => [Type] -> EndoKleisli' m (Expression' ext)
+     => [Type] -> EndoKleisli' m (Expression' pext ext)
 etaExpand tys e = do
     (unzip -> (exps, pats)) <- forM tys $ \ty -> do
         name <- NameGen <$> mkname Nothing

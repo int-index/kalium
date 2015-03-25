@@ -46,6 +46,7 @@ instance Mask Pattern where
         PTuple  p1   p2 -> PTuple  <$> mask p1   <*> mask p2
         PWildCard -> return PWildCard
         PUnit     -> return PUnit
+        PExt pext -> absurd pext
 
 instance Mask Expression where
     mask  = \case

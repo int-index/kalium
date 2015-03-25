@@ -133,6 +133,7 @@ convPattern = \case
              | otherwise = id
         pure $ annotate (H.PVar hsName)
     Vec.PTuple pat1 pat2 -> H.PTuple H.Boxed <$> traverse convPattern [pat1, pat2]
+    Vec.PExt pext -> absurd pext
 
 convLit :: Vec.Literal -> H.Exp
 convLit = \case
