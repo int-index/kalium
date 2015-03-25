@@ -5,8 +5,6 @@ import qualified Data.Map as M
 import Kalium.Prelude
 import Kalium.Util
 import Kalium.Nucleus.Vector.Program
-import Kalium.Nucleus.Vector.Pattern
-import Kalium.Nucleus.Vector.Name
 
 newtype MetaName = MetaName Int
     deriving (Eq, Ord)
@@ -35,8 +33,8 @@ metaMatch (Beta f' a') (Beta f  a) = do
     unionWithSame m1 m2
 
 metaMatch (Lambda p' a') (Lambda p a)
-    | Just alpha <- alphaMatch p p'
-    = metaMatch a' (alphaRename alpha a)
+    | p' == p
+    = metaMatch a' a
 
 metaMatch _ (Ext ext) = absurd (getConst ext)
 metaMatch _ _ = empty
