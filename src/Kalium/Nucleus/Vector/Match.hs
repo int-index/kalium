@@ -60,18 +60,11 @@ commonReduce = commonReduce' . \case
 appIgnore :: Endo' Expression
 appIgnore = appIgnore' . \case
 
-    AppOp2 OpBindIgnore (propagate attemptIgnore -> Just x) a
-        -> AppOp2 OpBindIgnore x a
-
-    AppOp2 OpFmapIgnore a (propagate attemptIgnore -> Just e)
-        -> AppOp2 OpFmapIgnore a e
     AppOp2 OpFmapIgnore c (over propagate (AppOp2 OpFmapIgnore c) -> e) -> e
 
     AppOp3 OpFoldTainted (Lambda2 PWildCard p2 a) _ x2
          | Just a' <- propagate attemptIgnore a
         -> AppOp2 OpMapTaintedIgnore (Lambda p2 a') x2
-
-    Ignore (propagate attemptIgnore -> Just e) -> e
 
     e -> e
   where
@@ -83,6 +76,17 @@ appIgnore = appIgnore' . \case
     , AppOp2 OpFmapIgnore LitUnit x := Ignore x
     , AppOp2 OpFmapIgnore a (Taint  x) := Taint a
     , AppOp2 OpFmapIgnore a (Ignore x) := AppOp2 OpFmapIgnore a x
+
+    , AppOp2 OpBindIgnore x a
+        := AppOp2 OpBindIgnore x a
+        :> transform (propagate attemptIgnore) x
+
+    , AppOp2 OpFmapIgnore a x
+        := AppOp2 OpFmapIgnore a x
+        :> transform (propagate attemptIgnore) x
+
+    , Ignore a := a :> transform (propagate attemptIgnore) a
+
     ] where (a:x:_) = metaSource
 
 attemptIgnore :: EndoKleisli' Maybe Expression

@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -10,18 +11,26 @@ import Kalium.Prelude
 import Kalium.Util
 import Kalium.Nucleus.Vector.Program
 
-newtype MetaName = MetaName Int
+data family MetaReference a
+
+newtype instance MetaReference Expression = MetaName Int
     deriving (Eq, Ord)
 
-newtype MetaPName = MetaPName Int
+newtype instance MetaReference Pattern = MetaPName Int
     deriving (Eq, Ord)
 
-type MetaPattern = Pattern' MetaPName
-type MetaExpression = Expression' MetaPName MetaName
+type family Meta a where
+    Meta Expression = Expression' (MetaReference Pattern) (MetaReference Expression)
+    Meta Pattern = Pattern' (MetaReference Pattern)
+
+type MetaName  = MetaReference Expression
+type MetaPName = MetaReference Pattern
+
+type MetaSubtable a = Map (MetaReference a) a
 
 data MetaTable = MetaTable
-    { _metaExpressionTable :: Map MetaName  Expression
-    , _metaPatternTable    :: Map MetaPName Pattern
+    { _metaExpressionTable :: MetaSubtable Expression
+    , _metaPatternTable    :: MetaSubtable Pattern
     }
 
 singletonMetaExpressionTable :: MetaName -> Expression -> MetaTable
@@ -40,11 +49,17 @@ m1 <+> m2 = do
 
 makeLenses ''MetaTable
 
-class    MetaSource     a          where metaFromInt :: Int -> a
-instance MetaSource MetaName       where metaFromInt =  MetaName
-instance MetaSource MetaPName      where metaFromInt =  MetaPName
-instance MetaSource MetaExpression where metaFromInt =  Ext . metaFromInt
-instance MetaSource MetaPattern    where metaFromInt = PExt . metaFromInt
+class    MetaSource     a     where metaFromInt :: Int -> a
+instance MetaSource MetaName  where metaFromInt =  MetaName
+instance MetaSource MetaPName where metaFromInt =  MetaPName
+
+instance MetaSource
+  ( Expression' (MetaReference Pattern) (MetaReference Expression)
+  ) where metaFromInt =  Ext . metaFromInt
+
+instance MetaSource
+  ( Pattern' (MetaReference Pattern)
+  ) where metaFromInt = PExt . metaFromInt
 
 metaSource :: MetaSource a => [a]
 metaSource = metaFromInt <$> [0..]
@@ -54,7 +69,7 @@ metaSource2 = (metaSource, metaSource)
 
 type MetaMonad = ReaderT MetaTable Maybe
 
-metaMatch :: MetaExpression -> Expression -> Maybe MetaTable
+metaMatch :: Meta Expression -> Expression -> Maybe MetaTable
 
 metaMatch (Ext metaname) expr
     = pure (singletonMetaExpressionTable metaname expr)
@@ -69,7 +84,7 @@ metaMatch _ (Ext ext) = absurd ext
 metaMatch _ _ = empty
 
 
-metaPMatch :: MetaPattern -> Pattern -> Maybe MetaTable
+metaPMatch :: Meta Pattern -> Pattern -> Maybe MetaTable
 
 metaPMatch (PExt metapname) pat
     = pure (singletonMetaPatternTable metapname pat)
@@ -88,28 +103,28 @@ metaPMatch _ (PExt pext) = absurd pext
 metaPMatch _ _ = empty
 
 
-metaSubst :: MetaExpression -> MetaMonad Expression
+metaSubst :: Meta Expression -> MetaMonad Expression
 metaSubst = \case
     Primary l -> pure (Primary l)
     Access  n -> pure (Access  n)
     Lambda p a -> Lambda <$> metaPSubst p <*> metaSubst a
     Beta f a -> Beta <$> metaSubst f <*> metaSubst a
-    Ext metaname -> viewMetaExpression metaname
+    Ext metaname -> viewMetaObject metaname
 
 
-metaPSubst :: MetaPattern -> MetaMonad Pattern
+metaPSubst :: Meta Pattern -> MetaMonad Pattern
 metaPSubst = \case
     PWildCard -> pure PWildCard
     PUnit -> pure PUnit
     PAccess n t -> pure (PAccess n t)
     PTuple p1 p2 -> PTuple <$> metaPSubst p1 <*> metaPSubst p2
-    PExt metapname -> viewMetaPattern metapname
+    PExt metapname -> viewMetaObject metapname
 
 
 type MetaModifier = MetaTable -> Maybe MetaTable
 
 data Rule
-    = MetaExpression := MetaExpression
+    = Meta Expression := Meta Expression
     | Rule :> MetaModifier
 
 infixl 7 :=
@@ -126,30 +141,47 @@ ruleMatch' metamod (lhs := rhs)
     >>= metamod
     >>= runReaderT (metaSubst rhs)
 
-viewMetaExpression :: MetaName -> MetaMonad Expression
-viewMetaExpression metaname = views metaExpressionTable (M.lookup metaname) >>= lift
+class Ord (MetaReference a) => MetaObjectSubtable a where
+    metaObjectSubtable :: Lens' MetaTable (MetaSubtable a)
 
-viewMetaPattern :: MetaPName -> MetaMonad Pattern
-viewMetaPattern metapname = views metaPatternTable (M.lookup metapname) >>= lift
+instance MetaObjectSubtable Expression where
+    metaObjectSubtable = metaExpressionTable
+
+instance MetaObjectSubtable Pattern where
+    metaObjectSubtable = metaPatternTable
+
+viewMetaObject :: MetaObjectSubtable a => MetaReference a -> MetaMonad a
+viewMetaObject metaname = views metaObjectSubtable (M.lookup metaname) >>= lift
+
+class GetMetaReference a where
+    getMetaReference :: Meta a -> MetaMonad (MetaReference a)
+
+instance GetMetaReference Expression where
+    getMetaReference = \case { Ext metaname -> return metaname; _ -> empty }
+
+instance GetMetaReference Pattern where
+    getMetaReference = \case { PExt metapname -> return metapname; _ -> empty }
+
 
 constraint :: MetaMonad Bool -> MetaModifier
 constraint ma = runReaderT $ ma >>= guard >> ask
 
-constraint1 c x1    = constraint (c <$> extract x1)
-constraint2 c x1 x2 = constraint (c <$> extract x1 <*> extract x2)
+constraint1 c x1    = constraint (c <$> mmeta x1)
+constraint2 c x1 x2 = constraint (c <$> mmeta x1 <*> mmeta x2)
 
-type family Extracted a where
-    Extracted MetaExpression = Expression
-    Extracted MetaPattern = Pattern
+type MetaObject a = (MetaObjectSubtable a, GetMetaReference a)
 
-class Extract a where
-    extract :: a -> MetaMonad (Extracted a)
+transform :: MetaObject a => (a -> Maybe a) -> Meta a -> MetaModifier
+transform fn metaobj = runReaderT $ do
+    metaname <- getMetaReference metaobj
+    expr <- viewMetaObject metaname
+    case fn expr of
+        Nothing -> empty
+        Just a -> over metaObjectSubtable (M.insert metaname a) <$> ask
 
-instance Extract MetaExpression where
-    extract = \case { Ext metaname -> viewMetaExpression metaname; _ -> empty }
 
-instance Extract MetaPattern where
-    extract = \case { PExt metapname -> viewMetaPattern metapname; _ -> empty }
+mmeta :: MetaObject a => Meta a -> MetaMonad a
+mmeta = getMetaReference >=> viewMetaObject
 
 fire :: [Rule] -> Endo' Expression
 fire = foldr (.) id . map (tryApply . ruleMatch)
