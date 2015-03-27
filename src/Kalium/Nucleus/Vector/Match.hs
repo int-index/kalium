@@ -58,17 +58,7 @@ commonReduce = commonReduce' . \case
     ] where (a:x:_, p:_) = metaSource2
 
 appIgnore :: Endo' Expression
-appIgnore = appIgnore' . \case
-
-    AppOp2 OpFmapIgnore c (over propagate (AppOp2 OpFmapIgnore c) -> e) -> e
-
-    AppOp3 OpFoldTainted (Lambda2 PWildCard p2 a) _ x2
-         | Just a' <- propagate attemptIgnore a
-        -> AppOp2 OpMapTaintedIgnore (Lambda p2 a') x2
-
-    e -> e
-  where
-   appIgnore' = fire
+appIgnore = fire
     [ Follow PWildCard x a := AppOp2 OpBindIgnore x a
     , AppOp2 OpBindIgnore (Taint LitUnit) a := a
     , AppOp2 OpBindIgnore x (Taint a) := AppOp2 OpFmapIgnore a x
@@ -87,7 +77,16 @@ appIgnore = appIgnore' . \case
 
     , Ignore a := a :> transform (propagate attemptIgnore) a
 
-    ] where (a:x:_) = metaSource
+    , AppOp3 OpFoldTainted (Lambda2 PWildCard p a) x' x
+        := AppOp2 OpMapTaintedIgnore (Lambda p a) x
+        :> transform (propagate attemptIgnore) a
+
+    , AppOp2 OpFmapIgnore a x := x'
+       .:> do
+         a <- mmeta a
+         x <- mmeta x
+         x' .:= over propagate (AppOp2 OpFmapIgnore a) x
+    ] where (a:x:x':_, p:_) = metaSource2
 
 attemptIgnore :: EndoKleisli' Maybe Expression
 attemptIgnore = \case

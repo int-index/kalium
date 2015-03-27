@@ -129,6 +129,9 @@ data Rule
 
 infixl 7 :=
 infixl 7 :>
+infixl 7 .:>
+
+rule .:> metamod = rule :> runReaderT metamod
 
 ruleMatch :: Rule -> Expression -> Maybe Expression
 ruleMatch = ruleMatch' return
@@ -172,13 +175,27 @@ constraint2 c x1 x2 = constraint (c <$> mmeta x1 <*> mmeta x2)
 type MetaObject a = (MetaObjectSubtable a, GetMetaReference a)
 
 transform :: MetaObject a => (a -> Maybe a) -> Meta a -> MetaModifier
-transform fn metaobj = runReaderT $ do
-    metaname <- getMetaReference metaobj
-    expr <- viewMetaObject metaname
-    case fn expr of
-        Nothing -> empty
-        Just a -> over metaObjectSubtable (M.insert metaname a) <$> ask
+transform fn metaobj = (metaobj --> metaobj) fn
 
+settingMetaReference :: MetaObjectSubtable a => MetaReference a -> a -> MetaMonad MetaTable
+settingMetaReference metaname a = over metaObjectSubtable (M.insert metaname a) <$> ask
+
+settingMetaObject :: MetaObject a => Meta a -> a -> MetaMonad MetaTable
+settingMetaObject metaobj a = getMetaReference metaobj >>= flip settingMetaReference a
+
+distort :: MetaObject a => Meta a -> Maybe a -> MetaMonad MetaTable
+distort metaobj a = maybe empty (settingMetaObject metaobj) a
+
+(.:=) :: MetaObject a => Meta a -> a -> MetaMonad MetaTable
+metaobj .:= a = distort metaobj (return a)
+
+(-->)
+    :: (MetaObject a, MetaObject b)
+    => Meta a -> Meta b
+    -> (a -> Maybe b) -> MetaModifier
+(-->) metaobj metaobj' fn = runReaderT $ do
+    a <- mmeta metaobj
+    distort metaobj' (fn a)
 
 mmeta :: MetaObject a => Meta a -> MetaMonad a
 mmeta = getMetaReference >=> viewMetaObject
