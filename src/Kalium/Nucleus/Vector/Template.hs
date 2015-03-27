@@ -46,6 +46,9 @@ instance MetaSource MetaPattern    where metaFromInt = PExt . MetaPName
 metaSource :: MetaSource a => [a]
 metaSource = metaFromInt <$> [0..]
 
+metaSource2 :: (MetaSource a, MetaSource b) => ([a], [b])
+metaSource2 = (metaSource, metaSource)
+
 metaMatch :: MetaExpression -> Expression -> Maybe MetaTable
 
 metaMatch (Ext metaname) expr

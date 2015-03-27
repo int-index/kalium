@@ -86,22 +86,21 @@ attemptIgnore = \case
     _ -> Nothing
 
 foldMatch :: Endo' Expression
-foldMatch = \case
-    AppOp3 OpFoldTainted (Lambda2 p1 p2 (Taint a)) x1 x2
-        -> Taint (AppOp3 OpFold (Lambda2 p1 p2 a) x1 x2)
+foldMatch = fire
+    [ AppOp3 OpFoldTainted (Lambda2 p1 p2 (Taint a)) x1 x2
+        := Taint (AppOp3 OpFold (Lambda2 p1 p2 a) x1 x2)
 
-    AppOp3 OpFoldTainted (Lambda2 PWildCard p2 a) LitUnit x2
-        -> AppOp2 OpMapTaintedIgnore (Lambda p2 a) x2
+    , AppOp3 OpFoldTainted (Lambda2 PWildCard p2 a) LitUnit x2
+        := AppOp2 OpMapTaintedIgnore (Lambda p2 a) x2
 
-    AppOp3 OpFoldTainted (Lambda PWildCard a) _ x2
-        -> AppOp3 OpFoldTainted (Lambda PWildCard a) (OpAccess OpUndefined) x2
+    , AppOp3 OpFoldTainted (Lambda PWildCard a) x1 x2
+        := AppOp3 OpFoldTainted (Lambda PWildCard a) (OpAccess OpUndefined) x2
 
-    AppOp3 OpFold (OpAccess OpMultiply) LitOne x -> AppOp1 OpProduct x
-    AppOp3 OpFold (OpAccess OpAdd) LitZero x -> AppOp1 OpSum x
-    AppOp3 OpFold (OpAccess OpAnd) LitTrue x -> AppOp1 OpAnd' x
-    AppOp3 OpFold (OpAccess OpOr) LitFalse x -> AppOp1 OpOr' x
-
-    e -> e
+    , AppOp3 OpFold (OpAccess OpMultiply) LitOne a := AppOp1 OpProduct a
+    , AppOp3 OpFold (OpAccess OpAdd) LitZero a := AppOp1 OpSum a
+    , AppOp3 OpFold (OpAccess OpAnd) LitTrue a := AppOp1 OpAnd' a
+    , AppOp3 OpFold (OpAccess OpOr) LitFalse a := AppOp1 OpOr' a
+    ] where (x1:x2:a:_, p1:p2:_) = metaSource2
 
 booleanCompute :: Endo' Expression
 booleanCompute = fire
