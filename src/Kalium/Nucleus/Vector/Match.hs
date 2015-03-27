@@ -29,19 +29,9 @@ pattern LitTrue = OpAccess OpTrue
 pattern LitFalse = OpAccess OpFalse
 
 commonReduce :: Endo' Expression
-commonReduce = \case
+commonReduce = commonReduce' . \case
 
-    AppOp1 OpId a -> a
     Lambda p a | preciseMatch p a -> OpAccess OpId
-
-    Bind (Taint a) x -> App1 x a
-    Bind x (OpAccess OpTaint) -> x
-
-    AppOp1 OpPutLn (AppOp1 OpShow a) -> AppOp1 OpPrintLn a
-
-    AppOp3 OpIf (Taint LitUnit) xThen cond -> AppOp2 OpWhen cond xThen
-    AppOp2 OpWhen LitTrue a -> a
-    AppOp2 OpWhen LitFalse _ -> Taint LitUnit
 
     AppOp3 OpIf xElse xThen cond
         | AppOp1 opElse aElse <- xElse
@@ -53,19 +43,27 @@ commonReduce = \case
         -> AppOp1 opElse (AppOp3 OpIf aElse aThen cond)
 
     e -> e
+  where
+   commonReduce' = fire
+    [ AppOp1 OpId a := a
+
+    , Bind (Taint a) x := App1 x a
+    , Bind x (OpAccess OpTaint) := x
+
+    , AppOp1 OpPutLn (AppOp1 OpShow a) := AppOp1 OpPrintLn a
+
+    , AppOp3 OpIf (Taint LitUnit) x a := AppOp2 OpWhen a x
+    , AppOp2 OpWhen LitTrue a := a
+    , AppOp2 OpWhen LitFalse a := Taint LitUnit
+
+    ] where (a:x:_) = metaSource
 
 appIgnore :: Endo' Expression
-appIgnore = \case
+appIgnore = appIgnore' . \case
 
-    Follow PWildCard x a -> AppOp2 OpBindIgnore x a
-    AppOp2 OpBindIgnore (Taint LitUnit) a -> a
-    AppOp2 OpBindIgnore x (Taint a) -> AppOp2 OpFmapIgnore a x
     AppOp2 OpBindIgnore (propagate attemptIgnore -> Just x) a
         -> AppOp2 OpBindIgnore x a
 
-    AppOp2 OpFmapIgnore LitUnit x -> Ignore x
-    AppOp2 OpFmapIgnore a (Taint  _) -> Taint a
-    AppOp2 OpFmapIgnore a (Ignore x) -> AppOp2 OpFmapIgnore a x
     AppOp2 OpFmapIgnore a (propagate attemptIgnore -> Just e)
         -> AppOp2 OpFmapIgnore a e
     AppOp2 OpFmapIgnore c (over propagate (AppOp2 OpFmapIgnore c) -> e) -> e
@@ -77,6 +75,16 @@ appIgnore = \case
     Ignore (propagate attemptIgnore -> Just e) -> e
 
     e -> e
+  where
+   appIgnore' = fire
+    [ Follow PWildCard x a := AppOp2 OpBindIgnore x a
+    , AppOp2 OpBindIgnore (Taint LitUnit) a := a
+    , AppOp2 OpBindIgnore x (Taint a) := AppOp2 OpFmapIgnore a x
+
+    , AppOp2 OpFmapIgnore LitUnit x := Ignore x
+    , AppOp2 OpFmapIgnore a (Taint  x) := Taint a
+    , AppOp2 OpFmapIgnore a (Ignore x) := AppOp2 OpFmapIgnore a x
+    ] where (a:x:_) = metaSource
 
 attemptIgnore :: EndoKleisli' Maybe Expression
 attemptIgnore = \case
@@ -191,18 +199,20 @@ pairReduce = \case
         _ -> Nothing
 
 listReduce :: Endo' Expression
-listReduce = \case
-    AppOp2 OpConcat (OpAccess OpNil) e -> e
-    AppOp2 OpConcat e (OpAccess OpNil) -> e
-
+listReduce = listReduce' . \case
     AppOp2 OpConcat (unlist -> Just es) e@(unlist -> Just _)
         -> foldr (AppOp2 OpCons) e es
     e -> e
   where
-    unlist = \case
-        AppOp2 OpCons e es -> (e:) <$> unlist es
-        OpAccess OpNil -> pure []
-        _ -> Nothing
+   listReduce' = fire
+    [ AppOp2 OpConcat (OpAccess OpNil) a := a
+    , AppOp2 OpConcat a (OpAccess OpNil) := a
+    ] where (a:_) = metaSource
+
+   unlist = \case
+       AppOp2 OpCons e es -> (e:) <$> unlist es
+       OpAccess OpNil -> pure []
+       _ -> Nothing
 
 -- TODO: typecheck
 isTaintedUnit :: Expression -> Bool
@@ -222,11 +232,15 @@ etaReduce = \case
               , not (x `mentions` patBound p) -> x
     e -> e
 
-lambdaReduce = \case
-    Into PWildCard _ a -> a
-    Into p x (Taint a) -> Taint (Into p x a)
+lambdaReduce = lambdaReduce' . \case
     Lambda p a -> Lambda (cleanPattern a p) a
     e -> e
+
+  where
+   lambdaReduce' = fire
+    [ Into PWildCard x a := a
+    , Into p x (Taint a) := Taint (Into p x a)
+    ] where (a:x:_, p:_) = metaSource2
 
 cleanPattern :: Mask scope => scope -> Pattern -> Pattern
 cleanPattern a = go where
