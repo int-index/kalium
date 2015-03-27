@@ -31,8 +31,6 @@ pattern LitFalse = OpAccess OpFalse
 commonReduce :: Endo' Expression
 commonReduce = commonReduce' . \case
 
-    Lambda p a | preciseMatch p a -> OpAccess OpId
-
     AppOp3 OpIf xElse xThen cond
         | AppOp1 opElse aElse <- xElse
         , AppOp1 opThen aThen <- xThen
@@ -46,6 +44,7 @@ commonReduce = commonReduce' . \case
   where
    commonReduce' = fire
     [ AppOp1 OpId a := a
+    , Lambda p a := OpAccess OpId :> constraint2 preciseMatch p a
 
     , Bind (Taint a) x := App1 x a
     , Bind x (OpAccess OpTaint) := x
@@ -56,7 +55,7 @@ commonReduce = commonReduce' . \case
     , AppOp2 OpWhen LitTrue a := a
     , AppOp2 OpWhen LitFalse a := Taint LitUnit
 
-    ] where (a:x:_) = metaSource
+    ] where (a:x:_, p:_) = metaSource2
 
 appIgnore :: Endo' Expression
 appIgnore = appIgnore' . \case

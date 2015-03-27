@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Kalium.Nucleus.Vector.Template where
@@ -40,14 +41,18 @@ m1 <+> m2 = do
 makeLenses ''MetaTable
 
 class    MetaSource     a          where metaFromInt :: Int -> a
-instance MetaSource MetaExpression where metaFromInt =  Ext . MetaName
-instance MetaSource MetaPattern    where metaFromInt = PExt . MetaPName
+instance MetaSource MetaName       where metaFromInt =  MetaName
+instance MetaSource MetaPName      where metaFromInt =  MetaPName
+instance MetaSource MetaExpression where metaFromInt =  Ext . metaFromInt
+instance MetaSource MetaPattern    where metaFromInt = PExt . metaFromInt
 
 metaSource :: MetaSource a => [a]
 metaSource = metaFromInt <$> [0..]
 
 metaSource2 :: (MetaSource a, MetaSource b) => ([a], [b])
 metaSource2 = (metaSource, metaSource)
+
+type MetaMonad = ReaderT MetaTable Maybe
 
 metaMatch :: MetaExpression -> Expression -> Maybe MetaTable
 
@@ -83,28 +88,68 @@ metaPMatch _ (PExt pext) = absurd pext
 metaPMatch _ _ = empty
 
 
-metaSubst :: MetaExpression -> ReaderT MetaTable Maybe Expression
+metaSubst :: MetaExpression -> MetaMonad Expression
 metaSubst = \case
     Primary l -> pure (Primary l)
     Access  n -> pure (Access  n)
     Lambda p a -> Lambda <$> metaPSubst p <*> metaSubst a
     Beta f a -> Beta <$> metaSubst f <*> metaSubst a
-    Ext metaname -> views metaExpressionTable (M.lookup metaname) >>= lift
+    Ext metaname -> viewMetaExpression metaname
 
 
-metaPSubst :: MetaPattern -> ReaderT MetaTable Maybe Pattern
+metaPSubst :: MetaPattern -> MetaMonad Pattern
 metaPSubst = \case
     PWildCard -> pure PWildCard
     PUnit -> pure PUnit
     PAccess n t -> pure (PAccess n t)
     PTuple p1 p2 -> PTuple <$> metaPSubst p1 <*> metaPSubst p2
-    PExt metapname -> views metaPatternTable (M.lookup metapname) >>= lift
+    PExt metapname -> viewMetaPattern metapname
 
 
-data Rule = MetaExpression := MetaExpression
+type MetaModifier = MetaTable -> Maybe MetaTable
+
+data Rule
+    = MetaExpression := MetaExpression
+    | Rule :> MetaModifier
+
+infixl 7 :=
+infixl 7 :>
 
 ruleMatch :: Rule -> Expression -> Maybe Expression
-ruleMatch (lhs := rhs) expr = metaMatch lhs expr >>= runReaderT (metaSubst rhs)
+ruleMatch = ruleMatch' return
+
+ruleMatch' :: MetaModifier -> Rule -> Expression -> Maybe Expression
+ruleMatch' metamod (rule :> metamod') = ruleMatch' (metamod >=> metamod') rule
+ruleMatch' metamod (lhs := rhs)
+      = \expr
+     -> metaMatch lhs expr
+    >>= metamod
+    >>= runReaderT (metaSubst rhs)
+
+viewMetaExpression :: MetaName -> MetaMonad Expression
+viewMetaExpression metaname = views metaExpressionTable (M.lookup metaname) >>= lift
+
+viewMetaPattern :: MetaPName -> MetaMonad Pattern
+viewMetaPattern metapname = views metaPatternTable (M.lookup metapname) >>= lift
+
+constraint :: MetaMonad Bool -> MetaModifier
+constraint ma = runReaderT $ ma >>= guard >> ask
+
+constraint1 c x1    = constraint (c <$> extract x1)
+constraint2 c x1 x2 = constraint (c <$> extract x1 <*> extract x2)
+
+type family Extracted a where
+    Extracted MetaExpression = Expression
+    Extracted MetaPattern = Pattern
+
+class Extract a where
+    extract :: a -> MetaMonad (Extracted a)
+
+instance Extract MetaExpression where
+    extract = \case { Ext metaname -> viewMetaExpression metaname; _ -> empty }
+
+instance Extract MetaPattern where
+    extract = \case { PExt metapname -> viewMetaPattern metapname; _ -> empty }
 
 fire :: [Rule] -> Endo' Expression
 fire = foldr (.) id . map (tryApply . ruleMatch)
