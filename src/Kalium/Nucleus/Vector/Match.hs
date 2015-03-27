@@ -28,6 +28,8 @@ pattern LitOne  = Primary (LitInteger 1)
 pattern LitTrue = OpAccess OpTrue
 pattern LitFalse = OpAccess OpFalse
 
+transgate = transform . propagate
+
 commonReduce :: Endo' Expression
 commonReduce = commonReduce' . \case
 
@@ -69,23 +71,21 @@ appIgnore = fire
 
     , AppOp2 OpBindIgnore x a
         := AppOp2 OpBindIgnore x a
-        :> transform (propagate attemptIgnore) x
+        :> transgate attemptIgnore x
 
     , AppOp2 OpFmapIgnore a x
         := AppOp2 OpFmapIgnore a x
-        :> transform (propagate attemptIgnore) x
+        :> transgate attemptIgnore x
 
-    , Ignore a := a :> transform (propagate attemptIgnore) a
+    , Ignore a := a :> transgate attemptIgnore a
 
     , AppOp3 OpFoldTainted (Lambda2 PWildCard p a) x' x
         := AppOp2 OpMapTaintedIgnore (Lambda p a) x
-        :> transform (propagate attemptIgnore) a
+        :> transgate attemptIgnore a
 
     , AppOp2 OpFmapIgnore a x := x'
-       .:> do
-         a <- mmeta a
-         x <- mmeta x
-         x' .:= over propagate (AppOp2 OpFmapIgnore a) x
+        :> metaExecWith2 a x
+            (\a x -> x' ..= over propagate (AppOp2 OpFmapIgnore a) x)
     ] where (a:x:x':_, p:_) = metaSource2
 
 attemptIgnore :: EndoKleisli' Maybe Expression
@@ -176,14 +176,17 @@ doubleOp2 = \case
     _ -> Nothing
 
 pairReduce :: Endo' Expression
-pairReduce = \case
-    Lambda (PTuple p1 p2) (propagate (swapApp p1 p2) -> Just a)
-        -> Lambda (PTuple p2 p1) a
-    AppOp1 OpSwap (propagate swapAttempt -> Just a) -> a
-    AppOp1 OpFst (propagate fstAttempt -> Just a) -> a
-    AppOp1 OpSnd (propagate sndAttempt -> Just a) -> a
-    e -> e
+pairReduce = fire
+    [ Lambda (PTuple p1 p2) a := Lambda (PTuple p2 p1) a'
+       :> metaExecWith3 p1 p2 a
+           (\p1 p2 a -> a' ...= propagate (swapApp p1 p2) a)
+
+    , AppOp1 OpSwap a := a :> transgate swapAttempt a
+    , AppOp1 OpFst  a := a :> transgate fstAttempt a
+    , AppOp1 OpSnd  a := a :> transgate sndAttempt a
+    ]
   where
+    (a:a':_, p1:p2:_) = metaSource2
     fstAttempt = \case
         AppOp2 OpPair a _ -> Just a
         _ -> Nothing
@@ -201,20 +204,24 @@ pairReduce = \case
         _ -> Nothing
 
 listReduce :: Endo' Expression
-listReduce = listReduce' . \case
-    AppOp2 OpConcat (unlist -> Just es) e@(unlist -> Just _)
-        -> foldr (AppOp2 OpCons) e es
-    e -> e
-  where
-   listReduce' = fire
+listReduce = fire
     [ AppOp2 OpConcat (OpAccess OpNil) a := a
     , AppOp2 OpConcat a (OpAccess OpNil) := a
-    ] where (a:_) = metaSource
+    , AppOp2 OpConcat es e := a
+       :> metaExecWith2 e es
+           (\e es -> do
+                _   <- unlist e
+                es' <- unlist es
+                a ..= foldr (AppOp2 OpCons) e es')
+    ]
+  where
+    (a:e:es:_) = metaSource
 
-   unlist = \case
-       AppOp2 OpCons e es -> (e:) <$> unlist es
-       OpAccess OpNil -> pure []
-       _ -> Nothing
+    unlist :: Alternative f => Expression -> f [Expression]
+    unlist = \case
+        AppOp2 OpCons e es -> (e:) <$> unlist es
+        OpAccess OpNil -> pure []
+        _ -> empty
 
 -- TODO: typecheck
 isTaintedUnit :: Expression -> Bool
@@ -229,20 +236,21 @@ isTaintedUnit = \case
     AppOp3 OpIf xElse xThen _ -> isTaintedUnit xElse && isTaintedUnit xThen
     _ -> False
 
-etaReduce = \case
-    Eta p x a | preciseMatch p a
-              , not (x `mentions` patBound p) -> x
-    e -> e
+notMentions :: Pattern -> Expression -> Bool
+notMentions p x = not (x `mentions` patBound p)
 
-lambdaReduce = lambdaReduce' . \case
-    Lambda p a -> Lambda (cleanPattern a p) a
-    e -> e
+etaReduce = fire
+    [ Eta p x a := x
+        :> constraint2 preciseMatch p a
+        :> constraint2  notMentions p x
+    ] where (x:a:_, p:_) = metaSource2
 
-  where
-   lambdaReduce' = fire
+lambdaReduce = fire
     [ Into PWildCard x a := a
     , Into p x (Taint a) := Taint (Into p x a)
-    ] where (a:x:_, p:_) = metaSource2
+    , Lambda p a := Lambda p' a
+       :> metaExecWith2 p a (\p a -> p' ..= cleanPattern (a :: Expression) p)
+    ] where (a:x:_, p:p':_) = metaSource2
 
 cleanPattern :: Mask scope => scope -> Pattern -> Pattern
 cleanPattern a = go where

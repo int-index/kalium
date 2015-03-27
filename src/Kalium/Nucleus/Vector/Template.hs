@@ -183,11 +183,15 @@ settingMetaReference metaname a = over metaObjectSubtable (M.insert metaname a) 
 settingMetaObject :: MetaObject a => Meta a -> a -> MetaMonad MetaTable
 settingMetaObject metaobj a = getMetaReference metaobj >>= flip settingMetaReference a
 
-distort :: MetaObject a => Meta a -> Maybe a -> MetaMonad MetaTable
-distort metaobj a = maybe empty (settingMetaObject metaobj) a
+(...=) :: MetaObject a => Meta a -> Maybe a -> MetaMonad MetaTable
+metaobj ...= a = maybe empty (settingMetaObject metaobj) a
 
-(.:=) :: MetaObject a => Meta a -> a -> MetaMonad MetaTable
-metaobj .:= a = distort metaobj (return a)
+(..=) :: MetaObject a => Meta a -> a -> MetaMonad MetaTable
+metaobj ..= a = metaobj ...= return a
+
+metaExecWith1 a     fn = runReaderT                (mmeta a >>= fn)
+metaExecWith2 a b   fn = metaExecWith1 a     (\a -> mmeta b >>= fn a)
+metaExecWith3 a b c fn = metaExecWith2 a b (\a b -> mmeta c >>= fn a b)
 
 (-->)
     :: (MetaObject a, MetaObject b)
@@ -195,7 +199,7 @@ metaobj .:= a = distort metaobj (return a)
     -> (a -> Maybe b) -> MetaModifier
 (-->) metaobj metaobj' fn = runReaderT $ do
     a <- mmeta metaobj
-    distort metaobj' (fn a)
+    metaobj' ...= fn a
 
 mmeta :: MetaObject a => Meta a -> MetaMonad a
 mmeta = getMetaReference >=> viewMetaObject
