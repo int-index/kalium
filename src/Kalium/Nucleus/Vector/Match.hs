@@ -106,19 +106,26 @@ foldMatch = fire
     , AppOp3 OpFoldTainted (Lambda PWildCard a) x1 x2
         := AppOp3 OpFoldTainted (Lambda PWildCard a) (OpAccess OpUndefined) x2
 
-    , AppOp3 OpFold (OpAccess OpMultiply) LitOne a := AppOp1 OpProduct a
-    , AppOp3 OpFold (OpAccess OpAdd) LitZero a := AppOp1 OpSum a
-    , AppOp3 OpFold (OpAccess OpAnd) LitTrue a := AppOp1 OpAnd' a
-    , AppOp3 OpFold (OpAccess OpOr) LitFalse a := AppOp1 OpOr' a
+    , AppOp2 OpFold (OpAccess OpMultiply) LitOne := OpAccess OpProduct
+    , AppOp2 OpFold (OpAccess OpAdd) LitZero := OpAccess OpSum
+    , AppOp2 OpFold (OpAccess OpAnd) LitTrue := OpAccess OpAnd'
+    , AppOp2 OpFold (OpAccess OpOr) LitFalse := OpAccess OpOr'
     ] where (x1:x2:a:_, p1:p2:_) = metaSource2
+
+leftIdentity  f x = let (a:_) = metaSource in App2 f a x := a
+rightIdentity f x = let (a:_) = metaSource in App2 f x a := a
+
+unaryIdempotence  f = let (a:_) = metaSource in App1 f (App1 f a) := a
+binaryIdempotence f = let (a:_) = metaSource in App2 f a a := a
 
 booleanCompute :: Endo' Expression
 booleanCompute = fire
     [ AppOp1 OpNot LitTrue  := LitFalse
     , AppOp1 OpNot LitFalse := LitTrue
 
-    , AppOp2 OpAnd x x := x
-    , AppOp2 OpOr  x x := x
+    , unaryIdempotence (OpAccess OpNot)
+    , binaryIdempotence (OpAccess OpAnd)
+    , binaryIdempotence (OpAccess OpOr)
 
     , AppOp2 OpAnd x (AppOp1 OpNot x) := LitFalse
     , AppOp2 OpAnd (AppOp1 OpNot x) x := LitFalse
@@ -126,11 +133,11 @@ booleanCompute = fire
     , AppOp2 OpOr x (AppOp1 OpNot x) := LitTrue
     , AppOp2 OpOr (AppOp1 OpNot x) x := LitTrue
 
-    , AppOp2 OpAnd LitTrue x := x
-    , AppOp2 OpAnd x LitTrue := x
+    , leftIdentity  (OpAccess OpAnd) LitTrue
+    , rightIdentity (OpAccess OpAnd) LitTrue
 
-    , AppOp2 OpOr x LitFalse := x
-    , AppOp2 OpOr LitFalse x := x
+    , leftIdentity  (OpAccess OpOr) LitFalse
+    , rightIdentity (OpAccess OpOr) LitFalse
 
     , AppOp2 OpAnd LitFalse x := LitFalse
     , AppOp2 OpAnd x LitFalse := LitFalse
@@ -205,8 +212,8 @@ pairReduce = fire
 
 listReduce :: Endo' Expression
 listReduce = fire
-    [ AppOp2 OpConcat (OpAccess OpNil) a := a
-    , AppOp2 OpConcat a (OpAccess OpNil) := a
+    [ leftIdentity  (OpAccess OpConcat) (OpAccess OpNil)
+    , rightIdentity (OpAccess OpConcat) (OpAccess OpNil)
     , AppOp2 OpConcat es e := a
        :> metaExecWith2 e es
            (\e es -> do
