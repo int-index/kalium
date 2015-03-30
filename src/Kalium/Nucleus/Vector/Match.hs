@@ -54,8 +54,8 @@ commonReduce = commonReduce' . \case
     , AppOp1 OpPutLn (AppOp1 OpShow a) := AppOp1 OpPrintLn a
 
     , AppOp3 OpIf (Taint LitUnit) x a := AppOp2 OpWhen a x
-    , AppOp2 OpWhen LitTrue a := a
     , AppOp2 OpWhen LitFalse a := Taint LitUnit
+    , AppOp1 OpWhen LitTrue := OpAccess OpId
 
     ] where (a:x:_, p:_) = metaSource2
 
@@ -112,8 +112,8 @@ foldMatch = fire
     , AppOp2 OpFold (OpAccess OpOr) LitFalse := OpAccess OpOr'
     ] where (x1:x2:a:_, p1:p2:_) = metaSource2
 
-leftIdentity  f x = let (a:_) = metaSource in App2 f a x := a
-rightIdentity f x = let (a:_) = metaSource in App2 f x a := a
+leftIdentity  f x = let (a:_) = metaSource in App2 f x a := a
+rightIdentity f x = let (a:_) = metaSource in App2 f a x := a
 
 unaryIdempotence  f = let (a:_) = metaSource in App1 f (App1 f a) := a
 binaryIdempotence f = let (a:_) = metaSource in App2 f a a := a
