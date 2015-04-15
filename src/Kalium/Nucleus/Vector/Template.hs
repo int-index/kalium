@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Kalium.Nucleus.Vector.Template where
@@ -67,7 +68,45 @@ metaSource = metaFromInt <$> [0..]
 metaSource2 :: (MetaSource a, MetaSource b) => ([a], [b])
 metaSource2 = (metaSource, metaSource)
 
-type MetaMonad = ReaderT MetaTable Maybe
+-- begin MetaMonad
+
+newtype MetaTableReader a = MetaTableReader (ReaderT MetaTable Maybe a)
+    deriving (Functor, Applicative, Alternative, Monad, MonadFix, MonadPlus)
+
+runMetaTableReader :: MetaTableReader a -> MetaTable -> Maybe a
+runMetaTableReader (MetaTableReader t) = runReaderT t
+
+newtype MetaTableState a = MetaTableState (StateT MetaTable Maybe a)
+    deriving (Functor, Applicative, Alternative, Monad, MonadFix, MonadPlus)
+
+class (Alternative m, MonadPlus m) => GetMetaTable m where
+    getMetaTable :: m MetaTable
+
+instance GetMetaTable MetaTableReader where
+    getMetaTable = MetaTableReader ask
+
+instance GetMetaTable MetaTableState where
+    getMetaTable = MetaTableState get
+
+class (Alternative m, MonadPlus m) => SetMetaTable m where
+    setMetaTable :: MetaTable -> m ()
+
+instance SetMetaTable MetaTableState where
+    setMetaTable = MetaTableState . put
+
+class ToMetaModifier m where
+    type family ToMetaModifierReturn m :: *
+    toMetaModifier :: m (ToMetaModifierReturn m) -> MetaModifier
+
+instance ToMetaModifier MetaTableReader where
+    type ToMetaModifierReturn MetaTableReader = MetaTable
+    toMetaModifier = runMetaTableReader
+
+instance ToMetaModifier MetaTableState where
+    type ToMetaModifierReturn MetaTableState = ()
+    toMetaModifier (MetaTableState t) = execStateT t
+
+-- end MetaMonad
 
 metaMatch :: Meta Expression -> Expression -> Maybe MetaTable
 
@@ -103,7 +142,7 @@ metaPMatch _ (PExt pext) = absurd pext
 metaPMatch _ _ = empty
 
 
-metaSubst :: Meta Expression -> MetaMonad Expression
+metaSubst :: (GetMetaTable m, Alternative m) => Meta Expression -> m Expression
 metaSubst = \case
     Primary l -> pure (Primary l)
     Access  n -> pure (Access  n)
@@ -112,7 +151,7 @@ metaSubst = \case
     Ext metaname -> viewMetaObject metaname
 
 
-metaPSubst :: Meta Pattern -> MetaMonad Pattern
+metaPSubst :: (GetMetaTable m, Alternative m) => Meta Pattern -> m Pattern
 metaPSubst = \case
     PWildCard -> pure PWildCard
     PUnit -> pure PUnit
@@ -129,9 +168,6 @@ data Rule
 
 infixl 7 :=
 infixl 7 :>
-infixl 7 .:>
-
-rule .:> metamod = rule :> runReaderT metamod
 
 ruleMatch :: Rule -> Expression -> Maybe Expression
 ruleMatch = ruleMatch' return
@@ -142,7 +178,7 @@ ruleMatch' metamod (lhs := rhs)
       = \expr
      -> metaMatch lhs expr
     >>= metamod
-    >>= runReaderT (metaSubst rhs)
+    >>= runMetaTableReader (metaSubst rhs)
 
 class Ord (MetaReference a) => MetaObjectSubtable a where
     metaObjectSubtable :: Lens' MetaTable (MetaSubtable a)
@@ -153,21 +189,25 @@ instance MetaObjectSubtable Expression where
 instance MetaObjectSubtable Pattern where
     metaObjectSubtable = metaPatternTable
 
-viewMetaObject :: MetaObjectSubtable a => MetaReference a -> MetaMonad a
-viewMetaObject metaname = views metaObjectSubtable (M.lookup metaname) >>= lift
+viewMetaObject
+    :: (MetaObjectSubtable a, GetMetaTable m, Alternative m)
+    => MetaReference a -> m a
+viewMetaObject metaname = do
+    mobj <- views metaObjectSubtable (M.lookup metaname) <$> getMetaTable
+    maybe empty pure mobj
 
 class GetMetaReference a where
-    getMetaReference :: Meta a -> MetaMonad (MetaReference a)
+    getMetaReference :: Alternative m => Meta a -> m (MetaReference a)
 
 instance GetMetaReference Expression where
-    getMetaReference = \case { Ext metaname -> return metaname; _ -> empty }
+    getMetaReference = \case { Ext metaname -> pure metaname; _ -> empty }
 
 instance GetMetaReference Pattern where
-    getMetaReference = \case { PExt metapname -> return metapname; _ -> empty }
+    getMetaReference = \case { PExt metapname -> pure metapname; _ -> empty }
 
 
-constraint :: MetaMonad Bool -> MetaModifier
-constraint ma = runReaderT $ ma >>= guard >> ask
+constraint :: MetaTableReader Bool -> MetaModifier
+constraint ma = runMetaTableReader $ ma >>= guard >> getMetaTable
 
 constraint1 c x1    = constraint (c <$> mmeta x1)
 constraint2 c x1 x2 = constraint (c <$> mmeta x1 <*> mmeta x2)
@@ -177,19 +217,25 @@ type MetaObject a = (MetaObjectSubtable a, GetMetaReference a)
 transform :: MetaObject a => (a -> Maybe a) -> Meta a -> MetaModifier
 transform fn metaobj = (metaobj --> metaobj) fn
 
-settingMetaReference :: MetaObjectSubtable a => MetaReference a -> a -> MetaMonad MetaTable
-settingMetaReference metaname a = over metaObjectSubtable (M.insert metaname a) <$> ask
+settingMetaReference
+    :: (MetaObjectSubtable a, GetMetaTable m)
+    => a -> MetaReference a -> m MetaTable
+settingMetaReference a metaname = over metaObjectSubtable (M.insert metaname a) <$> getMetaTable
 
-settingMetaObject :: MetaObject a => Meta a -> a -> MetaMonad MetaTable
-settingMetaObject metaobj a = getMetaReference metaobj >>= flip settingMetaReference a
+settingMetaObject
+    :: (MetaObject a, GetMetaTable m, Alternative m)
+    => Meta a -> a -> m MetaTable
+settingMetaObject metaobj a = getMetaReference metaobj >>= settingMetaReference a
 
-(...=) :: MetaObject a => Meta a -> Maybe a -> MetaMonad MetaTable
-metaobj ...= a = maybe empty (settingMetaObject metaobj) a
+(...=) :: MetaObject a => Meta a -> Maybe a -> MetaTableState ()
+metaobj ...= ma = do
+    a <- maybe empty pure ma
+    metaobj ..= a
 
-(..=) :: MetaObject a => Meta a -> a -> MetaMonad MetaTable
-metaobj ..= a = metaobj ...= return a
+(..=) :: MetaObject a => Meta a -> a -> MetaTableState ()
+metaobj ..= a = settingMetaObject metaobj a >>= setMetaTable
 
-metaExecWith1 a     fn = runReaderT                (mmeta a >>= fn)
+metaExecWith1 a     fn = toMetaModifier            (mmeta a >>= fn)
 metaExecWith2 a b   fn = metaExecWith1 a     (\a -> mmeta b >>= fn a)
 metaExecWith3 a b c fn = metaExecWith2 a b (\a b -> mmeta c >>= fn a b)
 
@@ -197,11 +243,11 @@ metaExecWith3 a b c fn = metaExecWith2 a b (\a b -> mmeta c >>= fn a b)
     :: (MetaObject a, MetaObject b)
     => Meta a -> Meta b
     -> (a -> Maybe b) -> MetaModifier
-(-->) metaobj metaobj' fn = runReaderT $ do
+(-->) metaobj metaobj' fn = toMetaModifier $ do
     a <- mmeta metaobj
     metaobj' ...= fn a
 
-mmeta :: MetaObject a => Meta a -> MetaMonad a
+mmeta :: (MetaObject a, GetMetaTable m, Alternative m) => Meta a -> m a
 mmeta = getMetaReference >=> viewMetaObject
 
 fire :: [Rule] -> Endo' Expression
