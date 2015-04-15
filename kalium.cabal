@@ -56,17 +56,17 @@ library
                        Control.Monad.Config
                        Control.Dependent
 
-  build-depends:       base < 5
+  build-depends:       base >= 4.7 && < 5
                ,       transformers >= 0.4
-               ,       mtl
-               ,       containers
-               ,       unordered-containers
-               ,       array
-               ,       lens
-               ,       profunctors
+               ,       mtl >= 2.2
+               ,       containers >= 0.5
+               ,       unordered-containers >= 0.2
+               ,       array >= 0.5
+               ,       lens >= 4.9
+               ,       profunctors >= 4.4
                ,       haskell-src-exts == 1.16.*
-               ,       parsec
-               ,       void
+               ,       parsec >= 3.1
+               ,       void >= 0.7
 
   ghc-options:         -W
   ghc-prof-options:    -fprof-auto
