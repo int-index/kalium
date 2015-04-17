@@ -3,9 +3,11 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Kalium.Nucleus.Vector.Template where
 
+import Data.String
 import qualified Data.Map as M
 
 import Kalium.Prelude
@@ -14,10 +16,10 @@ import Kalium.Nucleus.Vector.Program
 
 data family MetaReference a
 
-newtype instance MetaReference Expression = MetaName Int
+newtype instance MetaReference Expression = MetaName String
     deriving (Eq, Ord)
 
-newtype instance MetaReference Pattern = MetaPName Int
+newtype instance MetaReference Pattern = MetaPName String
     deriving (Eq, Ord)
 
 type family Meta a where
@@ -50,23 +52,19 @@ m1 <+> m2 = do
 
 makeLenses ''MetaTable
 
-class    MetaSource     a     where metaFromInt :: Int -> a
-instance MetaSource MetaName  where metaFromInt =  MetaName
-instance MetaSource MetaPName where metaFromInt =  MetaPName
+instance IsString MetaName where
+    fromString = MetaName
 
-instance MetaSource
+instance IsString MetaPName where
+    fromString = MetaPName
+
+instance IsString
   ( Expression' (MetaReference Pattern) (MetaReference Expression)
-  ) where metaFromInt =  Ext . metaFromInt
+  ) where fromString =  Ext . fromString
 
-instance MetaSource
+instance IsString
   ( Pattern' (MetaReference Pattern)
-  ) where metaFromInt = PExt . metaFromInt
-
-metaSource :: MetaSource a => [a]
-metaSource = metaFromInt <$> [0..]
-
-metaSource2 :: (MetaSource a, MetaSource b) => ([a], [b])
-metaSource2 = (metaSource, metaSource)
+  ) where fromString = PExt . fromString
 
 -- begin MetaMonad
 
@@ -168,17 +166,16 @@ data Rule
 
 infixl 7 :=
 infixl 7 :>
+infixl 7 .:>
+
+rule .:> metamod = rule :> toMetaModifier metamod
 
 ruleMatch :: Rule -> Expression -> Maybe Expression
 ruleMatch = ruleMatch' return
 
 ruleMatch' :: MetaModifier -> Rule -> Expression -> Maybe Expression
 ruleMatch' metamod (rule :> metamod') = ruleMatch' (metamod >=> metamod') rule
-ruleMatch' metamod (lhs := rhs)
-      = \expr
-     -> metaMatch lhs expr
-    >>= metamod
-    >>= runMetaTableReader (metaSubst rhs)
+ruleMatch' metamod (lhs := rhs) = metaMatch lhs >=> metamod >=> runMetaTableReader (metaSubst rhs)
 
 class Ord (MetaReference a) => MetaObjectSubtable a where
     metaObjectSubtable :: Lens' MetaTable (MetaSubtable a)
@@ -194,7 +191,7 @@ viewMetaObject
     => MetaReference a -> m a
 viewMetaObject metaname = do
     mobj <- views metaObjectSubtable (M.lookup metaname) <$> getMetaTable
-    maybe empty pure mobj
+    amaybe mobj
 
 class GetMetaReference a where
     getMetaReference :: Alternative m => Meta a -> m (MetaReference a)
@@ -227,25 +224,16 @@ settingMetaObject
     => Meta a -> a -> m MetaTable
 settingMetaObject metaobj a = getMetaReference metaobj >>= settingMetaReference a
 
-(...=) :: MetaObject a => Meta a -> Maybe a -> MetaTableState ()
-metaobj ...= ma = do
-    a <- maybe empty pure ma
-    metaobj ..= a
-
 (..=) :: MetaObject a => Meta a -> a -> MetaTableState ()
 metaobj ..= a = settingMetaObject metaobj a >>= setMetaTable
 
-metaExecWith1 a     fn = toMetaModifier            (mmeta a >>= fn)
-metaExecWith2 a b   fn = metaExecWith1 a     (\a -> mmeta b >>= fn a)
-metaExecWith3 a b c fn = metaExecWith2 a b (\a b -> mmeta c >>= fn a b)
-
 (-->)
     :: (MetaObject a, MetaObject b)
-    => Meta a -> Meta b
-    -> (a -> Maybe b) -> MetaModifier
+    => Meta a -> Meta b -> (a -> Maybe b) -> MetaModifier
 (-->) metaobj metaobj' fn = toMetaModifier $ do
     a <- mmeta metaobj
-    metaobj' ...= fn a
+    b <- amaybe (fn a)
+    metaobj' ..= b
 
 mmeta :: (MetaObject a, GetMetaTable m, Alternative m) => Meta a -> m a
 mmeta = getMetaReference >=> viewMetaObject

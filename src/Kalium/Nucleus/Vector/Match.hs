@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Kalium.Nucleus.Vector.Match where
 
 import Kalium.Prelude
@@ -45,48 +46,49 @@ commonReduce = commonReduce' . \case
     e -> e
   where
    commonReduce' = fire
-    [ AppOp1 OpId a := a
-    , Lambda p a := OpAccess OpId :> constraint2 preciseMatch p a
+    [ AppOp1 OpId "a" := "a"
+    , Lambda "p" "a" := OpAccess OpId :> constraint2 preciseMatch "p" "a"
 
-    , Bind (Taint a) x := App1 x a
-    , Bind x (OpAccess OpTaint) := x
+    , Bind (Taint "a") "x" := App1 "x" "a"
+    , Bind "x" (OpAccess OpTaint) := "x"
 
-    , AppOp1 OpPutLn (AppOp1 OpShow a) := AppOp1 OpPrintLn a
+    , AppOp1 OpPutLn (AppOp1 OpShow "a") := AppOp1 OpPrintLn "a"
 
-    , AppOp3 OpIf (Taint LitUnit) x a := AppOp2 OpWhen a x
-    , AppOp2 OpWhen LitFalse a := Taint LitUnit
+    , AppOp3 OpIf (Taint LitUnit) "x" "a" := AppOp2 OpWhen "a" "x"
+    , AppOp2 OpWhen LitFalse "a" := Taint LitUnit
     , AppOp1 OpWhen LitTrue := OpAccess OpId
-
-    ] where (a:x:_, p:_) = metaSource2
+    ]
 
 appIgnore :: Endo' Expression
 appIgnore = fire
-    [ Follow PWildCard x a := AppOp2 OpBindIgnore x a
-    , AppOp2 OpBindIgnore (Taint LitUnit) a := a
-    , AppOp2 OpBindIgnore x (Taint a) := AppOp2 OpFmapIgnore a x
+    [ Follow PWildCard "x" "a" := AppOp2 OpBindIgnore "x" "a"
+    , AppOp2 OpBindIgnore (Taint LitUnit) "a" := "a"
+    , AppOp2 OpBindIgnore "x" (Taint "a") := AppOp2 OpFmapIgnore "a" "x"
 
-    , AppOp2 OpFmapIgnore LitUnit x := Ignore x
-    , AppOp2 OpFmapIgnore a (Taint  x) := Taint a
-    , AppOp2 OpFmapIgnore a (Ignore x) := AppOp2 OpFmapIgnore a x
+    , AppOp2 OpFmapIgnore LitUnit "x" := Ignore "x"
+    , AppOp2 OpFmapIgnore "a" (Taint  "x") := Taint "a"
+    , AppOp2 OpFmapIgnore "a" (Ignore "x") := AppOp2 OpFmapIgnore "a" "x"
 
-    , AppOp2 OpBindIgnore x a
-        := AppOp2 OpBindIgnore x a
-        :> transgate attemptIgnore x
+    , AppOp2 OpBindIgnore "x" "a"
+        := AppOp2 OpBindIgnore "x" "a"
+        :> transgate attemptIgnore "x"
 
-    , AppOp2 OpFmapIgnore a x
-        := AppOp2 OpFmapIgnore a x
-        :> transgate attemptIgnore x
+    , AppOp2 OpFmapIgnore "a" "x"
+        := AppOp2 OpFmapIgnore "a" "x"
+        :> transgate attemptIgnore "x"
 
-    , Ignore a := a :> transgate attemptIgnore a
+    , Ignore "a" := "a" :> transgate attemptIgnore "a"
 
-    , AppOp3 OpFoldTainted (Lambda2 PWildCard p a) x' x
-        := AppOp2 OpMapTaintedIgnore (Lambda p a) x
-        :> transgate attemptIgnore a
+    , AppOp3 OpFoldTainted (Lambda2 PWildCard "p" "a") "_1" "x"
+        := AppOp2 OpMapTaintedIgnore (Lambda "p" "a") "x"
+        :> transgate attemptIgnore "a"
 
-    , AppOp2 OpFmapIgnore a x := x'
-        :> metaExecWith2 a x
-            (\a x -> x' ..= over propagate (AppOp2 OpFmapIgnore a) x)
-    ] where (a:x:x':_, p:_) = metaSource2
+    , AppOp2 OpFmapIgnore "a" "x" := "x'"
+        .:> do
+         a <- mmeta "a"
+         x <- mmeta "x"
+         "x'" ..= over propagate (AppOp2 OpFmapIgnore a) x
+    ]
 
 attemptIgnore :: EndoKleisli' Maybe Expression
 attemptIgnore = \case
@@ -97,26 +99,26 @@ attemptIgnore = \case
 
 foldMatch :: Endo' Expression
 foldMatch = fire
-    [ AppOp3 OpFoldTainted (Lambda2 p1 p2 (Taint a)) x1 x2
-        := Taint (AppOp3 OpFold (Lambda2 p1 p2 a) x1 x2)
+    [ AppOp3 OpFoldTainted (Lambda2 "p1" "p2" (Taint "a")) "x1" "x2"
+        := Taint (AppOp3 OpFold (Lambda2 "p1" "p2" "a") "x1" "x2")
 
-    , AppOp3 OpFoldTainted (Lambda2 PWildCard p2 a) LitUnit x2
-        := AppOp2 OpMapTaintedIgnore (Lambda p2 a) x2
+    , AppOp3 OpFoldTainted (Lambda2 PWildCard "p2" "a") LitUnit "x2"
+        := AppOp2 OpMapTaintedIgnore (Lambda "p2" "a") "x2"
 
-    , AppOp3 OpFoldTainted (Lambda PWildCard a) x1 x2
-        := AppOp3 OpFoldTainted (Lambda PWildCard a) (OpAccess OpUndefined) x2
+    , AppOp3 OpFoldTainted (Lambda PWildCard "a") "x1" "x2"
+        := AppOp3 OpFoldTainted (Lambda PWildCard "a") (OpAccess OpUndefined) "x2"
 
     , AppOp2 OpFold (OpAccess OpMultiply) LitOne := OpAccess OpProduct
     , AppOp2 OpFold (OpAccess OpAdd) LitZero := OpAccess OpSum
     , AppOp2 OpFold (OpAccess OpAnd) LitTrue := OpAccess OpAnd'
     , AppOp2 OpFold (OpAccess OpOr) LitFalse := OpAccess OpOr'
-    ] where (x1:x2:a:_, p1:p2:_) = metaSource2
+    ]
 
-leftIdentity  f x = let (a:_) = metaSource in App2 f x a := a
-rightIdentity f x = let (a:_) = metaSource in App2 f a x := a
+leftIdentity  f x = App2 f x "a" := "a"
+rightIdentity f x = App2 f "a" x := "a"
 
-unaryIdempotence  f = let (a:_) = metaSource in App1 f (App1 f a) := a
-binaryIdempotence f = let (a:_) = metaSource in App2 f a a := a
+unaryIdempotence  f = App1 f (App1 f "a") := "a"
+binaryIdempotence f = App2 f "a" "a" := "a"
 
 booleanCompute :: Endo' Expression
 booleanCompute = fire
@@ -127,11 +129,11 @@ booleanCompute = fire
     , binaryIdempotence (OpAccess OpAnd)
     , binaryIdempotence (OpAccess OpOr)
 
-    , AppOp2 OpAnd x (AppOp1 OpNot x) := LitFalse
-    , AppOp2 OpAnd (AppOp1 OpNot x) x := LitFalse
+    , AppOp2 OpAnd "x" (AppOp1 OpNot "x") := LitFalse
+    , AppOp2 OpAnd (AppOp1 OpNot "x") "x" := LitFalse
 
-    , AppOp2 OpOr x (AppOp1 OpNot x) := LitTrue
-    , AppOp2 OpOr (AppOp1 OpNot x) x := LitTrue
+    , AppOp2 OpOr "x" (AppOp1 OpNot "x") := LitTrue
+    , AppOp2 OpOr (AppOp1 OpNot "x") "x" := LitTrue
 
     , leftIdentity  (OpAccess OpAnd) LitTrue
     , rightIdentity (OpAccess OpAnd) LitTrue
@@ -139,15 +141,15 @@ booleanCompute = fire
     , leftIdentity  (OpAccess OpOr) LitFalse
     , rightIdentity (OpAccess OpOr) LitFalse
 
-    , AppOp2 OpAnd LitFalse x := LitFalse
-    , AppOp2 OpAnd x LitFalse := LitFalse
+    , AppOp2 OpAnd LitFalse "x" := LitFalse
+    , AppOp2 OpAnd "x" LitFalse := LitFalse
 
-    , AppOp2 OpOr LitTrue x := LitTrue
-    , AppOp2 OpOr x LitTrue := LitTrue
+    , AppOp2 OpOr LitTrue "x" := LitTrue
+    , AppOp2 OpOr "x" LitTrue := LitTrue
 
-    , AppOp3 OpIf x a LitFalse := x
-    , AppOp3 OpIf a x LitTrue  := x
-    ] where (x:a:_) = metaSource
+    , AppOp3 OpIf "x" "a" LitFalse := "x"
+    , AppOp3 OpIf "a" "x" LitTrue  := "x"
+    ]
 
 numericCompute :: Endo' Expression
 numericCompute = \case
@@ -184,16 +186,19 @@ doubleOp2 = \case
 
 pairReduce :: Endo' Expression
 pairReduce = fire
-    [ Lambda (PTuple p1 p2) a := Lambda (PTuple p2 p1) a'
-       :> metaExecWith3 p1 p2 a
-           (\p1 p2 a -> a' ...= propagate (swapApp p1 p2) a)
+    [ Lambda (PTuple "p1" "p2") "a" := Lambda (PTuple "p2" "p1") "a'"
+       .:> do
+        p1 <- mmeta "p1"
+        p2 <- mmeta "p2"
+        a <- mmeta "a"
+        a' <- amaybe $ propagate (swapApp p1 p2) a
+        "a'" ..= a'
 
-    , AppOp1 OpSwap a := a :> transgate swapAttempt a
-    , AppOp1 OpFst  a := a :> transgate fstAttempt a
-    , AppOp1 OpSnd  a := a :> transgate sndAttempt a
+    , AppOp1 OpSwap "a" := "a" :> transgate swapAttempt "a"
+    , AppOp1 OpFst  "a" := "a" :> transgate fstAttempt "a"
+    , AppOp1 OpSnd  "a" := "a" :> transgate sndAttempt "a"
     ]
   where
-    (a:a':_, p1:p2:_) = metaSource2
     fstAttempt = \case
         AppOp2 OpPair a _ -> Just a
         _ -> Nothing
@@ -214,16 +219,15 @@ listReduce :: Endo' Expression
 listReduce = fire
     [ leftIdentity  (OpAccess OpConcat) (OpAccess OpNil)
     , rightIdentity (OpAccess OpConcat) (OpAccess OpNil)
-    , AppOp2 OpConcat es e := a
-       :> metaExecWith2 e es
-           (\e es -> do
-                _   <- unlist e
-                es' <- unlist es
-                a ..= foldr (AppOp2 OpCons) e es')
+    , AppOp2 OpConcat "es" "e" := "a"
+       .:> do
+        e <- mmeta "e"
+        es <- mmeta "es"
+        _   <- unlist e
+        es' <- unlist es
+        "a" ..= foldr (AppOp2 OpCons) e es'
     ]
   where
-    (a:e:es:_) = metaSource
-
     unlist :: Alternative f => Expression -> f [Expression]
     unlist = \case
         AppOp2 OpCons e es -> (e:) <$> unlist es
@@ -247,17 +251,20 @@ notMentions :: Pattern -> Expression -> Bool
 notMentions p x = not (x `mentions` patBound p)
 
 etaReduce = fire
-    [ Eta p x a := x
-        :> constraint2 preciseMatch p a
-        :> constraint2  notMentions p x
-    ] where (x:a:_, p:_) = metaSource2
+    [ Eta "p" "x" "a" := "x"
+        :> constraint2 preciseMatch "p" "a"
+        :> constraint2  notMentions "p" "x"
+    ]
 
 lambdaReduce = fire
-    [ Into PWildCard x a := a
-    , Into p x (Taint a) := Taint (Into p x a)
-    , Lambda p a := Lambda p' a
-       :> metaExecWith2 p a (\p a -> p' ..= cleanPattern (a :: Expression) p)
-    ] where (a:x:_, p:p':_) = metaSource2
+    [ Into PWildCard "x" "a" := "a"
+    , Into "p" "x" (Taint "a") := Taint (Into "p" "x" "a")
+    , Lambda "p" "a" := Lambda "p'" "a"
+       .:> do
+        p <- mmeta "p"
+        a <- mmeta "a"
+        "p'" ..= cleanPattern (a :: Expression) p
+    ]
 
 cleanPattern :: Mask scope => scope -> Pattern -> Pattern
 cleanPattern a = go where

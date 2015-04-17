@@ -18,6 +18,9 @@ closureM :: (Eq a, Monad m) => LensLike' m a a
 closureM f = go where
     go x = f x >>= \y -> bool (go y) (return x) (x == y)
 
+amaybe :: Alternative f => Maybe a -> f a
+amaybe = maybe empty pure
+
 uniform :: Eq a => [a] -> Maybe a
 uniform (x:xs) | all (==x) xs = Just x
 uniform _ = Nothing
