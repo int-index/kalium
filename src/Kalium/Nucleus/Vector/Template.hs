@@ -36,32 +36,46 @@ data MetaTable = MetaTable
     , _metaPatternTable    :: MetaSubtable Pattern
     }
 
-singletonMetaExpressionTable :: MetaName -> Expression -> MetaTable
-singletonMetaExpressionTable metaname expr
-    = MetaTable (M.singleton metaname expr) M.empty
-
-singletonMetaPatternTable :: MetaPName -> Pattern -> MetaTable
-singletonMetaPatternTable metapname pat
-    = MetaTable M.empty (M.singleton metapname pat)
-
-done = Just (MetaTable M.empty M.empty)
-m1 <+> m2 = do
-    MetaTable me1 mp1 <- m1
-    MetaTable me2 mp2 <- m2
-    MetaTable <$> unionWithSame me1 me2 <*> unionWithSame mp1 mp2
-
 makeLenses ''MetaTable
 
-instance IsString MetaName where
-    fromString = MetaName
+newtype MetaTableBuilder = MetaTableBuilder { getMetaTableBuilder :: Maybe MetaTable }
 
-instance IsString MetaPName where
-    fromString = MetaPName
+runMetaTableBuilder :: (a -> MetaTableBuilder) -> (a -> Maybe MetaTable)
+runMetaTableBuilder = (getMetaTableBuilder .)
 
+instance Monoid MetaTableBuilder where
+    mempty = MetaTableBuilder (Just (MetaTable M.empty M.empty))
+    mappend (MetaTableBuilder m1) (MetaTableBuilder m2) = MetaTableBuilder $ do
+        MetaTable me1 mp1 <- m1
+        MetaTable me2 mp2 <- m2
+        MetaTable <$> unionWithSame me1 me2 <*> unionWithSame mp1 mp2
+
+class MetaTableBuilderYield a where
+    metaYield :: MetaReference a -> a -> MetaTableBuilder
+
+instance MetaTableBuilderYield Expression where
+    metaYield metaname expr
+        = MetaTableBuilder . Just
+        $ MetaTable (M.singleton metaname expr) mempty
+
+instance MetaTableBuilderYield Pattern where
+    metaYield metapname pat
+        = MetaTableBuilder . Just
+        $ MetaTable mempty (M.singleton metapname pat)
+
+-- TODO: MonoidZero or something
+
+guardMetaTableBuilder :: Bool -> MetaTableBuilder
+guardMetaTableBuilder = bool zeroMetaTableBuilder mempty
+
+zeroMetaTableBuilder :: MetaTableBuilder
+zeroMetaTableBuilder = MetaTableBuilder Nothing
+
+instance IsString MetaName  where fromString = MetaName
+instance IsString MetaPName where fromString = MetaPName
 instance IsString
   ( Expression' (MetaReference Pattern) (MetaReference Expression)
   ) where fromString =  Ext . fromString
-
 instance IsString
   ( Pattern' (MetaReference Pattern)
   ) where fromString = PExt . fromString
@@ -86,12 +100,6 @@ instance GetMetaTable MetaTableReader where
 instance GetMetaTable MetaTableState where
     getMetaTable = MetaTableState get
 
-class (Alternative m, MonadPlus m) => SetMetaTable m where
-    setMetaTable :: MetaTable -> m ()
-
-instance SetMetaTable MetaTableState where
-    setMetaTable = MetaTableState . put
-
 class ToMetaModifier m where
     type family ToMetaModifierReturn m :: *
     toMetaModifier :: m (ToMetaModifierReturn m) -> MetaModifier
@@ -106,38 +114,35 @@ instance ToMetaModifier MetaTableState where
 
 -- end MetaMonad
 
-metaMatch :: Meta Expression -> Expression -> Maybe MetaTable
+metaMatch :: Meta Expression -> Expression -> MetaTableBuilder
 
-metaMatch (Ext metaname) expr
-    = pure (singletonMetaExpressionTable metaname expr)
+metaMatch (Ext metaname) expr = metaYield metaname expr
 
-metaMatch (Primary l') (Primary l) = guard (l' == l) >> done
-metaMatch (Access  n') (Access  n) = guard (n' == n) >> done
+metaMatch (Primary l') (Primary l) = guardMetaTableBuilder (l' == l)
+metaMatch (Access  n') (Access  n) = guardMetaTableBuilder (n' == n)
 
-metaMatch (Beta   f' a') (Beta   f a) = metaMatch  f' f <+> metaMatch a' a
-metaMatch (Lambda p' a') (Lambda p a) = metaPMatch p' p <+> metaMatch a' a
+metaMatch (Beta   f' a') (Beta   f a) = metaMatch  f' f <> metaMatch a' a
+metaMatch (Lambda p' a') (Lambda p a) = metaPMatch p' p <> metaMatch a' a
 
 metaMatch _ (Ext ext) = absurd ext
-metaMatch _ _ = empty
+metaMatch _ _ = zeroMetaTableBuilder
 
 
-metaPMatch :: Meta Pattern -> Pattern -> Maybe MetaTable
+metaPMatch :: Meta Pattern -> Pattern -> MetaTableBuilder
 
-metaPMatch (PExt metapname) pat
-    = pure (singletonMetaPatternTable metapname pat)
+metaPMatch (PExt metapname) pat = metaYield metapname pat
 
-metaPMatch PWildCard PWildCard = done
-metaPMatch PUnit     PUnit     = done
-metaPMatch (PAccess n' t') (PAccess n t) = do
-    guard (n' == n)
-    guard (t' == t)
-    done
+metaPMatch PWildCard PWildCard = mempty
+metaPMatch PUnit     PUnit     = mempty
+metaPMatch (PAccess n' t') (PAccess n t)
+     = guardMetaTableBuilder (n' == n)
+    <> guardMetaTableBuilder (t' == t)
 
 metaPMatch (PTuple p1' p2') (PTuple p1 p2)
-    = metaPMatch p1' p1 <+> metaPMatch p2' p2
+    = metaPMatch p1' p1 <> metaPMatch p2' p2
 
 metaPMatch _ (PExt pext) = absurd pext
-metaPMatch _ _ = empty
+metaPMatch _ _ = zeroMetaTableBuilder
 
 
 metaSubst :: (GetMetaTable m, Alternative m) => Meta Expression -> m Expression
@@ -175,7 +180,10 @@ ruleMatch = ruleMatch' return
 
 ruleMatch' :: MetaModifier -> Rule -> Expression -> Maybe Expression
 ruleMatch' metamod (rule :> metamod') = ruleMatch' (metamod >=> metamod') rule
-ruleMatch' metamod (lhs := rhs) = metaMatch lhs >=> metamod >=> runMetaTableReader (metaSubst rhs)
+ruleMatch' metamod (lhs := rhs)
+     =  runMetaTableBuilder (metaMatch lhs)
+    >=> metamod
+    >=> runMetaTableReader (metaSubst rhs)
 
 class Ord (MetaReference a) => MetaObjectSubtable a where
     metaObjectSubtable :: Lens' MetaTable (MetaSubtable a)
@@ -225,7 +233,7 @@ settingMetaObject
 settingMetaObject metaobj a = getMetaReference metaobj >>= settingMetaReference a
 
 (..=) :: MetaObject a => Meta a -> a -> MetaTableState ()
-metaobj ..= a = settingMetaObject metaobj a >>= setMetaTable
+metaobj ..= a = settingMetaObject metaobj a >>= MetaTableState . put
 
 (-->)
     :: (MetaObject a, MetaObject b)
