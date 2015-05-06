@@ -85,7 +85,7 @@ library
                     ,  StandaloneDeriving
                     ,  TypeSynonymInstances
 
-executable kalium-tool
+executable kalium-cli
   main-is:             Main.hs
   build-depends:       base >= 4.7 && < 5
                ,       mtl >= 2.2.1
@@ -93,19 +93,21 @@ executable kalium-tool
                ,       kalium
   ghc-options:         -W -threaded "-with-rtsopts=-N"
   ghc-prof-options:    -fprof-auto
-  hs-source-dirs:      src/kalium-tool
+  hs-source-dirs:      kalium-cli
   default-language:    Haskell2010
   default-extensions:  LambdaCase
 
-test-suite test
-  main-is:             Test.hs
+test-suite regression
+  main-is:             Regression.hs
   build-depends:       base >= 4.7 && < 5
-               ,       lens >= 4.9
                ,       mtl >= 2.2.1
-               ,       bytestring >= 0.10
-               ,       process >= 1.2
-               ,       temporary >= 1.2
+               ,       turtle >= 1.1
+               ,       managed >= 1.0
+               ,       foldl >= 1.0
+               ,       system-filepath >= 0.4
                ,       directory >= 1.2
+               ,       process >= 1.2
+               ,       text >= 1.2
                ,       tasty >= 0.10
                ,       tasty-hunit >= 0.9
                ,       kalium
