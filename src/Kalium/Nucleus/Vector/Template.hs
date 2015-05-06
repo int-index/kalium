@@ -247,4 +247,4 @@ mmeta :: (MetaObject a, GetMetaTable m, Alternative m) => Meta a -> m a
 mmeta = getMetaReference >=> viewMetaObject
 
 fire :: [Rule] -> Endo' Expression
-fire = foldr (.) id . map (tryApply . ruleMatch)
+fire = sofar ruleMatch

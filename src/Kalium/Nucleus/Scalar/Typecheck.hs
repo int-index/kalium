@@ -47,14 +47,12 @@ instance Typecheck Atom where
     typecheck (Primary lit) = typecheck lit
     typecheck (Access name) = do
         vars <- asks (view tsVariables)
-        M.lookup name vars
-            & maybe (throwError $ errorNoAccess name vars) return
+        M.lookup name vars & throwMaybe (errorNoAccess name vars)
 
 lookupFuncSig :: TypeEnv e m => Name -> m FuncSig
 lookupFuncSig name = do
     funcSigs <- asks (view tsFunctions)
-    M.lookup name funcSigs
-        & maybe (throwError $ errorNoFunction name) return
+    M.lookup name funcSigs & throwMaybe (errorNoFunction name)
 
 instance Typecheck Expression where
     typecheck (Atom atom) = typecheck atom
@@ -62,8 +60,7 @@ instance Typecheck Expression where
         case M.lookup name Op.operators of
             Just op -> do
                 argTys <- traverse typecheck args
-                let panic = throwError (errorTypeMismatch name argTys)
-                maybe panic return (Op.tc op tyArgs argTys)
+                Op.tc op tyArgs argTys & throwMaybe (errorTypeMismatch name argTys)
             Nothing -> funcSigType <$> lookupFuncSig name
 
 class TypeIntro a where

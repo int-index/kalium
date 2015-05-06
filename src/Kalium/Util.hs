@@ -15,15 +15,25 @@ tryApply :: (a -> Maybe a) -> (a -> a)
 tryApply f a = maybe a id (f a)
 
 closureM :: (Eq a, Monad m) => LensLike' m a a
-closureM f = go where
+closureM f = go
+  where
     go x = f x >>= \y -> bool (go y) (return x) (x == y)
 
 amaybe :: Alternative f => Maybe a -> f a
 amaybe = maybe empty pure
 
+throwEither :: MonadError e m => Either e a -> m a
+throwEither = either throwError return
+
+throwMaybe :: MonadError e m => e -> Maybe a -> m a
+throwMaybe e = throwEither . maybe (Left e) Right
+
 uniform :: Eq a => [a] -> Maybe a
 uniform (x:xs) | all (==x) xs = Just x
 uniform _ = Nothing
+
+inContext :: Monad m => (m a -> a -> m b) -> m a -> m b
+inContext f ma = ma >>= f ma
 
 zipFilter :: [Bool] -> [a] -> Maybe [a]
 zipFilter (keep:keeps) (a:as)
@@ -35,25 +45,32 @@ zipFilter _ _ = Nothing
 keepByFst :: (b -> Bool) -> Pairs b a -> [a]
 keepByFst p = map snd . filter (p . fst)
 
-far k f = foldr (\h go -> k go (f h)) id
+far :: EndoCon a -> (h -> a -> Maybe a) -> [h] -> Endo' a
+far k f = foldl (toEndoWith . k) id . fmap f
 
-asfar :: (h -> a -> Maybe a) -> [h] -> (a -> a)
-asfar = far $ \go -> toEndoWith id go id
+-- Elements are traversed right-to-left
+asfar, nofar, sofar :: (h -> a -> Maybe a) -> [h] -> Endo' a
 
-sofar :: (h -> a -> Maybe a) -> [h] -> (a -> a)
-sofar = far $ \go -> toEndoWith id id go
+-- Sequentially fuse elements until one fails
+asfar = far endoSuccess
 
-nofar :: (h -> a -> Maybe a) -> [h] -> (a -> a)
-nofar = far $ \go -> toEndoWith go id id
+-- Fuse with the first successful element
+nofar = far endoFailure
 
-toEndoWith
-    :: (a -> a) -- failure
-    -> (a -> a) -- success
-    -> (a -> a) -- both
-    -> (a -> Maybe a)
-    -> (a -> a)
-toEndoWith failure success both f = \a -> both (maybe (failure a) success (f a))
+-- Sequentially fuse all successful elements
+sofar = far endoBoth
 
+data EndoConfig a = EndoConfig (Endo' a) (Endo' a) (Endo' a)
+type EndoCon a = Endo' a -> EndoConfig a
+
+endoSuccess, endoFailure, endoBoth :: EndoCon a
+endoSuccess fn = EndoConfig id fn id
+endoFailure fn = EndoConfig fn id id
+endoBoth    fn = EndoConfig id id fn
+
+toEndoWith :: EndoConfig a -> EndoKleisli' Maybe a -> Endo' a
+toEndoWith (EndoConfig failure success both) f a
+    = both (maybe (failure a) success (f a))
 
 unionWithSame :: (Ord k, Eq v) => Map k v -> Map k v -> Maybe (Map k v)
 unionWithSame m1 m2 = sequenceA $ M.unionWith same (pure <$> m1) (pure <$> m2)

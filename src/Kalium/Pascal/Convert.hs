@@ -55,7 +55,7 @@ lookupName :: Bool -> S.Name ~> D.Name
 lookupName ct name = do
     names <- views csNames (M.! ct)
     let mname = M.lookup name names
-    maybe (throwError (errorNoAccess name (M.keys names))) return mname
+    throwMaybe (errorNoAccess name (M.keys names)) mname
 
 alias :: (Applicative m, MonadNameGen m) => Kleisli' m S.Name D.Name
 alias name = D.NameGen <$> mkname (Just name)
@@ -217,7 +217,7 @@ typeOfAccess :: S.Name ~> S.Type
 typeOfAccess name = do
     types <- view (csTypes.tsVariables)
     let mtype = M.lookup name types
-    maybe (throwError (errorNoAccess name (M.keys types))) return mtype
+    throwMaybe (errorNoAccess name (M.keys types)) mtype
 
 typecasts :: S.Expression ~> Pairs S.Type S.Expression
 typecasts expr = case expr of
@@ -245,9 +245,7 @@ typecasting ty expr = expr : [op1App tc expr | tc <- tcs]
             _ -> []
 
 typecheck :: S.Expression ~> S.Type
-typecheck expr = do
-    mty <- typecheck' expr
-    maybe (throwError errorTypecheck) return mty
+typecheck expr = typecheck' expr >>= throwMaybe errorTypecheck
 
 typecheck' :: S.Expression ~> Maybe S.Type
 typecheck' = runMaybeT . \case

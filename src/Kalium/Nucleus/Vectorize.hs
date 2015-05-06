@@ -55,7 +55,8 @@ vectorize program = do
                 _ -> alias name
             return $ M.singleton (name, Immutable) (Just name')
     flip runReaderT (VectorizeScope mempty mempty names') $ do
-        vecFuncs <- traverse (uncurry vectorizeFunc) (program ^. programFuncs & M.toList)
+        let funcs = M.toList (program ^. programFuncs)
+        vecFuncs <- traverse (uncurry vectorizeFunc) funcs
         return $ Vec.Program (M.fromList vecFuncs)
 
 vectorizeFunc :: Name -> Primitive Func ~> (Vec.Name, Vec.Func)
@@ -66,7 +67,10 @@ vectorizeFunc name func = do
     initialScope <- initIndices zeroIndex (scoping params)
     local (initialScope <>) $ do
         (_, vecBody) <- vectorizeBody (func ^. funcScope . scopeElem)
-        let FuncSig (vectorizeType -> tyResult) (map vectorizeType -> tyArgs) = funcSig func
+        let FuncSig
+                (vectorizeType -> tyResult)
+                (map vectorizeType -> tyArgs)
+              = funcSig func
             vecFuncType = Vec.tyfun tyArgs (Vec.TypeApp1 Vec.TypeTaint tyResult)
         vecParams <- traverse mkPAccess (map fst params)
         let vecFuncLambda = Vec.lambda vecParams vecBody
@@ -111,6 +115,7 @@ vectorizeBody scope = do
     let Body statement result = scope ^. scopeElem
     vectorizeScope (const [result]) (Scope vars statement)
 
+updateLocalize :: (E e m, MonadReader VectorizeScope m) => [Name] -> m a -> m a
 updateLocalize names action = do
     (unzip -> (names', updated)) <- for names $ \name -> do
         index <- lookupIndex name >>= \case
@@ -124,9 +129,15 @@ updateLocalize names action = do
           ) action
 
 vectorizeResults :: [Atom] ~> Vec.Expression
-vectorizeResults results = Vec.Taint . mkExpTuple <$> traverse vectorizeAtom results
+vectorizeResults results
+     =  Vec.Taint . mkExpTuple
+    <$> traverse vectorizeAtom results
 
-vectorizeScope :: Scoping v => ([Name] -> [Atom]) -> Primitive (Scope v Statement) ~> ([Name], Vec.Expression)
+vectorizeScope
+    :: Scoping v
+    => ([Name] -> [Atom])
+    -> Primitive (Scope v Statement)
+    ~> ([Name], Vec.Expression)
 vectorizeScope resulting (Scope (scoping -> vars) statement) = do
     localScope <- initIndices Uninitialized vars
     local (localScope <>) $ do
@@ -212,7 +223,8 @@ vectorizeStatement = \case
             (changed, _) <- vectorizeStatement (forCycle ^. forStatement)
             argExp <- expTuple changed
             updateLocalize changed $ do
-                (changed', vecStatement) <- vectorizeStatement (forCycle ^. forStatement)
+                (changed', vecStatement)
+                    <- vectorizeStatement (forCycle ^. forStatement)
                 when (changed /= changed') $
                     throwError (errorInsane "changed == changed'")
                 argPat <- patTuple changed
@@ -226,8 +238,12 @@ vectorizeStatement = \case
         (changedThen, vecStatementThen) <- vectorizeStatement (ifb ^. ifThen)
         (changedElse, vecStatementElse) <- vectorizeStatement (ifb ^. ifElse)
         let changed = nub $ changedThen ++ changedElse
-        vecBodyThen <- Vec.Bind vecStatementThen <$> vectorizeAgainst changedThen changed
-        vecBodyElse <- Vec.Bind vecStatementElse <$> vectorizeAgainst changedElse changed
+        vecBodyThen
+            <-  Vec.Bind vecStatementThen
+            <$> vectorizeAgainst changedThen changed
+        vecBodyElse
+            <-  Vec.Bind vecStatementElse
+            <$> vectorizeAgainst changedElse changed
         let vecIf = Vec.AppOp3 Vec.OpIf vecBodyElse vecBodyThen vecCond
         return (changed, vecIf)
 
@@ -250,15 +266,14 @@ lookupType :: Name ~> Type
 lookupType = lookupX (view vsTypes)
 
 lookupName :: Name -> Index ~> Maybe Vec.Name
-lookupName name index =
-    views vsNames (M.lookup (name, index))
-       >>= maybe (throwError $ errorNoAccess name []) return
+lookupName name index
+      = views vsNames (M.lookup (name, index))
+    >>= throwMaybe (errorNoAccess name [])
 
 lookupX :: (VectorizeScope -> Map Name x) -> Name ~> x
 lookupX f name = do
     xs <- asks f
-    M.lookup name xs
-       & maybe (throwError $ errorNoAccess name (M.keys xs)) return
+    M.lookup name xs & throwMaybe (errorNoAccess name (M.keys xs))
 
 initIndices :: E e m => Index -> Map Name Type -> m VectorizeScope
 initIndices n types = do

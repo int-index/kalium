@@ -40,7 +40,26 @@ structure :: Dependent k => [k] -> [[[k]]]
 structure = fmap group . split . sift
 
 destructure :: ([k] -> a -> Maybe a) -> [[[k]]] -> a -> a
-destructure f ks = (appEndo . foldMap Endo) (asfar f <$> ks)
+destructure f ks = (appEndo . foldMap Endo) (asfar f . reverse <$> ks)
 
 restructure :: Dependent k => ([k] -> a -> Maybe a) -> [k] -> a -> a
 restructure f = destructure f . structure
+
+-- Minimal instance
+
+data Dep a = Dep a (Set a)
+    deriving (Eq, Ord)
+
+toDep :: Dependent k => k -> Dep (Name k)
+toDep k = Dep (provides k) (depends k)
+
+instance Ord a => Dependent (Dep a) where
+    type Name (Dep a) = a
+    provides (Dep a _) = a
+    depends (Dep _ as) = as
+
+dep :: Ord a => a -> [a] -> Dep a
+dep a as = Dep a (S.fromList as)
+
+viewStructure :: Dependent k => [k] -> [[[Name k]]]
+viewStructure = fmap (fmap (fmap provides)) . structure

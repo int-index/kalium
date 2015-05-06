@@ -16,7 +16,7 @@ import Kalium.Nucleus.Vector.Name
 purify :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
 purify program = do
     p1s <- execWriterT $ itraverse funcPurify (program ^. programFuncs)
-    return $ Dep.restructure substituteSCC (resolve' p1s) program
+    return $ Dep.restructure substituteSCC (resolve p1s) program
 
 substituteSCC :: [PurifyInfo] -> EndoKleisli' Maybe Program
 substituteSCC infoGroup program =
@@ -30,7 +30,7 @@ substituteSCC infoGroup program =
         pureFuncs = M.fromList $ do
             PurifyInfo _ _ name' func _ <- infoGroup
             return (name', func)
-    in if dangling then Nothing else Just program'
+    in guard (not dangling) >> return program'
   where
     purifyExpression :: Endo' Expression
     purifyExpression = sofar appPurify infoGroup
@@ -45,10 +45,7 @@ instance Dep.Dependent PurifyInfo where
     provides (PurifyInfo _ arity name' _ _) = (name', arity)
     depends (PurifyInfo _ _ _ _ reqs) = reqs
 
-resolve :: Monad m => (m a -> a -> m b) -> m a -> m b
-resolve f ma = ma >>= f ma
-
-resolve' = resolve getGen
+resolve = inContext getGen
   where
     getGen ps (P1 name arity name' gen) = maybeToList $ do
         (func, reqs) <- gen (map getNames ps)
@@ -90,7 +87,7 @@ expForcePurify = \case
         <*> pure cond
     (unbeta -> (Access name : es)) -> do
         let arity = length es
-        name' <- asks (lookup name) >>= maybe (throwError ()) return
+        name' <- asks (lookup name) >>= throwMaybe ()
         tell (S.singleton (name', arity))
         return (beta (Access name' : es))
     _ -> throwError ()
