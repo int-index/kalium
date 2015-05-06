@@ -6,6 +6,7 @@ import Control.Monad.Except
 import Control.Monad.Managed
 import Turtle
 import Filesystem.Path.CurrentOS (encodeString)
+import System.IO.Silently (silence)
 import System.Directory
 import System.Process
 import qualified Data.Text as Text
@@ -66,7 +67,7 @@ testScenario name scenario = testCase (Text.unpack scenario) $ do
             ghcBinPath = tmpdir </> "ghc_bin"
         mkdir ghcObjPath
         output mainPath (pure (Text.pack src))
-        callProcess "ghc"
+        silence $ callProcess "ghc"
             [ encodeString mainPath
             , "-outputdir", encodeString ghcObjPath
             , "-o", encodeString ghcBinPath ]
