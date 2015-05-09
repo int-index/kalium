@@ -7,7 +7,6 @@ import Control.Monad.Managed
 import Turtle
 import Filesystem.Path.CurrentOS (encodeString)
 import System.IO.Silently (silence)
-import System.Directory
 import System.Process
 import qualified Data.Text as Text
 import qualified Control.Foldl as Fold
@@ -50,11 +49,6 @@ testScenarios :: Text -> [Text] -> TestTree
 testScenarios name scenarios = testGroup (Text.unpack name)
     (testScenario name `map` scenarios)
 
-chmod :: MonadIO io => FilePath -> (Permissions -> Permissions) -> io ()
-chmod path f = liftIO $ do
-    let path' = encodeString path
-    getPermissions path' >>= setPermissions path' . f
-
 testScenario :: Text -> Text -> TestTree
 testScenario name scenario = testCase (Text.unpack scenario) $ do
     source <- (strict . input) (testsDir </> fromText name </> "program.pas")
@@ -71,7 +65,7 @@ testScenario name scenario = testCase (Text.unpack scenario) $ do
             [ encodeString mainPath
             , "-outputdir", encodeString ghcObjPath
             , "-o", encodeString ghcBinPath ]
-        chmod ghcBinPath (setOwnerExecutable True)
+        chmod executable ghcBinPath
         let scenarioPath = scenariosDir </> fromText scenario
         (excode, msg, _) <- readProcessWithExitCode
             (encodeString scenarioPath) [] (encodeString ghcBinPath)

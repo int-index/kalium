@@ -105,7 +105,6 @@ test-suite regression
                ,       managed >= 1.0
                ,       foldl >= 1.0
                ,       system-filepath >= 0.4
-               ,       directory >= 1.2
                ,       process >= 1.2
                ,       silently >= 1.2
                ,       text >= 1.2
