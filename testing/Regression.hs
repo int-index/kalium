@@ -3,7 +3,7 @@ module Main where
 
 import Prelude hiding (FilePath)
 import Control.Monad.Except
-import Control.Monad.Managed
+import Control.Monad.Managed (with)
 import Turtle
 import Filesystem.Path.CurrentOS (encodeString)
 import System.IO.Silently (silence)
@@ -18,10 +18,6 @@ import qualified Kalium
 main :: IO ()
 main = getTests >>= defaultMain . testGroup ""
 
-data TestDescription
-    = TestScenarios  FilePath [(Text, FilePath)]
-    | TestShouldfail FilePath
-
 testingDir, testsDir :: FilePath
 testingDir = "testing"
 testsDir = testingDir </> "tests"
@@ -35,24 +31,29 @@ getTests = flip fold Fold.list $ do
     if shouldfail
       then return (testShouldfail name)
       else do
-        scenarios <- strict $ input (path </> "scenarios")
+        scenarios <- (strict . input) (path </> "scenarios")
         return $ testScenarios name (Text.words scenarios)
 
+translating name cont = do
+  source <- (strict . input) (testsDir </> fromText name </> "program.pas")
+  cont $ runExcept (Kalium.translate True (Text.unpack source))
+
 testShouldfail :: Text -> TestTree
-testShouldfail name = testCase (Text.unpack name) $ do
-    source <- (strict . input) (testsDir </> fromText name </> "program.pas")
-    case runExcept (Kalium.translate True (Text.unpack source)) of
+testShouldfail name
+  = testCase (Text.unpack name)
+  $ translating name $ \case
       Left _ -> return ()
       Right _ -> assertFailure "should fail"
 
 testScenarios :: Text -> [Text] -> TestTree
-testScenarios name scenarios = testGroup (Text.unpack name)
-    (testScenario name `map` scenarios)
+testScenarios name scenarios
+  = testGroup (Text.unpack name)
+  $ map (testScenario name) scenarios
 
 testScenario :: Text -> Text -> TestTree
-testScenario name scenario = testCase (Text.unpack scenario) $ do
-    source <- (strict . input) (testsDir </> fromText name </> "program.pas")
-    case runExcept (Kalium.translate True (Text.unpack source)) of
+testScenario name scenario
+  = testCase (Text.unpack scenario)
+  $ translating name $ \case
       Left e -> assertFailure (show e)
       Right (_, src) -> with (mktempdir "/tmp" "kalium") $ \tmpdir -> do
         let
