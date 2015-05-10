@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Kalium.Util where
 
 import Kalium.Prelude

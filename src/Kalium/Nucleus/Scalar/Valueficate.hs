@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
@@ -11,12 +12,16 @@ import Kalium.Nucleus.Scalar.Program
 
 class ValueficateSubstitute a where
     valueficateSubstitute
-        :: ReferenceInfo
-        -> a (Configuration param0 Pattern Atom)
-        -> a (Configuration param1 Pattern Expression)
+        :: (Applicative m, MonadReader ReferenceInfo m)
+        =>    a (Configuration param0 Pattern Atom)
+        -> m (a (Configuration param1 Pattern Expression))
+
+ap1On f a   = f <$> valueficateSubstitute a
+ap2On f a b = ap1On f a <*> valueficateSubstitute b
 
 instance ValueficateSubstitute Exec where
-    valueficateSubstitute referenceInfo (Exec ret op tyArgs args) =
+    valueficateSubstitute (Exec ret op tyArgs args) = do
+        referenceInfo <- ask
         let ret' = foldr1 PTuple (ret:rets)
             rets = case M.lookup op referenceInfo of
                 Nothing -> []
@@ -26,34 +31,28 @@ instance ValueficateSubstitute Exec where
                     return $ case arg of
                         Access name -> PAccess name
                         Primary _ -> error "non-variables by-ref"
-        in Exec ret' op tyArgs (map Atom args)
+        return $ Exec ret' op tyArgs (map Atom args)
 
 instance ValueficateSubstitute Statement where
-    valueficateSubstitute referenceInfo = \case
-        Follow a1 a2 -> Follow (go a1) (go a2)
-        ScopeStatement a -> ScopeStatement (go a)
-        IfStatement  a -> IfStatement  (go a)
-        ForStatement a -> ForStatement (go a)
-        Execute      a -> Execute      (go a)
-        Pass -> Pass
-        where go = valueficateSubstitute referenceInfo
+    valueficateSubstitute = \case
+        Follow a1 a2 -> ap2On Follow a1 a2
+        ScopeStatement a -> ap1On ScopeStatement a
+        IfStatement  a -> ap1On IfStatement a
+        ForStatement a -> ap1On ForStatement a
+        Execute a -> ap1On Execute a
+        Pass -> return Pass
 
 instance   ValueficateSubstitute obj
         => ValueficateSubstitute (Scope vars obj) where
-    valueficateSubstitute referenceInfo
-       = scopeElem %~ valueficateSubstitute referenceInfo
+    valueficateSubstitute = scopeElem valueficateSubstitute
 
 instance ValueficateSubstitute If where
-    valueficateSubstitute referenceInfo
-        (If       ifCond      ifThen      ifElse)
-       = If (Atom ifCond) (go ifThen) (go ifElse)
-       where go = valueficateSubstitute referenceInfo
+    valueficateSubstitute (If ifCond ifThen ifElse)
+       = ap2On (If (Atom ifCond)) ifThen ifElse
 
 instance ValueficateSubstitute ForCycle where
-    valueficateSubstitute referenceInfo
-        (ForCycle forName       forRange      forStatement)
-       = ForCycle forName (Atom forRange) (go forStatement)
-       where go = valueficateSubstitute referenceInfo
+    valueficateSubstitute (ForCycle forName forRange forStatement)
+       = ap1On (ForCycle forName (Atom forRange)) forStatement
 
 valueficate
     :: Program (Configuration ByType Pattern Atom)
@@ -82,7 +81,7 @@ valueficateFunc referenceInfo name
             guard keep
             return param
 
-          statement' = valueficateSubstitute referenceInfo statement
+          statement' = runReader (valueficateSubstitute statement) referenceInfo
 
       in Func ty' (Scope params' (Scope vars (Body statement' result')))
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Kalium.Pascal.Tokenize (tokenCC, Token(..)) where
 
 import Prelude
