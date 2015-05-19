@@ -289,11 +289,11 @@ end.
 <pre>
 main :: IO ()
 main
-  = do n :: Int &lt;- readLn
+  = do n &lt;- readLn
        print (f (product [1 .. n]))
 
 f :: Int -&gt; Int
-f (a :: Int) = sum [1 .. a]
+f a = sum [1 .. a]
 </pre>
                     </td>
                 </tr>
