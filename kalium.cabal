@@ -103,6 +103,7 @@ executable kalium-js
                ,       reflex
                ,       reflex-dom
                ,       kalium
+  ghc-options:         -W -O2
   hs-source-dirs:      kalium-js
   default-language:    Haskell2010
   default-extensions:  LambdaCase

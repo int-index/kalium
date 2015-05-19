@@ -7,7 +7,7 @@ main :: IO ()
 main = mainWidget $ el "div" $ do
     t <- textArea def
     r <- mapDyn trans (_textArea_value t)
-    el "pre" (dynHtml r)
+    el "pre" (dynText r)
 
 trans :: String -> String
 trans s = case Kalium.translate False s of
