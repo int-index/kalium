@@ -105,10 +105,15 @@
         <script>
         $(function(){
             $('nav a').on('click', function(e) {
-                console.log('click', e);
-                  var el = $( e.target.getAttribute('href') );
-                  $.smoothScroll({ speed: 700 }, el.offset().top - 100);
-                  return false;
+                var el = $( e.target.getAttribute('href') );
+                var excess = $(window).height() - el.outerHeight();
+                excess = Math.min(excess, 150);
+                var offset = el.offset().top;
+                console.log(offset, excess);
+                offset = Math.min(offset, offset - excess/2);
+                console.log(offset, excess);
+                $.smoothScroll({ speed: 700 }, offset);
+                return false;
             });
         });
         </script>
