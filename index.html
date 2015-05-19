@@ -1,29 +1,91 @@
 <!doctype html>
 <html>
     <head>
-        <link href='http://fonts.googleapis.com/css?family=Ubuntu:700|Droid+Serif:400,700&subset=latin,greek' rel='stylesheet' type='text/css'>
+        <link href='http://fonts.googleapis.com/css?family=Ubuntu:400,700&subset=latin,greek' rel='stylesheet' type='text/css'>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-smooth-scroll/1.5.5/jquery.smooth-scroll.min.js"></script>
         <style>
+            html, body {
+                margin: 0;
+                padding: 0;
+            }
             body {
-                font-family: 'Droid Serif', serif;
-            }
-            main {
-                width: 70%;
-                margin-left: auto;
-                margin-right: auto;
-            }
-            h1, h2 {
                 font-family: 'Ubuntu', sans-serif;
             }
+            a {
+                color: inherit;
+            }
+            a:hover {
+                color: #618c9a;
+            }
+            nav {
+                display: -webkit-flex;
+                display: flex;
+                -webkit-justify-content: space-around;
+                justify-content: space-around;
+                position: fixed;
+                top:0;
+                left:0;
+                width: 70%;
+                padding-left: 15%;
+                padding-right: 15%;
+                text-transform: uppercase;
+                background: #444444;
+                color: white;
+            }
+            nav > a {
+                display: block;
+                padding: 10px;
+                text-decoration: none;
+            }
+            nav > a:hover {
+                color: #add8e6;
+                text-decoration: underline;
+            }
+            section, footer {
+                padding-top: 90px;
+                padding-bottom: 100px;
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+            section:first-child {
+                padding-top: 50px;
+            }
+            section:nth-child(even) {
+                background: #666766;
+                color: white;
+            }
+            section:nth-child(even) a:hover {
+                color: #add8e6;
+            }
+            .header-section {
+                text-align: center;
+            }
+            h1 {
+                font-size: 50px;
+            }
             h2 {
-                clear: both;
                 margin-top: 2em;
+                font-size: 30px;
+            }
+            h2:first-child {
+                margin-top: 0;
+            }
+            .section {
+                display: block;
+                margin: 0 auto;
+                max-width: 800px;
             }
             footer {
                 text-align: center;
             }
             .logo {
-                width: 10em;
-                float: left;
+                width: 200px;
+                margin-bottom: 20px;
+            }
+            li {
+                margin-top: 0.5em;
+                margin-bottom: 0.5em;
             }
             table {
                 margin-left: auto;
@@ -36,16 +98,41 @@
                 vertical-align: top;
             }
             tfoot {
-                font-size: x-small;
                 text-align: center;
             }
         </style>
         <title>Kalium</title>
+        <script>
+        $(function(){
+            $('nav a').on('click', function(e) {
+                console.log('click', e);
+                  var el = $( e.target.getAttribute('href') );
+                  $.smoothScroll({ speed: 700 }, el.offset().top - 100);
+                  return false;
+            });
+        });
+        </script>
     </head>
     <body>
+
+    <nav>
+        <a href="#what">What</a>
+        <a href="#why">Why</a>
+        <a href="#how">How</a>
+        <a href="#example">Example</a>
+        <a href="#help">Help</a>
+    </nav>
+
     <main>
-        <img src="sodium.png" class="logo"/>
+
+      <section class="header-section">
         <h1>Kalium</h1>
+        <img src="kalium.svg" class="logo"/>
+        <h2>Translate Pascal into Haskell</h2>
+      </section>
+
+      <section id="what">
+      <div class="section">
         <p>
             Kalium is a research project. The goal is to generate idiomatic
             functional code from imperative code. The source language is
@@ -60,11 +147,11 @@
             or create a pull request.
         </p>
 
-        <p>
-            The name of the project was changed from Sodium to Kalium due to
-            multiple name collisions with other projects.
-        </p>
+      </div>
+      </section>
 
+      <section id="why">
+      <div class="section">
         <h2>Why bother?</h2>
         <p>
             There are reasons to believe that functional paradigm is superior.
@@ -99,7 +186,11 @@
             Manually rewriting every library is extremely tedious
             and can introduce new bugs.
         </p>
+      </div>
+      </section>
 
+      <section id="how">
+      <div class="section">
         <h2>The problem</h2>
         <p>
             Functional programming is based on λ-calculus, whereas
@@ -144,7 +235,17 @@
                 </li>
             </ol>
         </p>
+      </div>
+      </section>
+
+      <section id="example">
+      <div class="section">
         <h2>Example</h2>
+        <p>
+            Kalium is far from its goal, but let's see what it currently can do.
+            Cluttered imperative mess turns into a short and simple
+            functional program:
+        </p>
         <table>
             <thead>
                 <tr>
@@ -198,18 +299,18 @@ f (a :: Int) = sum [1 .. a]
                 </tr>
             </tbody>
             <tfoot>
-                <tr>
-                    <td colspan="2">
-                        the code above was translated using Kalium
-                    </td>
-                </tr>
+             <tr> <td colspan="2">
+               <a href="https://int-index.github.io/kalium/examples.html">
+                 More examples
+               </a>
+             </td> </tr>
             </tfoot>
         </table>
-        <p>
-            <a href="https://int-index.github.io/kalium/examples.html">
-                More examples
-            </a>
-        </p>
+      </div>
+      </section>
+
+      <section id="help">
+      <div class="section">
         <h2>Can I help?</h2>
         <p>
             Sure! Fork the repo and do whatever you think is good, then create
@@ -229,6 +330,8 @@ f (a :: Int) = sum [1 .. a]
            I am a student from Russia and I don't get any financial support to
            work on this project, so donation is one more way to help me.
         </p>
+      </div>
+      </section>
 
     </main>
     <footer>
@@ -237,7 +340,6 @@ f (a :: Int) = sum [1 .. a]
 <input type="hidden" name="encrypted" value="-----BEGIN PKCS7-----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-----END PKCS7-----
 ">
 <input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" border="0" name="submit" alt="PayPal - The safer, easier way to pay online!">
-<img alt="" border="0" src="https://www.paypalobjects.com/ru_RU/i/scr/pixel.gif" width="1" height="1">
 </form>
 <br>
         <a href="https://github.com/int-index">Index Int</a>, 2014&ndash;2015

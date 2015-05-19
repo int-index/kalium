@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+     width="800px" height="800px" viewBox="0 0 800 800" xml:space="preserve">
+<circle fill="#666766" cx="400" cy="400" r="389.779"/>
+<path fill="#FFFFFF" d="M247.829,202.766c0,34.993,0,69.987,0,104.98c0,64.022,0,128.044,0,192.066c0,31.753,0,63.506,0,95.258
+    c0,15.778,13.166,28.945,28.945,28.945s28.945-13.166,28.945-28.945c0-34.993,0-69.987,0-104.98c0-64.022,0-128.044,0-192.066
+    c0-31.753,0-63.506,0-95.258c0-15.778-13.166-28.945-28.945-28.945S247.829,186.988,247.829,202.766L247.829,202.766z"/>
+<line fill="none" stroke="#FFFFFF" stroke-width="59.8403" stroke-miterlimit="10" x1="353.654" y1="419.186" x2="553.225" y2="211.899"/>
+<ellipse fill="#FFFFFF" cx="553.725" cy="211.068" rx="29.546" ry="30.08"/>
+<line fill="none" stroke="#FFFFFF" stroke-width="59.8403" stroke-miterlimit="10" x1="367.412" y1="390.972" x2="562.314" y2="593.411"/>
+<ellipse fill="#FFFFFF" cx="562.314" cy="593.411" rx="29.203" ry="30.333"/>
+</svg>
