@@ -36,6 +36,8 @@ class Error e where
     errorTypecheck  :: e
     errorNoAccess   :: String -> [String] -> e
     errorNoFunction :: String -> e
+    errorNotImplemented :: String -> e
+    errorArgumentMismatch :: String -> e
 
 type E e m = (Applicative m, MonadError e m, Error e)
 type (~>)  a b = forall e m . (MonadReader ConvScope m, E e m) => Kleisli' m a b
@@ -156,7 +158,7 @@ instance Conv S.Type where
         S.TypeChar    -> return D.TypeChar
         S.TypeString  -> return D.TypeString
         S.TypeArray t -> D.TypeApp1 D.TypeList <$> conv t
-        S.TypeCustom _  -> error "Custom types are not implemented"
+        S.TypeCustom _  -> throwError (errorNotImplemented "Custom types")
 
 binary op a b = D.Call op [] [a,b]
 
@@ -165,7 +167,7 @@ convSetLength [S.Access name', lenExpr'] = do
     lenExpr <- typecastConv (==S.TypeInteger) lenExpr'
     return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpSetLength) []
         [D.expression name, lenExpr]
-convSetLength _ = error "convSetLength: argument mismatch"
+convSetLength _ = throwError (errorArgumentMismatch "SetLength")
 
 convReadLn [e@(S.Access name')] = do
     name <- nameV name'
@@ -174,14 +176,14 @@ convReadLn [e@(S.Access name')] = do
         ty' -> do
             ty <- conv ty'
             return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpReadLn) [ty] []
-convReadLn _ = error "convReadLn: argument mismatch"
+convReadLn _ = throwError (errorArgumentMismatch "ReadLn")
 
 convRead [e@(S.Access name')] = do
     name <- nameV name'
     typecheck e >>= \case
         S.TypeChar -> return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpGetChar) [] []
-        _ -> error "convRead: type mismatch"
-convRead _ = error "convRead: argument mismatch"
+        _ -> throwError errorTypecheck
+convRead _ = throwError (errorArgumentMismatch "Read")
 
 convWriteLn ln exprs = do
     arg <- traverse convArg exprs <&> \case
@@ -336,9 +338,9 @@ instance Conv S.Statement where
                     ixExpr <- typecastConv (==S.TypeInteger) ixExpr'
                     name <- nameV name'
                     tyW <- typecheck (S.Access name') >>= \case
-                        S.TypeString -> error "string-indexing"
+                        S.TypeString -> throwError (errorNotImplemented "String indexing")
                         S.TypeArray ty -> return ty
-                        _ -> error "non-array indexing"
+                        _ -> throwError errorTypecheck
                     elemExpr <- typecastConv (==tyW) expr'
                     let expr = D.Call (D.NameSpecial D.OpIxSet) []
                                 [ ixExpr, elemExpr

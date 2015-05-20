@@ -18,6 +18,8 @@ data Error = ParseError String Int Int
            | UpdateImmutable String
            | PasConvError
            | TypeError String [S.Type]
+           | NotImplemented String
+           | ArgumentMismatch String
            | Insane String
     deriving (Show)
 
@@ -42,3 +44,5 @@ instance CP.Error Error where
     errorTypecheck  = TypeError "" []
     errorNoAccess   = NoAccess
     errorNoFunction = NoFunction
+    errorNotImplemented = NotImplemented
+    errorArgumentMismatch = ArgumentMismatch
