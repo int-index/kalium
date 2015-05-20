@@ -10,7 +10,7 @@ import Kalium.Nucleus.Vector.Program
 import Kalium.Nucleus.Vector.Recmap
 import Kalium.Nucleus.Vector.Pattern
 import Kalium.Nucleus.Vector.Name
-import Kalium.Nucleus.Vector.Cost
+import Kalium.Nucleus.Vector.Cost (lesser)
 
 inline :: (Applicative m, MonadNameGen m, Recmappable a) => EndoKleisli' m a
 inline = recmapped (mergePattern . inlineExpression)

@@ -31,6 +31,7 @@ data NameSpecial
     | OpIf
     | OpFold
     | OpFoldTainted
+    | OpFlipMapTaintedIgnore
     | OpMapTaintedIgnore
     | OpProduct
     | OpSum

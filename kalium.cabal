@@ -50,6 +50,7 @@ library
                        Kalium.Nucleus.Vector.Cost
                        Kalium.Nucleus.Vector.Sanity
                        Kalium.Nucleus.Vector.Template
+                       Kalium.Nucleus.Vector.Normalize
                        Kalium.Nucleus.Vector.Show
                        Kalium.Nucleus.Vectorize
                        Control.Monad.Rename

@@ -56,6 +56,9 @@ operators = M.fromList
     , OpFoldTainted # Operator
         { hs = H.Var (HsIdent "Control.Monad" "foldM")
         }
+    , OpFlipMapTaintedIgnore # Operator
+        { hs = H.Var (HsIdent "Data.Foldable" "for_")
+        }
     , OpMapTaintedIgnore # Operator
         { hs = H.Var (HsIdent "Data.Foldable" "traverse_")
         }

@@ -12,6 +12,7 @@ import Kalium.Nucleus.Vector.ArgClean (argClean)
 import Kalium.Nucleus.Vector.Purify (purify)
 import Kalium.Nucleus.Vector.BindClean (bindClean)
 import Kalium.Nucleus.Vector.Context (extractCtx)
+import Kalium.Nucleus.Vector.Normalize (normalize, denormalize)
 import Kalium.Nucleus.Vector.Sanity (sanity_nameUniqueness)
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified Kalium.Pascal.Parse   as P (parse)
@@ -58,7 +59,9 @@ type TranslationLog = [V.Program]
 optimize
     :: (Applicative m, MonadNameGen m)
     => V.Program -> m (V.Program, TranslationLog)
-optimize program = runWriterT (closureM optimizeStep program)
+optimize program
+    = runWriterT
+    $ denormalize <$> closureM optimizeStep (normalize program)
 
 logging :: MonadWriter [a] m => LensLike' m a a
 logging f x = tell [x] >> f x
