@@ -231,6 +231,9 @@ listReduce = fire
         _   <- unlist e
         es' <- unlist es
         "a" ..= foldr (AppOp2 OpCons) e es'
+    , AppOp2 OpTake "n" (AppOp1 OpRepeat "a") := AppOp2 OpReplicate "n" "a"
+    , AppOp2 OpReplicate (Primary (LitInteger 0)) "a" := OpAccess OpNil
+    , AppOp2 OpReplicate (Primary (LitInteger 1)) "a" := AppOp1 OpSingleton "a"
     ]
   where
     unlist :: Alternative f => Expression -> f [Expression]

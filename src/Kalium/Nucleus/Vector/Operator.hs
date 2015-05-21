@@ -176,6 +176,9 @@ operators = M.fromList
     , OpRepeat # Operator
         { hs = H.Var (HsIdent "Prelude" "repeat")
         }
+    , OpReplicate # Operator
+        { hs = H.Var (HsIdent "Prelude" "replicate")
+        }
     , OpBind # Operator
         { hs = H.Var (HsSymbol "Prelude" ">>=")
         }

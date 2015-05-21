@@ -66,6 +66,7 @@ data NameSpecial
     | OpWhen
     | OpConcat
     | OpTake
+    | OpReplicate
     | OpRepeat
     | OpIntToDouble
     | OpUndefined
