@@ -12,8 +12,12 @@ bindClean = over recmapped bindCleanExpression
 
 bindCleanExpression :: Endo' Expression
 bindCleanExpression = \case
+
     Follow p x a | Just e <- asum $ map (subst Follow tainting x a) (patClean p) -> e
     Into   p x a | Just e <- asum $ map (subst Into   id       x a) (patClean p) -> e
+
+    Follow (PTuple PWildCard p) (AppOp2 OpFmap (AppOp1 OpPair _) x) a -> Follow p x a
+
     e -> e
 
 subst h t x a (p, c) = t propagate c x <&> \x' -> h p x' a

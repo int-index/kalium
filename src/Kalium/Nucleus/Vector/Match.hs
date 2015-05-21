@@ -43,6 +43,10 @@ commonReduce = commonReduce' . \case
         -- TODO: typecheck (typeof aElse == typeof aThen)
         -> AppOp1 opElse (AppOp3 OpIf aElse aThen cond)
 
+    AppOp2 OpFmap f a
+        | Just a' <- tainting propagate (Just . App1 f) a
+        -> a'
+
     e -> e
   where
    commonReduce' = fire
@@ -95,6 +99,7 @@ attemptIgnore = \case
     Taint _ -> Just (Taint LitUnit)
     e | isTaintedUnit e -> Just e
     AppOp2 OpFmapIgnore _ a -> Just (Ignore a)
+    AppOp2 OpFmap _ a -> Just (Ignore a)
     _ -> Nothing
 
 foldMatch :: Endo' Expression
