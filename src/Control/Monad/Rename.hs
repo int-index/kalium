@@ -15,6 +15,7 @@ import qualified Data.Map as M
 
 import Control.Monad.Signatures
 import qualified Control.Monad.Trans.State as State
+import Control.Monad.Trans.Maybe (MaybeT)
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Except
@@ -53,6 +54,10 @@ instance MonadRename i s m => MonadRename i s (ReaderT r m) where
     rename = lift . rename
 
 instance (Monoid w, MonadRename i s m) => MonadRename i s (WriterT w m) where
+    mkname = lift . mkname
+    rename = lift . rename
+
+instance MonadRename i s m => MonadRename i s (MaybeT m) where
     mkname = lift . mkname
     rename = lift . rename
 

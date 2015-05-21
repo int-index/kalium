@@ -4,45 +4,24 @@ module Kalium.Nucleus.Vector.ArgClean where
 import Kalium.Prelude
 import Kalium.Util
 
-import qualified Data.Map as M
+import Control.Monad.Trans.Maybe
 
 import Kalium.Nucleus.Vector.Program
 import Kalium.Nucleus.Vector.Recmap
-import Kalium.Nucleus.Vector.Name
+import Kalium.Nucleus.Vector.FuncUpdate
 
 argClean :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
-argClean program = do
-    let funcs = program ^. programFuncs
-    info <- execWriterT (itraverse funcArgClean funcs)
-    return (sofar substitute info program)
+argClean = funcUpdate funcArgClean
 
-substitute :: CleanInfo -> EndoKleisli' Maybe Program
-substitute info@(CleanInfo name _ _ _) program
-    | program' `mentions` name = Nothing
-    | otherwise = Just program'
-  where
-    program'
-        = programReplaceFunc info program
-        & recmapped %~ tryApply (appArgClean info)
-
-data CleanInfo = CleanInfo Name [Bool] Name Func
-
-programReplaceFunc :: CleanInfo -> Endo' Program
-programReplaceFunc (CleanInfo name _  name' func)
-    = programFuncs %~ M.insert name' func . M.delete name
-
-funcArgClean
-    :: (Applicative m, MonadWriter [CleanInfo] m, MonadNameGen m)
-    => Name -> Func -> m ()
-funcArgClean name (Func ty a) = do
-    name' <- alias name
+funcArgClean :: (Applicative m, MonadNameGen m) => FuncUpdate m
+funcArgClean name name' (Func ty a) = do
     let (ps, b) = unlambda a
         (ns, ps') = patsArgClean ps
         a' = lambda ps' b
-    case tyArgClean ns ty of
-        Just ty' | ty' /= ty
-          -> tell [CleanInfo name ns name' (Func ty' a')]
-        _ -> return ()
+    ty' <- (MaybeT . pure) (tyArgClean ns ty)
+    guard (ty' /= ty)
+    let upd = recmapped %~ tryApply (appArgClean name ns name')
+    return (upd, Func ty' a')
 
 patsArgClean :: [Pattern] -> ([Bool], [Pattern])
 patsArgClean [] = ([], [])
@@ -59,8 +38,8 @@ tyArgClean (n:ns) (TypeApp2 TypeFunction ty1 ty2) = wrap <$> tyArgClean ns ty2
                | otherwise = id
 tyArgClean _ _ = Nothing
 
-appArgClean :: CleanInfo -> Expression -> Maybe Expression
-appArgClean (CleanInfo name ns name' _) e
+appArgClean :: Name -> [Bool] -> Name -> Expression -> Maybe Expression
+appArgClean name ns name' e
     | (Access op:es) <- unbeta e, op == name
      = beta <$> ((Access name':) <$> zipFilter ns es)
-appArgClean _ _ = Nothing
+appArgClean _ _ _ _ = Nothing
