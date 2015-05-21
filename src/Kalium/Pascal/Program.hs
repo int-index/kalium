@@ -6,7 +6,7 @@ type Name = String
 
 data Program
     = Program [Func] Vars Body
-    deriving (Show)
+    deriving (Eq, Show)
 
 type Vars = Map Name Type
 
@@ -17,7 +17,7 @@ data FuncSig = FuncSig [ParamDecl] (Maybe Type)
 
 data Func
     = Func Name FuncSig Vars Body
-    deriving (Show)
+    deriving (Eq, Show)
 
 data ParamDecl
     = ParamDecl Name (By, Type)
@@ -37,13 +37,13 @@ data Statement
     | IfBranch Expression Statement (Maybe Statement)
     | CaseBranch Expression [Leaf] (Maybe Statement)
     | BodyStatement Body
-    deriving (Show)
+    deriving (Eq, Show)
 
 data Expression
     = Access Name
     | Call (Either Operator Name) [Expression]
     | Primary Literal
-    deriving (Show)
+    deriving (Eq, Show)
 
 data Literal
     = LitBool Bool
@@ -75,7 +75,7 @@ data Operator
     | OpIx
     | OpCharToString
     | OpIntToReal
-    deriving (Show)
+    deriving (Eq, Show)
 
 data Type
     = TypeInteger

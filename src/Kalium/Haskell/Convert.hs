@@ -19,7 +19,7 @@ convert = convProgram
 
 data Config = Config
     { configPatSig :: Bool
-    }
+    } deriving (Eq)
 
 type T m =
     ( Applicative m

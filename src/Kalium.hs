@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-module Kalium (translate) where
+module Kalium (translate, Cache, updateCache, extractCache) where
 
 import Kalium.Prelude
 
@@ -16,6 +16,7 @@ import Kalium.Nucleus.Vector.Context (extractCtx)
 import Kalium.Nucleus.Vector.Normalize (normalize, denormalize)
 import Kalium.Nucleus.Vector.Sanity (sanity_nameUniqueness)
 import Language.Haskell.Exts.Pretty (prettyPrint)
+import qualified Kalium.Pascal.Program as P (Program)
 import qualified Kalium.Pascal.Parse   as P (parse)
 import qualified Kalium.Pascal.Convert as P (convert)
 import qualified Kalium.Haskell.Sugar   as H (sugarcoat)
@@ -34,8 +35,7 @@ nuclear
     :: ( Applicative m
        , MonadError E.Error m
        , MonadNameGen m
-       ) => Kleisli' m (S.Program (S.Configuration S.ByType S.Pattern S.Expression))
-                       (V.Program, TranslationLog)
+       ) => Kleisli' m (S.Complex S.Program) (V.Program, TranslationLog)
 nuclear
      =  atomize
     >=> atomize . valueficate
@@ -43,17 +43,64 @@ nuclear
     >=> sanity_check "Name uniqueness" sanity_nameUniqueness
     >=> optimize
 
+rnuclear pas = (`runRenameT` 0) (P.convert pas >>= nuclear)
+
 translate
     :: (Applicative m, MonadError E.Error m)
     => Bool -> String -> m ([String], String)
 translate configPatSig src = do
     pas <- P.parse src
-    ((optimal, log), nameTags) <- (`runRenameT` 0) $ P.convert pas >>= nuclear
+    ((optimal, log), nameTags) <- rnuclear pas
     let hsConfig = H.Config { H.configPatSig = configPatSig }
     let sweeten = H.imports . H.sugarcoat . H.convert hsConfig nameTags
     return ( map (prettyPrint . sweeten) log
-           , prettyPrint (sweeten optimal)
-           )
+           , prettyPrint (sweeten optimal) )
+
+data Cache
+    = Cache_PascalParseError String E.Error
+    | Cache_HaskellGenError String P.Program E.Error
+    | Cache_Success String P.Program (Map Integer String, V.Program) H.Config String
+
+extractCache :: Cache -> Either E.Error String
+extractCache = \case
+    Cache_PascalParseError _ e -> Left e
+    Cache_HaskellGenError _ _ e -> Left e
+    Cache_Success _ _ _ _ r -> Right r
+
+updateCache :: Bool -> String -> Maybe Cache -> Cache
+updateCache configPatSig src =
+  let hsConfig = H.Config { H.configPatSig = configPatSig }
+  in \case
+    Nothing -> case P.parse src of
+        Left e -> Cache_PascalParseError src e
+        Right pas -> withPas hsConfig pas
+    Just cache -> case cache of
+      Cache_PascalParseError src' _ ->
+        if src == src' then cache else updateCache configPatSig src Nothing
+      Cache_HaskellGenError src' pas' e' ->
+        if src == src' then cache else
+          case P.parse src of
+            Left e -> Cache_PascalParseError src e
+            Right pas -> if pas == pas'
+                then Cache_HaskellGenError src pas e'
+                else withPas hsConfig pas
+      Cache_Success src' pas' opt' hsConfig' _ ->
+        let keep | hsConfig == hsConfig' = cache
+                 | otherwise = withOptimal hsConfig pas' opt'
+        in if src == src' then keep
+           else case P.parse src of
+               Left e -> Cache_PascalParseError src e
+               Right pas -> if pas == pas' then keep else withPas hsConfig pas
+
+  where
+    withPas hsConfig pas = case rnuclear pas of
+        Left e -> Cache_HaskellGenError src pas e
+        Right ((optimal, log), nameTags) -> withOptimal hsConfig pas (nameTags,optimal)
+    withOptimal hsConfig pas (nameTags,optimal) =
+        let sweet = H.imports . H.sugarcoat
+                  $ H.convert hsConfig nameTags optimal
+        in Cache_Success src pas (nameTags,optimal) hsConfig (prettyPrint sweet)
+
 
 type TranslationLog = [V.Program]
 
