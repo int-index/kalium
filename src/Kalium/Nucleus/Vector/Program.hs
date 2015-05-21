@@ -60,6 +60,7 @@ data NameSpecial
     | OpTaint
     | OpBind
     | OpBindIgnore
+    | OpFmap
     | OpFmapIgnore
     | OpIgnore
     | OpWhen
@@ -199,6 +200,24 @@ etaExpand tys e = do
         name <- NameGen <$> mkname Nothing
         return (Access name, PAccess name ty)
     return $ lambda pats $ beta (e:exps)
+
+typeDrivenUnlambda
+    :: (Applicative m, MonadNameGen m)
+    => Type -> Expression -> m ( ([Pattern],[Type]) , (Expression,Type) )
+typeDrivenUnlambda ty a =
+  let (tys, ty') = untyfun ty
+      ( ps,  a') = unlambda a
+      tysLength = length tys
+      psLength = length  ps
+  in if | tysLength < psLength -> do
+            error "lambda-abstraction with non-function type"
+
+        | tysLength > psLength -> do
+            let tys' = drop psLength tys
+            b <- etaExpand tys' a -- TODO: or is it a'?
+            typeDrivenUnlambda ty b
+
+        | otherwise -> return ( (ps,tys) , (a',ty') )
 
 makeLenses ''Func
 makeLenses ''Program

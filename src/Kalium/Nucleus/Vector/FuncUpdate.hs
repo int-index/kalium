@@ -14,17 +14,21 @@ type FuncUpdate m = Name -> Name -> Func -> MaybeT m (Endo' Func, Func)
 
 funcUpdate :: MonadNameGen m => FuncUpdate m -> Program -> m Program
 funcUpdate fnUpd program = do
-    updates <- itraverse (reifyFuncUpdate fnUpd) (program ^. programFuncs)
-    return (foldr (.) id (M.elems updates) program)
+    updates
+        <-  catMaybes . M.elems
+        <$> itraverse (reifyFuncUpdate fnUpd) (program ^. programFuncs)
+    return $ (maybe program id . asum) (map ($program) updates)
 
-reifyFuncUpdate :: MonadNameGen m => FuncUpdate m -> Name -> Func -> m (Endo' Program)
-reifyFuncUpdate fnUpd name func = defaultMaybeT id $ do
+reifyFuncUpdate
+    :: MonadNameGen m => FuncUpdate m -> Name -> Func
+    -> m (Maybe (Program -> Maybe Program))
+reifyFuncUpdate fnUpd name func = runMaybeT $ do
     name' <- alias name
     (upd, func') <- fnUpd name name' func
     let
       substitute program
-          | program' `mentions` name = program
-          | otherwise = program'
+          | program' `mentions` name = Nothing
+          | otherwise = Just program'
         where
           program' = program
             & programFuncs %~ M.insert name' func' . M.delete name

@@ -2,7 +2,6 @@
 module Kalium.Util where
 
 import Kalium.Prelude
-import Control.Monad.Trans.Maybe (MaybeT(..))
 import qualified Data.Map as M
 
 type Pairs a b = [(a, b)]
@@ -20,9 +19,6 @@ closureM :: (Eq a, Monad m) => LensLike' m a a
 closureM f = go
   where
     go x = f x >>= \y -> bool (go y) (return x) (x == y)
-
-defaultMaybeT :: Functor m => a -> MaybeT m a -> m a
-defaultMaybeT a m = maybe a id <$> runMaybeT m
 
 amaybe :: Alternative f => Maybe a -> f a
 amaybe = maybe empty pure

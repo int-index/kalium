@@ -182,6 +182,9 @@ operators = M.fromList
     , OpBindIgnore # Operator
         { hs = H.Var (HsSymbol "Prelude" ">>")
         }
+    , OpFmap # Operator
+        { hs = H.Var (HsSymbol "Control.Applicative" "<$>")
+        }
     , OpFmapIgnore # Operator
         { hs = H.Var (HsSymbol "Control.Applicative" "<$")
         }

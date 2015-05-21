@@ -9,6 +9,7 @@ import Kalium.Nucleus.Scalar.Valueficate (valueficate)
 import Kalium.Nucleus.Vector.Match (match)
 import Kalium.Nucleus.Vector.Inline (inline, reorder)
 import Kalium.Nucleus.Vector.ArgClean (argClean)
+import Kalium.Nucleus.Vector.RetClean (retClean)
 import Kalium.Nucleus.Vector.Purify (purify)
 import Kalium.Nucleus.Vector.BindClean (bindClean)
 import Kalium.Nucleus.Vector.Context (extractCtx)
@@ -75,4 +76,5 @@ optimizeStep = closureM (logging f) >=> logging reorder
             >=> return . bindClean
             >=> extractCtx
             >=> argClean
+            >=> retClean
             >=> purify
