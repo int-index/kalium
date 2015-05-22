@@ -1,0 +1,12 @@
+#!/usr/bin/python3
+from subprocess import check_output
+
+nums = range(1024, -1024, -23)
+
+program = input()
+for num in nums:
+    inp = bytes('0\n' + str(num), encoding='utf-8')
+    out = check_output(program, input=inp, timeout=3)
+    if not out == bytes(str(num+1) + '\n', encoding='utf-8'):
+        print('output mismatch')
+        break

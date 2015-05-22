@@ -83,7 +83,7 @@ appIgnore = fire
 
     , Ignore "a" := "a" :> transgate attemptIgnore "a"
 
-    , AppOp3 OpFoldTainted (Lambda2 PWildCard "p" "a") "_1" "x"
+    , Ignore (AppOp3 OpFoldTainted (Lambda2 PWildCard "p" "a") "_1" "x")
         := AppOp2 OpMapTaintedIgnore (Lambda "p" "a") "x"
         :> transgate attemptIgnore "a"
 
