@@ -21,6 +21,6 @@ install:
 script:
  - if [ -f configure.ac ]; then autoreconf -i; fi
  - cabal configure -f-build-js -v2
- - "cabal build --ghc-options='-fno-warn-unused-imports -fno-warn-dodgy-imports -Werror'"
+ - cabal build
  # commented out because Python tests don't want to run
  # - cabal test
