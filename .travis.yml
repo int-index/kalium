@@ -1,12 +1,13 @@
 language: haskell
 
 ghc:
-  - '7.10'
+ # uncomment once Travis has GHC 7.10
+ #  - '7.10'
   - '7.8'
 
 install:
  - cabal install happy
- - cabal install --only-dependencies --enable-tests
+ - cabal install --only-dependencies --enable-tests -f '''-build-js'''
 
 script:
  - cabal configure --enable-tests -f '''-build-js'''
