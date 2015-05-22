@@ -18,6 +18,11 @@ source-repository head
   type:                git
   location:            git://github.com/int-index/kalium.git
 
+flag build-js
+  description:         Enable the JavaScript interface
+  default:             True
+  manual:              False
+
 library
   exposed-modules:     Kalium
                        Kalium.Util
@@ -102,10 +107,16 @@ executable kalium-cli
 
 executable kalium-js
   main-is:             Main.hs
-  build-depends:       base >= 4.7 && < 5
-               ,       reflex
-               ,       reflex-dom
-               ,       kalium
+
+  if !flag(build-js)
+    buildable: False
+
+  else
+    build-depends:       base >= 4.7 && < 5
+                 ,       reflex
+                 ,       reflex-dom
+                 ,       kalium
+
   ghcjs-options:       -W -O2
   hs-source-dirs:      kalium-js
   default-language:    Haskell2010
