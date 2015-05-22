@@ -4,8 +4,6 @@ module Kalium.Nucleus.Vector.RetClean where
 import Kalium.Prelude
 import Kalium.Util
 
-import Control.Monad.Trans.Maybe
-
 import Kalium.Nucleus.Vector.Program
 import Kalium.Nucleus.Vector.Recmap
 import Kalium.Nucleus.Vector.FuncUpdate

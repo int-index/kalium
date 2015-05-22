@@ -9,8 +9,8 @@ install:
  - cabal install --only-dependencies --enable-tests
 
 script:
- - cabal configure --enable-tests
- - cabal build --ghc-options=-Werror
+ - cabal configure --enable-tests -f '''-build-js'''
+ - cabal build '--ghc-options=''-fno-warn-dodgy-imports -Werror'''
 
  # uncomment once Travis's version of Cabal knows about PatternSynonyms
  # - cabal check

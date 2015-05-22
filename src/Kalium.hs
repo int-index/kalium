@@ -95,7 +95,7 @@ updateCache configPatSig src =
   where
     withPas hsConfig pas = case rnuclear pas of
         Left e -> Cache_HaskellGenError src pas e
-        Right ((optimal, log), nameTags) -> withOptimal hsConfig pas (nameTags,optimal)
+        Right ((optimal, _log), nameTags) -> withOptimal hsConfig pas (nameTags,optimal)
     withOptimal hsConfig pas (nameTags,optimal) =
         let sweet = H.imports . H.sugarcoat
                   $ H.convert hsConfig nameTags optimal
