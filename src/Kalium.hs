@@ -6,7 +6,7 @@ import Kalium.Prelude
 import Kalium.Nucleus.Vectorize (vectorize)
 import Kalium.Nucleus.Scalar.Atomize (atomize)
 import Kalium.Nucleus.Scalar.Valueficate (valueficate)
-import Kalium.Nucleus.Vector.Match (match)
+import Kalium.Nucleus.Vector.Match (match, match')
 import Kalium.Nucleus.Vector.Inline (inline, reorder)
 import Kalium.Nucleus.Vector.ArgClean (argClean)
 import Kalium.Nucleus.Vector.RetClean (retClean)
@@ -117,8 +117,11 @@ logging f x = tell [x] >> f x
 optimizeStep
     :: (Applicative m, MonadWriter TranslationLog m, MonadNameGen m)
     => EndoKleisli' m V.Program
-optimizeStep = closureM (logging f) >=> logging reorder
-    where f  =  return . match
+optimizeStep =  closureM g
+            >=> closureM (logging f)
+            >=> logging reorder
+    where g  =  return . match' >=> inline >=> return . bindClean
+          f  =  return . match
             >=> inline
             >=> return . bindClean
             >=> extractCtx

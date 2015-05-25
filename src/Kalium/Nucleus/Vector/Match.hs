@@ -24,6 +24,9 @@ match = over recmapped
       . numericCompute
       . appIgnore
 
+match' :: Endo' Program
+match' = over recmapped (lambdaReduce . appIgnore)
+
 pattern LitZero = Primary (LitInteger 0)
 pattern LitOne  = Primary (LitInteger 1)
 pattern LitTrue = OpAccess OpTrue
