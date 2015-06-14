@@ -1,74 +1,39 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Control.Monad.Rename
-    ( MonadRename(..)
-    , RenameT(..)
+    ( MonadRename
+    , mkname
+    , rename
+    , RenameT
     , runRenameT
     ) where
 
 import Prelude
-import Data.Coerce
 import qualified Data.Map as M
 
-import Control.Monad.Signatures
-import qualified Control.Monad.Trans.State as State
-import Control.Monad.Trans.Maybe (MaybeT)
-import Control.Applicative
-import Control.Monad.State
-import Control.Monad.Except
-import Control.Monad.Reader
-import Control.Monad.Writer
+import Control.Ether.TH (ethereal)
+import Control.Monad.Ether.State
 
-class Monad m => MonadRename i s m | m -> i, m -> s where
-    mkname :: (Ord i, Enum i) => Maybe s -> m i
-    rename :: (Ord i, Enum i) =>       i -> m i
+ethereal "Rename" "rnm"
 
 type InternalState i s = (M.Map i s, i)
 
-newtype RenameT i s m a = RenameT (StateT (InternalState i s) m a)
-    deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MonadFix)
+type MonadRename i s = MonadState Rename (InternalState i s)
+type RenameT i s = StateT Rename (InternalState i s)
 
-instance Monad m => MonadRename i s (RenameT i s m) where
-    mkname ms = RenameT $ do
-        (table, seed) <- get
-        let tabmod = case ms of
-              Nothing -> id
-              Just s  -> M.insert seed s
-        put (tabmod table, succ seed)
-        return seed
-    rename i = RenameT (gets (M.lookup i . fst)) >>= mkname
+mkname :: (Ord i, Enum i, MonadRename i s m) => Maybe s -> m i
+mkname ms = do
+    (table, seed) <- get rnm
+    let tabmod = case ms of
+          Nothing -> id
+          Just s  -> M.insert seed s
+    put rnm (tabmod table, succ seed)
+    return seed
 
-instance MonadRename i s m => MonadRename i s (ExceptT e m) where
-    mkname = lift . mkname
-    rename = lift . rename
-
-instance MonadRename i s m => MonadRename i s (StateT st m) where
-    mkname = lift . mkname
-    rename = lift . rename
-
-instance MonadRename i s m => MonadRename i s (ReaderT r m) where
-    mkname = lift . mkname
-    rename = lift . rename
-
-instance (Monoid w, MonadRename i s m) => MonadRename i s (WriterT w m) where
-    mkname = lift . mkname
-    rename = lift . rename
-
-instance MonadRename i s m => MonadRename i s (MaybeT m) where
-    mkname = lift . mkname
-    rename = lift . rename
-
-liftCatch :: Catch e m (a, InternalState i s) -> Catch e (RenameT i s m) a
-liftCatch catchE m h = coerce $ State.liftCatch catchE (coerce m) (coerce h)
-
-instance MonadError e m => MonadError e (RenameT i s m) where
-    throwError = lift . throwError
-    catchError = liftCatch catchError
+rename :: (Ord i, Enum i, MonadRename i s m) => i -> m i
+rename i = gets rnm (M.lookup i . fst) >>= mkname
 
 runRenameT :: Monad m => RenameT i s m a -> i -> m (a, M.Map i s)
-runRenameT (RenameT t) i = do
-    (a, (table, _)) <- runStateT t (M.empty, i)
+runRenameT t i = do
+    (a, (table, _)) <- runStateT rnm t (M.empty, i)
     return (a, table)

@@ -75,6 +75,7 @@ library
                ,       haskell-src-exts == 1.16.*
                ,       parsec >= 3.1
                ,       void >= 0.7
+               ,       ether >= 0.1.0.1
 
   ghc-options:         -W
   ghc-prof-options:    -fprof-auto
