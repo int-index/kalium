@@ -13,6 +13,7 @@ import qualified Kalium.Nucleus.Vector.Pattern as Vec
 import qualified Kalium.Nucleus.Vector.Operator as VecOp
 import qualified Language.Haskell.Exts        as H
 import qualified Language.Haskell.Exts.SrcLoc as H
+import qualified Control.Monad.Ether.Implicit as I
 
 convert :: Config -> Map Integer String -> Vec.Program -> H.Module
 convert = convProgram
@@ -25,7 +26,7 @@ type T m =
     ( Applicative m
     , MonadReader (Set Vec.Name) m
     , MonadState (Map Integer (Either String H.Name)) m )
-type C m = (Applicative m, MonadConfig Config m)
+type C m = (Applicative m, I.MonadReader Config m)
 
 convProgram :: Config -> Map Integer String -> Vec.Program -> H.Module
 convProgram config nameTags (Vec.Program funcs) = run $ do
@@ -36,7 +37,7 @@ convProgram config nameTags (Vec.Program funcs) = run $ do
   where
     extensions names = [H.LanguagePragma H.noLoc (map H.Ident names)]
     run = (`evalState` fmap Left nameTags)
-        . (`runConfigT` config)
+        . (`I.runReaderT` config)
         . (`runReaderT` M.keysSet funcs)
 
 keywords :: [String]
@@ -127,7 +128,7 @@ convPattern = \case
         hsName <- case name of
             Vec.NameGen n -> nameGen n
             _ -> error "convPattern: incorrect name"
-        configPatSig <- configPatSig <$> config
+        configPatSig <- configPatSig <$> I.ask
         let annotate
              | configPatSig = \pat -> H.PatTypeSig H.noLoc pat (convType ty)
              | otherwise = id

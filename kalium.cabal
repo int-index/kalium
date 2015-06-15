@@ -61,7 +61,6 @@ library
                        Kalium.Nucleus.Vector.Show
                        Kalium.Nucleus.Vectorize
                        Control.Monad.Rename
-                       Control.Monad.Config
                        Control.Dependent
 
   build-depends:       base >= 4.7 && < 5
@@ -75,7 +74,7 @@ library
                ,       haskell-src-exts == 1.16.*
                ,       parsec >= 3.1
                ,       void >= 0.7
-               ,       ether >= 0.1.0.1
+               ,       ether >= 0.2
 
   ghc-options:         -W
   ghc-prof-options:    -fprof-auto
