@@ -27,6 +27,10 @@ import qualified Kalium.Nucleus.Scalar.Program as S
 import qualified Kalium.Nucleus.Vector.Program as V
 import Kalium.Util
 
+import Control.Monad.Writer
+import Control.Monad.Except
+import Control.Monad.Rename
+
 sanity_check name f x
     | f x = return x
     | otherwise = throwError (E.Insane name)

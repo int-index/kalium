@@ -4,12 +4,8 @@ module Kalium.Prelude
 
 import Prelude as Exports hiding (concat, foldr, mapM_, sequence_, foldl1, maximum, minimum, product, sum, all, and, any, concatMap, elem, foldl, foldr1, notElem, or, mapM, sequence, FilePath, id, (.))
 import Data.Function as Exports hiding ((.), id)
+import Data.Monoid as Exports
 import Control.Monad as Exports hiding (mapM_, sequence_, forM_, msum, mapM, sequence, forM)
-import Control.Monad.Reader as Exports hiding (mapM_, sequence_, forM_, msum, mapM, sequence, forM)
-import Control.Monad.Writer as Exports hiding (mapM_, sequence_, forM_, msum, mapM, sequence, forM)
-import Control.Monad.State  as Exports hiding (mapM_, sequence_, forM_, msum, mapM, sequence, forM)
-import Control.Monad.Except as Exports hiding (mapM_, sequence_, forM_, msum, mapM, sequence, forM)
-import Control.Monad.Rename as Exports
 import Control.Applicative as Exports
 import Control.Category as Exports
 import Data.Foldable as Exports

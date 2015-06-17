@@ -3,6 +3,8 @@ module Kalium.Nucleus.Vector.Pattern where
 
 import qualified Data.Set as S
 
+import Control.Monad.Writer
+
 import Kalium.Prelude
 import Kalium.Nucleus.Vector.Program
 

@@ -10,6 +10,9 @@ module Kalium.Nucleus.Vector.Template where
 import Data.String
 import qualified Data.Map as M
 
+import Control.Monad.Reader
+import Control.Monad.State
+
 import Kalium.Prelude
 import Kalium.Util
 import Kalium.Nucleus.Vector.Program

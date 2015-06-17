@@ -6,6 +6,8 @@ module Kalium.Nucleus.Vector.Program where
 import Kalium.Prelude
 import Kalium.Util
 
+import Control.Monad.Rename
+
 data NameSpecial
     = OpAdd
     | OpSubtract

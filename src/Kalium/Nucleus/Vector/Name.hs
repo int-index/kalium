@@ -5,6 +5,9 @@ module Kalium.Nucleus.Vector.Name where
 import Kalium.Prelude
 import Kalium.Util
 
+import Control.Monad.Reader
+import Control.Monad.Writer
+
 import qualified Data.Set as S
 
 import Kalium.Nucleus.Vector.Program

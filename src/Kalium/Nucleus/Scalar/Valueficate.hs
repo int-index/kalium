@@ -5,6 +5,7 @@
 module Kalium.Nucleus.Scalar.Valueficate where
 
 import Kalium.Prelude
+import Control.Monad.Reader
 
 import qualified Data.Map as M
 

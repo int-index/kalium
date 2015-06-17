@@ -4,6 +4,10 @@ module Kalium.Nucleus.Scalar.Atomize (atomize) where
 import Kalium.Prelude
 import Kalium.Util
 
+import Control.Monad.Reader
+import Control.Monad.Writer
+import Control.Monad.Rename
+
 import qualified Data.Map as M
 
 import Kalium.Nucleus.Scalar.Program

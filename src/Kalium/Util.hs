@@ -4,6 +4,9 @@ module Kalium.Util where
 import Kalium.Prelude
 import qualified Data.Map as M
 
+import Control.Monad.Rename
+import Control.Monad.Except
+
 type Pairs a b = [(a, b)]
 type Endo' a = a -> a
 type Kleisli' m a b = a -> m b

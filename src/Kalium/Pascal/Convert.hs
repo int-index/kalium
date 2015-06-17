@@ -9,6 +9,10 @@ module Kalium.Pascal.Convert (convert, Error(..)) where
 import Kalium.Prelude
 import Kalium.Util
 
+import Control.Monad.Reader
+import Control.Monad.Except
+import Control.Monad.Rename
+
 import Control.Lens (ix)
 import qualified Data.Map as M
 

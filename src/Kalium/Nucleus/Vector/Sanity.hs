@@ -4,6 +4,8 @@ module Kalium.Nucleus.Vector.Sanity where
 import Kalium.Prelude
 import Kalium.Nucleus.Vector.Program
 
+import Control.Monad.Writer
+
 sanity_nameUniqueness :: Program -> Bool
 sanity_nameUniqueness program
     = liftA2 (==) nub id . execWriter

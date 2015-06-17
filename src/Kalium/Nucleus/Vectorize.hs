@@ -6,6 +6,10 @@ module Kalium.Nucleus.Vectorize (vectorize, Error(..)) where
 import Kalium.Prelude
 import Kalium.Util
 
+import Control.Monad.Reader
+import Control.Monad.Except
+import Control.Monad.Rename
+
 import qualified Data.Map as M
 import Kalium.Nucleus.Scalar.Program
 import qualified Kalium.Nucleus.Scalar.Operator as Op

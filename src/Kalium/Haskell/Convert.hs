@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Kalium.Haskell.Convert (convert, Config(..)) where
 
@@ -13,7 +14,14 @@ import qualified Kalium.Nucleus.Vector.Pattern as Vec
 import qualified Kalium.Nucleus.Vector.Operator as VecOp
 import qualified Language.Haskell.Exts        as H
 import qualified Language.Haskell.Exts.SrcLoc as H
+
+import Control.Ether.TH (ethereal)
+import Control.Ether.Abbr
+import qualified Control.Monad.Ether as Ether
 import qualified Control.Monad.Ether.Implicit as I
+
+ethereal "Scope" "scope"
+ethereal "ReifiedNames" "reifiedNames"
 
 convert :: Config -> Map Integer String -> Vec.Program -> H.Module
 convert = convProgram
@@ -24,8 +32,9 @@ data Config = Config
 
 type T m =
     ( Applicative m
-    , MonadReader (Set Vec.Name) m
-    , MonadState (Map Integer (Either String H.Name)) m )
+    , Ether '[ Scope --> Set Vec.Name
+             , ReifiedNames <-> Map Integer (Either String H.Name)
+             ] m )
 type C m = (Applicative m, I.MonadReader Config m)
 
 convProgram :: Config -> Map Integer String -> Vec.Program -> H.Module
@@ -36,9 +45,9 @@ convProgram config nameTags (Vec.Program funcs) = run $ do
     pure hsMod
   where
     extensions names = [H.LanguagePragma H.noLoc (map H.Ident names)]
-    run = (`evalState` fmap Left nameTags)
-        . (`I.runReaderT` config)
-        . (`runReaderT` M.keysSet funcs)
+    run = (\m -> Ether.evalState reifiedNames m $ fmap Left nameTags)
+        . (\m -> Ether.runReaderT scope m $ M.keysSet funcs)
+        . (\m -> I.runReaderT m config)
 
 keywords :: [String]
 keywords = words
@@ -62,20 +71,20 @@ resolveConflict name names
     change _ = error "impossible happened: H.Ident expected"
 
 nameGen :: T m => Integer -> m H.Name
-nameGen n = gets (M.lookup n) >>= \case
+nameGen n = Ether.gets reifiedNames (M.lookup n) >>= \case
     Nothing -> do
-        modify $ M.insert n (Left (show n))
+        Ether.modify reifiedNames $ M.insert n (Left (show n))
         nameGen n
     Just (Left str) -> do
         let name = H.Ident (nameSafe str)
         names <- do
-            dict <- get
+            dict <- Ether.get reifiedNames
             let assocName (Vec.NameGen n)
                   | Just (Right name) <- M.lookup n dict
                   = S.insert name
                 assocName _ = id
-            asks $ S.foldr assocName S.empty
-        modify $ M.insert n (Right $ resolveConflict name names)
+            Ether.asks scope (S.foldr assocName S.empty)
+        Ether.modify reifiedNames $ M.insert n (Right $ resolveConflict name names)
         nameGen n
     Just (Right name) -> pure name
 
@@ -99,7 +108,7 @@ convExpression = \case
     Vec.Lambda pat act
          -> H.Lambda H.noLoc
         <$> traverse convPattern [pat]
-        <*> local (Vec.patBound pat <>) (convExpression act)
+        <*> Ether.local scope (Vec.patBound pat <>) (convExpression act)
     Vec.Beta a1 a2 -> H.App <$> convExpression a1 <*> convExpression a2
     Vec.Primary lit -> pure $ convLit lit
     Vec.Access name -> case M.lookup name VecOp.operators of

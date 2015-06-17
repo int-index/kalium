@@ -10,6 +10,9 @@ import qualified Data.Map as M
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.SrcLoc (noLoc)
 
+import Control.Monad.Reader
+import Control.Monad.State
+
 imports :: Module -> Module
 imports (Module srcLoc name pragmas wtext exportSpec importDecls decls) =
     let importDecls' = importDecls ++ map importDecl

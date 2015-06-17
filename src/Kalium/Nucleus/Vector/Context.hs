@@ -4,6 +4,9 @@ module Kalium.Nucleus.Vector.Context where
 import Kalium.Prelude
 import Kalium.Util
 
+import Control.Monad.Writer
+import Control.Monad.Rename
+
 import Kalium.Nucleus.Vector.Program
 import Kalium.Nucleus.Vector.Recmap
 import Kalium.Nucleus.Vector.Name
