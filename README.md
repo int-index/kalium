@@ -11,7 +11,7 @@ development, so nothing is documented.
 
 You need the following programs to build *Kalium*:
 
-* ghc (7.8.4 or higher)
+* ghc (7.10.1 or higher)
 * cabal-install (1.22 or higher)
 * happy (1.19.5 or higher)
 

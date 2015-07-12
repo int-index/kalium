@@ -8,7 +8,6 @@ import Prelude
 import Data.Void (absurd)
 import Data.Ord  (comparing)
 import Data.List (minimumBy)
-import Control.Applicative
 import Control.Monad.Writer.Strict
 
 import GHC.Exts (Int(I#), Int#, (+#))
