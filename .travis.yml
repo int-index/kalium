@@ -29,3 +29,4 @@ addons:
     - cabal-install-1.22
     - cabal-install-head
     - happy-1.19.5
+    - python3
