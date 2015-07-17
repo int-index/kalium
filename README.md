@@ -9,7 +9,7 @@ development, so nothing is documented.
 
 ## Building
 
-You need the following programs to build *Kalium*:
+You need the following programs to build Kalium:
 
 * ghc (7.10.1 or higher)
 * cabal-install (1.22 or higher)
@@ -42,7 +42,7 @@ a message to `STDOUT` if something is wrong.
 
 ## Structure
 
-*Kalium* consists of a library that contains all the functionality and an
+Kalium consists of a library that contains all the functionality and an
 extremely small command-line tool. There are three parts of the library:
 
 * Front-end: `Kalium.Pascal`
