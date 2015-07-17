@@ -9,8 +9,11 @@ before_install:
  - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:/opt/happy/1.19.5/bin:$PATH
  - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
- - python3 --version
  - travis_retry cabal update
+ - mkdir $HOME/.bin
+ - ln -s $(which python3.4) $HOME/.bin/python3
+ - export PATH=$HOME/.bin:$PATH
+ - python3 --version
 
 install:
  - cabal install --dep -f-build-js --enable-tests
