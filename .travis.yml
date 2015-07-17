@@ -12,7 +12,7 @@ before_install:
  - travis_retry cabal update
 
 install:
- - cabal install --dep -f-build-js
+ - cabal install --dep -f-build-js --enable-tests
 
 script:
  - cabal configure -f-build-js --enable-tests -v2

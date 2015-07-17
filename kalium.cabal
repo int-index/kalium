@@ -128,7 +128,7 @@ test-suite regression
   main-is:             Regression.hs
   build-depends:       base >= 4.7 && < 5
                ,       mtl >= 2.2.1
-               ,       turtle >= 1.1
+               ,       turtle >= 1.2
                ,       managed >= 1.0
                ,       foldl >= 1.0
                ,       system-filepath >= 0.4
