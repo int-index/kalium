@@ -5,21 +5,17 @@ env:
  - CABALVER=1.22 GHCVER=7.10.1
  - CABALVER=head GHCVER=head
 
-before_install:
- - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:/opt/happy/1.19.5/bin:$PATH
- - travis_retry cabal update
- - export PATH=$HOME/.cabal/bin:$PATH
-
 install:
+ - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:/opt/happy/1.19.5/bin:$PATH
  - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
- - cabal install --only-dependencies -f-build-js
+ - travis_retry cabal update
 
 script:
- - cabal configure -f-build-js -v2
+ - cabal configure -f-build-js --enable-tests -v2
+ - cabal install --dep -f-build-js
  - cabal build
- # commented out because Python tests don't want to run
- # - cabal test
+ - cabal test
 
 addons:
   apt:
