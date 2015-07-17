@@ -5,15 +5,17 @@ env:
  - CABALVER=1.22 GHCVER=7.10.1
  - CABALVER=head GHCVER=head
 
-install:
+before_install:
  - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:/opt/happy/1.19.5/bin:$PATH
  - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
  - travis_retry cabal update
 
+install:
+ - cabal install --dep -f-build-js
+
 script:
  - cabal configure -f-build-js --enable-tests -v2
- - cabal install --dep -f-build-js
  - cabal build
  - cabal test
 
