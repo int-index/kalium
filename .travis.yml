@@ -2,11 +2,11 @@
 sudo: false
 
 env:
- - CABALVER=1.22 GHCVER=7.10.2
+ - CABALVER=1.22 GHCVER=7.10.1
  - CABALVER=head GHCVER=head
 
 before_install:
- - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
+ - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:/opt/happy/1.19.5/bin:$PATH
  - travis_retry cabal update
  - export PATH=$HOME/.cabal/bin:$PATH
 
@@ -26,9 +26,8 @@ addons:
     sources:
     - hvr-ghc
     packages:
-    - ghc-7.10.2
+    - ghc-7.10.1
     - ghc-head
     - cabal-install-1.22
     - cabal-install-head
-    - alex-3.1.4
     - happy-1.19.5
