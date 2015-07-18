@@ -8,10 +8,10 @@ import Kalium.Nucleus.Vector.Program
 import Kalium.Nucleus.Vector.Recmap
 import Kalium.Nucleus.Vector.FuncUpdate
 
-retClean :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
+retClean :: (MonadNameGen m) => EndoKleisli' m Program
 retClean = funcUpdate funcRetClean
 
-funcRetClean :: (Applicative m, MonadNameGen m) => FuncUpdate m
+funcRetClean :: (MonadNameGen m) => FuncUpdate m
 funcRetClean name name' (Func ty a) = do
     ( (ps,tys) , (a',ty') ) <- typeDrivenUnlambda ty a
     case ty' of

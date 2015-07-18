@@ -19,7 +19,7 @@ contexts
 contexts fits (Beta cxt (fits -> Just e)) = tell [cxt] >> return e
 contexts _ e = return e
 
-context :: (Applicative m, MonadNameGen m) => Name -> Expression
+context :: (MonadNameGen m) => Name -> Expression
         -> (Name -> Expression -> Maybe Expression -> m a) -> m a
 context name a cont = do
     name' <- NameGen <$> mkname Nothing
@@ -30,11 +30,11 @@ context name a cont = do
             _ -> Nothing
     cont name' b $ guard (not dangling) >> uniform cxts
 
-extractCtx :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
+extractCtx :: (MonadNameGen m) => EndoKleisli' m Program
 extractCtx = recmapped extractCtxExpression
 
 extractCtxExpression
-    :: (Applicative m, MonadNameGen m)
+    :: (MonadNameGen m)
     => EndoKleisli' m Expression
 extractCtxExpression = \case
     e@(Follow (PAccess name ty) x a) -> do

@@ -15,10 +15,10 @@ import Kalium.Nucleus.Vector.Pattern
 import Kalium.Nucleus.Vector.Name
 import Kalium.Nucleus.Vector.Cost (lesser)
 
-inline :: (Applicative m, MonadNameGen m, Recmappable a) => EndoKleisli' m a
+inline :: (MonadNameGen m, Recmappable a) => EndoKleisli' m a
 inline = recmapped (mergePattern . inlineExpression)
 
-reorder :: (Applicative m, MonadNameGen m, Recmappable a) => EndoKleisli' m a
+reorder :: (MonadNameGen m, Recmappable a) => EndoKleisli' m a
 reorder = recmapped reorderPattern
 
 inlineExpression (Into p x a) | not excessive, not dangling = b

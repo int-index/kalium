@@ -35,7 +35,7 @@ instance Monoid TypeScope where
     mappend (TypeScope funs1 vars1) (TypeScope funs2 vars2)
         = TypeScope (mappend funs1 funs2) (mappend vars1 vars2)
 
-type TypeEnv e m = (Applicative m, MonadReader TypeScope m, MonadError e m, Error e)
+type TypeEnv e m = (MonadReader TypeScope m, MonadError e m, Error e)
 
 class Typecheck a where
     typecheck :: TypeEnv e m => a -> m Type

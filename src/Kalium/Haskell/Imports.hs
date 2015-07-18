@@ -27,14 +27,14 @@ importDecl (moduleName, names) =
 
 gcollect :: Data a => a -> Map ModuleName (Set Name)
 gcollect = (`execState` mempty) . go where
-  go :: (Data d, Applicative m, MonadState (Map ModuleName (Set Name)) m)
+  go :: (Data d, MonadState (Map ModuleName (Set Name)) m)
      => EndoKleisli' m d
   go a | Just (Qual moduleName name) <- cast a
        = a <$ modify (M.insertWith S.union moduleName (S.singleton name))
        | otherwise = gmapM go a
 
 class Unqual a where
-    unqual :: (Applicative m, MonadReader (Set Name) m) => EndoKleisli' m a
+    unqual :: (MonadReader (Set Name) m) => EndoKleisli' m a
 
 class    Scoping a    where scoping :: a -> Set Name
 instance Scoping Name where scoping = S.singleton
@@ -73,7 +73,7 @@ instance (Scoping a, Foldable f) => Scoping (f a) where
     scoping = foldMap scoping
 
 unqualLocalize
-    :: (Applicative m, MonadReader (Set Name) m, Scoping p)
+    :: (MonadReader (Set Name) m, Scoping p)
     => p -> Endo' (m a)
 unqualLocalize (scoping -> p) = local (mappend p)
 

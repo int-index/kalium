@@ -17,7 +17,7 @@ import Kalium.Nucleus.Vector.Program
 import Kalium.Nucleus.Vector.Recmap
 import Kalium.Nucleus.Vector.Name
 
-purify :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
+purify :: (MonadNameGen m) => EndoKleisli' m Program
 purify program = do
     p1s <- execWriterT $ itraverse funcPurify (program ^. programFuncs)
     return $ Dep.restructure substituteSCC (resolve p1s) program
@@ -57,8 +57,7 @@ resolve = inContext getGen
     getNames = \(P1 name _ name' _) -> (name, name')
 
 funcPurify
-    :: ( Applicative m
-       , MonadNameGen m
+    :: ( MonadNameGen m
        , MonadWriter [P1] m )
     => Name -> Func -> m ()
 funcPurify (NameSpecial _) _ = return ()
@@ -75,8 +74,7 @@ funcPurify name (Func ty a) = do
         _ -> return ()
 
 expForcePurify
-    :: ( Applicative m
-       , MonadReader (Pairs Name Name) m
+    :: ( MonadReader (Pairs Name Name) m
        , MonadError () m
        , MonadWriter (Set Request) m)
     => EndoKleisli' m Expression

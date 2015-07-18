@@ -36,8 +36,7 @@ sanity_check name f x
     | otherwise = throwError (E.Insane name)
 
 nuclear
-    :: ( Applicative m
-       , MonadError E.Error m
+    :: ( MonadError E.Error m
        , MonadNameGen m
        ) => Kleisli' m (S.Complex S.Program) (V.Program, TranslationLog)
 nuclear
@@ -50,7 +49,7 @@ nuclear
 rnuclear pas = (`runRenameT` 0) (P.convert pas >>= nuclear)
 
 translate
-    :: (Applicative m, MonadError E.Error m)
+    :: (MonadError E.Error m)
     => Bool -> String -> m ([String], String)
 translate configPatSig src = do
     pas <- P.parse src
@@ -109,7 +108,7 @@ updateCache configPatSig src =
 type TranslationLog = [V.Program]
 
 optimize
-    :: (Applicative m, MonadNameGen m)
+    :: (MonadNameGen m)
     => V.Program -> m (V.Program, TranslationLog)
 optimize program
     = runWriterT
@@ -119,7 +118,7 @@ logging :: MonadWriter [a] m => LensLike' m a a
 logging f x = tell [x] >> f x
 
 optimizeStep
-    :: (Applicative m, MonadWriter TranslationLog m, MonadNameGen m)
+    :: (MonadWriter TranslationLog m, MonadNameGen m)
     => EndoKleisli' m V.Program
 optimizeStep =  closureM g
             >=> closureM (logging f)

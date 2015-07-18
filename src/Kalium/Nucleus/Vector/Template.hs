@@ -94,7 +94,7 @@ runMetaTableReader (MetaTableReader t) = runReaderT t
 newtype MetaTableState a = MetaTableState (StateT MetaTable Maybe a)
     deriving (Functor, Applicative, Alternative, Monad, MonadFix, MonadPlus)
 
-class (Alternative m, MonadPlus m) => GetMetaTable m where
+class (MonadPlus m) => GetMetaTable m where
     getMetaTable :: m MetaTable
 
 instance GetMetaTable MetaTableReader where
@@ -148,7 +148,7 @@ metaPMatch _ (PExt pext) = absurd pext
 metaPMatch _ _ = zeroMetaTableBuilder
 
 
-metaSubst :: (GetMetaTable m, Alternative m) => Meta Expression -> m Expression
+metaSubst :: (GetMetaTable m) => Meta Expression -> m Expression
 metaSubst = \case
     Primary l -> pure (Primary l)
     Access  n -> pure (Access  n)
@@ -157,7 +157,7 @@ metaSubst = \case
     Ext metaname -> viewMetaObject metaname
 
 
-metaPSubst :: (GetMetaTable m, Alternative m) => Meta Pattern -> m Pattern
+metaPSubst :: (GetMetaTable m) => Meta Pattern -> m Pattern
 metaPSubst = \case
     PWildCard -> pure PWildCard
     PUnit -> pure PUnit
@@ -198,7 +198,7 @@ instance MetaObjectSubtable Pattern where
     metaObjectSubtable = metaPatternTable
 
 viewMetaObject
-    :: (MetaObjectSubtable a, GetMetaTable m, Alternative m)
+    :: (MetaObjectSubtable a, GetMetaTable m)
     => MetaReference a -> m a
 viewMetaObject metaname = do
     mobj <- views metaObjectSubtable (M.lookup metaname) <$> getMetaTable
@@ -231,7 +231,7 @@ settingMetaReference
 settingMetaReference a metaname = over metaObjectSubtable (M.insert metaname a) <$> getMetaTable
 
 settingMetaObject
-    :: (MetaObject a, GetMetaTable m, Alternative m)
+    :: (MetaObject a, GetMetaTable m)
     => Meta a -> a -> m MetaTable
 settingMetaObject metaobj a = getMetaReference metaobj >>= settingMetaReference a
 
@@ -246,7 +246,7 @@ metaobj ..= a = settingMetaObject metaobj a >>= MetaTableState . put
     b <- amaybe (fn a)
     metaobj' ..= b
 
-mmeta :: (MetaObject a, GetMetaTable m, Alternative m) => Meta a -> m a
+mmeta :: (MetaObject a, GetMetaTable m) => Meta a -> m a
 mmeta = getMetaReference >=> viewMetaObject
 
 fire :: [Rule] -> Endo' Expression

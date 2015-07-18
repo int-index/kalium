@@ -13,7 +13,7 @@ import Kalium.Nucleus.Vector.Name (mentions)
 type FuncUpdate m = Name -> Name -> Func -> MaybeT m (Endo' Func, Func)
 
 funcUpdate
-    :: (Applicative m, MonadNameGen m)
+    :: (MonadNameGen m)
     => FuncUpdate m -> Program -> m Program
 funcUpdate fnUpd program = do
     updates
@@ -22,7 +22,7 @@ funcUpdate fnUpd program = do
     return $ (maybe program id . asum) (map ($program) updates)
 
 reifyFuncUpdate
-    :: (Applicative m, MonadNameGen m)
+    :: (MonadNameGen m)
     => FuncUpdate m -> Name -> Func
     -> m (Maybe (Program -> Maybe Program))
 reifyFuncUpdate fnUpd name func = runMaybeT $ do

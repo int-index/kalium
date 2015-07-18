@@ -12,7 +12,7 @@ sugarcoat :: Module -> Module
 sugarcoat = runIdentity . closureM sugar
 
 class Sugar a where
-    sugar :: (Applicative m, Monad m) => a -> m a
+    sugar :: (Monad m) => a -> m a
 
 instance (Sugar a, Traversable f) => Sugar (f a) where
     sugar = traverse sugar

@@ -24,7 +24,7 @@ a `mentions` names = getAny . execWriter
             return name
 
 class Mask a where
-    mask :: (Applicative m, Monad m) => a -> ReaderT (Name -> m Name) m a
+    mask :: (Monad m) => a -> ReaderT (Name -> m Name) m a
 
 instance (Mask a, Mask b) => Mask (a, b) where
     mask = _1 mask >=> _2 mask

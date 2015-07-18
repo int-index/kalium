@@ -88,7 +88,7 @@ data Name = NameSpecial NameSpecial
           | NameGen Integer
     deriving (Eq, Ord)
 
-alias :: (Applicative m, MonadNameGen m) => EndoKleisli' m Name
+alias :: (MonadNameGen m) => EndoKleisli' m Name
 alias (NameGen m) = NameGen <$> rename m
 alias _ = NameGen <$> mkname Nothing
 
@@ -196,7 +196,7 @@ unbeta = reverse . go where
         e -> [e]
 
 etaExpand
-     :: (Applicative m, MonadNameGen m)
+     :: (MonadNameGen m)
      => [Type] -> EndoKleisli' m (Expression' pext ext)
 etaExpand tys e = do
     (unzip -> (exps, pats)) <- forM tys $ \ty -> do
@@ -205,7 +205,7 @@ etaExpand tys e = do
     return $ lambda pats $ beta (e:exps)
 
 typeDrivenUnlambda
-    :: (Applicative m, MonadNameGen m)
+    :: (MonadNameGen m)
     => Type -> Expression -> m ( ([Pattern],[Type]) , (Expression,Type) )
 typeDrivenUnlambda ty a =
   let (tys, ty') = untyfun ty

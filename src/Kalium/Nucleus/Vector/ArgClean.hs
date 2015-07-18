@@ -10,10 +10,10 @@ import Kalium.Nucleus.Vector.Program
 import Kalium.Nucleus.Vector.Recmap
 import Kalium.Nucleus.Vector.FuncUpdate
 
-argClean :: (Applicative m, MonadNameGen m) => EndoKleisli' m Program
+argClean :: (MonadNameGen m) => EndoKleisli' m Program
 argClean = funcUpdate funcArgClean
 
-funcArgClean :: (Applicative m, MonadNameGen m) => FuncUpdate m
+funcArgClean :: (MonadNameGen m) => FuncUpdate m
 funcArgClean name name' (Func ty a) = do
     let (ps, b) = unlambda a
         (ns, ps') = patsArgClean ps

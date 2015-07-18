@@ -13,7 +13,7 @@ import Kalium.Nucleus.Scalar.Program
 
 class ValueficateSubstitute a where
     valueficateSubstitute
-        :: (Applicative m, MonadReader ReferenceInfo m)
+        :: (MonadReader ReferenceInfo m)
         =>    a (Configuration param0 Pattern Atom)
         -> m (a (Configuration param1 Pattern Expression))
 

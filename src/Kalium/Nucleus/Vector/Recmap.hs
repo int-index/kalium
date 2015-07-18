@@ -7,7 +7,7 @@ import Kalium.Nucleus.Vector.Program
 -- Be careful! Not a valid setter:
 -- over recmapped f . over recmapped g /= over recmapped (f . g)
 
-recmap :: (Applicative m, Monad m) => LensLike' m Expression Expression
+recmap :: (Monad m) => LensLike' m Expression Expression
 recmap outer = around where
     around = outer <=< inner
     inner = \case
@@ -18,7 +18,7 @@ recmap outer = around where
         Ext ext -> absurd ext
 
 class Recmappable a where
-    recmapped :: (Applicative m, Monad m) => LensLike' m a Expression
+    recmapped :: (Monad m) => LensLike' m a Expression
 
 instance Recmappable Expression where
     recmapped = recmap
