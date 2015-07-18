@@ -94,6 +94,7 @@ library
                     ,  TypeSynonymInstances
                     ,  TypeOperators
                     ,  DataKinds
+                    ,  AutoDeriveTypeable
 
 executable kalium-cli
   main-is:             Main.hs

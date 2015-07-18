@@ -1,6 +1,7 @@
 module Kalium.Error where
 
 import Kalium.Prelude
+import Control.Exception (Exception)
 
 import qualified Data.Map as M
 
@@ -22,6 +23,8 @@ data Error = ParseError String Int Int
            | ArgumentMismatch String
            | Insane String
     deriving (Show)
+
+instance Exception Error
 
 instance P.Error Error where
     errorParse e = ParseError name line column
