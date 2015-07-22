@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators #-}
-module Kalium.Nucleus.Vectorize (vectorize, Error(..)) where
+module Kalium.Nucleus.Vectorize (vectorize) where
 
 import Kalium.Prelude
 import Kalium.Util
@@ -9,6 +9,7 @@ import Kalium.Util
 import Control.Monad.Reader
 import Control.Monad.Except
 import Control.Monad.Rename
+import Control.Exception
 
 import qualified Data.Map as M
 import Kalium.Nucleus.Scalar.Program
@@ -38,12 +39,19 @@ instance Monoid VectorizeScope where
         (vs1 ^. vsIndices <> vs2 ^. vsIndices)
         (vs1 ^. vsNames   <> vs2 ^. vsNames)
 
-class Error e where
-    errorNoAccess :: Name -> [Name] -> e
-    errorUpdateImmutable :: Name -> e
-    errorInsane :: String -> e
+instance Exception ErrorNoAccess
+data ErrorNoAccess = ErrorNoAccess Name [Name]
+    deriving (Show)
 
-type E e m = (Applicative m, Error e, MonadError e m, MonadNameGen m)
+instance Exception ErrorUpdateImmutable
+data ErrorUpdateImmutable = ErrorUpdateImmutable Name
+    deriving (Show)
+
+instance Exception ErrorInsane
+data ErrorInsane = ErrorInsane String
+    deriving (Show)
+
+type E e m = (Applicative m, MonadError SomeException m, MonadNameGen m)
 type (~>) a b = forall e m . (MonadReader VectorizeScope m, E e m) => Kleisli' m a b
 
 alias :: E e m => Name -> m Vec.Name
@@ -125,7 +133,7 @@ updateLocalize names action = do
         index <- lookupIndex name >>= \case
             Index n -> return (Index $ succ n)
             Uninitialized -> return (Index 0)
-            Immutable -> throwError (errorUpdateImmutable name)
+            Immutable -> (throwError.SomeException) (ErrorUpdateImmutable name)
         name' <- Just <$> alias name
         return (((name, index), name'), (name, index))
     local ( (vsIndices %~ mappend (M.fromList updated))
@@ -230,7 +238,7 @@ vectorizeStatement = \case
                 (changed', vecStatement)
                     <- vectorizeStatement (forCycle ^. forStatement)
                 when (changed /= changed') $
-                    throwError (errorInsane "changed == changed'")
+                    (throwError.SomeException) (ErrorInsane "changed == changed'")
                 argPat <- patTuple changed
                 iterPat <- mkPAccess iter_name
                 let vecLambda = Vec.lambda [argPat, iterPat] vecStatement
@@ -272,12 +280,12 @@ lookupType = lookupX (view vsTypes)
 lookupName :: Name -> Index ~> Maybe Vec.Name
 lookupName name index
       = views vsNames (M.lookup (name, index))
-    >>= throwMaybe (errorNoAccess name [])
+    >>= (throwMaybe.SomeException) (ErrorNoAccess name [])
 
 lookupX :: (VectorizeScope -> Map Name x) -> Name ~> x
 lookupX f name = do
     xs <- asks f
-    M.lookup name xs & throwMaybe (errorNoAccess name (M.keys xs))
+    M.lookup name xs & (throwMaybe.SomeException) (ErrorNoAccess name (M.keys xs))
 
 initIndices :: E e m => Index -> Map Name Type -> m VectorizeScope
 initIndices n types = do

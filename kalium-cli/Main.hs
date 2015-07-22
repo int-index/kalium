@@ -7,7 +7,6 @@ import Control.Monad.Except
 import Options.Applicative
 
 import qualified Kalium
-import Kalium.Error ()
 
 data Options = Options
     { filenameIn  :: String

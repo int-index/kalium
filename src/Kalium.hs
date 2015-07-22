@@ -2,7 +2,7 @@
 module Kalium (translate, Cache, updateCache, extractCache) where
 
 import Kalium.Prelude
-import Control.Exception (SomeException(..))
+import Control.Exception
 
 import Kalium.Nucleus.Vectorize (vectorize)
 import Kalium.Nucleus.Scalar.Atomize (atomize)
@@ -23,7 +23,6 @@ import qualified Kalium.Pascal.Convert as P (convert)
 import qualified Kalium.Haskell.Sugar   as H (sugarcoat)
 import qualified Kalium.Haskell.Imports as H (imports)
 import qualified Kalium.Haskell.Convert as H (convert, Config(..))
-import qualified Kalium.Error as E
 import qualified Kalium.Nucleus.Scalar.Program as S
 import qualified Kalium.Nucleus.Vector.Program as V
 import Kalium.Util
@@ -32,12 +31,16 @@ import Control.Monad.Writer
 import Control.Monad.Except
 import Control.Monad.Rename
 
+instance Exception ErrorInsane
+data ErrorInsane = ErrorInsane String
+    deriving (Show)
+
 sanity_check name f x
     | f x = return x
-    | otherwise = throwError (E.Insane name)
+    | otherwise = (throwError.SomeException) (ErrorInsane name)
 
 nuclear
-    :: ( MonadError E.Error m
+    :: ( MonadError SomeException m
        , MonadNameGen m
        ) => Kleisli' m (S.Complex S.Program) (V.Program, TranslationLog)
 nuclear
@@ -50,7 +53,7 @@ nuclear
 rnuclear pas = (`runRenameT` 0) (P.convert pas >>= nuclear)
 
 translate
-    :: (MonadError E.Error m)
+    :: (MonadError SomeException m)
     => Bool -> String -> m ([String], String)
 translate configPatSig src = do
     pas <- P.parse src
@@ -76,7 +79,7 @@ updateCache configPatSig src =
   let hsConfig = H.Config { H.configPatSig = configPatSig }
   in \case
     Nothing -> case P.parse src of
-        Left (e :: E.Error) -> Cache_PascalParseError src (SomeException e)
+        Left (e :: SomeException) -> Cache_PascalParseError src e
         Right pas -> withPas hsConfig pas
     Just cache -> case cache of
       Cache_PascalParseError src' _ ->
@@ -84,21 +87,21 @@ updateCache configPatSig src =
       Cache_HaskellGenError src' pas' e' ->
         if src == src' then cache else
           case P.parse src of
-            Left (e :: E.Error) -> Cache_PascalParseError src (SomeException e)
+            Left (e :: SomeException) -> Cache_PascalParseError src e
             Right pas -> if pas == pas'
-                then Cache_HaskellGenError src pas (SomeException e')
+                then Cache_HaskellGenError src pas e'
                 else withPas hsConfig pas
       Cache_Success src' pas' opt' hsConfig' _ ->
         let keep | hsConfig == hsConfig' = cache
                  | otherwise = withOptimal hsConfig pas' opt'
         in if src == src' then keep
            else case P.parse src of
-               Left (e :: E.Error) -> Cache_PascalParseError src (SomeException e)
+               Left (e :: SomeException) -> Cache_PascalParseError src e
                Right pas -> if pas == pas' then keep else withPas hsConfig pas
 
   where
     withPas hsConfig pas = case rnuclear pas of
-        Left (e :: E.Error) -> Cache_HaskellGenError src pas (SomeException e)
+        Left (e :: SomeException) -> Cache_HaskellGenError src pas e
         Right ((optimal, _log), nameTags) -> withOptimal hsConfig pas (nameTags,optimal)
     withOptimal hsConfig pas (nameTags,optimal) =
         let sweet = H.imports . H.sugarcoat

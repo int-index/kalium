@@ -1,11 +1,12 @@
 {
-module Kalium.Pascal.Parse (parse, Error(..)) where
+module Kalium.Pascal.Parse (parse) where
 
 import Prelude
 
 import qualified Data.Map as M
 import Data.Ratio
 
+import Control.Exception
 import Control.Monad
 import Control.Monad.Except
 
@@ -227,16 +228,15 @@ Arguments_ :                           {      [] }
            | Arguments_ ',' Expression { $3 : $1 }
 
 {
+instance Exception P.ParseError
+
 parseErr _ = mzero
 
 binary op x y = Call (Left op) [x, y]
 
-class Error e where
-    errorParse :: P.ParseError -> e
-
-parse :: (Error e, MonadError e m) => String -> m Program
+parse :: (MonadError SomeException m) => String -> m Program
 parse s = case P.parse parser "" s of
-    Left  e -> throwError (errorParse e)
+    Left  e -> throwError (SomeException e)
     Right a -> return a
 
 match_quote [c] = Primary (LitChar c)

@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Kalium.Pascal.Convert (convert, Error(..)) where
+module Kalium.Pascal.Convert (convert) where
 
 import Kalium.Prelude
 import Kalium.Util
@@ -13,6 +13,7 @@ import Control.Monad.Reader
 import Control.Monad.Except
 import Control.Monad.Rename
 
+import Control.Exception
 import Control.Lens (ix)
 import qualified Data.Map as M
 
@@ -36,14 +37,27 @@ declareLenses [d|
 
                 |]
 
-class Error e where
-    errorTypecheck  :: e
-    errorNoAccess   :: String -> [String] -> e
-    errorNoFunction :: String -> e
-    errorNotImplemented :: String -> e
-    errorArgumentMismatch :: String -> e
+instance Exception ErrorTypecheck
+data ErrorTypecheck = ErrorTypecheck
+    deriving (Show)
 
-type E e m = (Applicative m, MonadError e m, Error e)
+instance Exception ErrorNoAccess
+data ErrorNoAccess = ErrorNoAccess String [String]
+    deriving (Show)
+
+instance Exception ErrorNoFunction
+data ErrorNoFunction = ErrorNoFunction String
+    deriving (Show)
+
+instance Exception ErrorNotImplemented
+data ErrorNotImplemented = ErrorNotImplemented String
+    deriving (Show)
+
+instance Exception ErrorArgumentMismatch
+data ErrorArgumentMismatch = ErrorArgumentMismatch String
+    deriving (Show)
+
+type E e m = (Applicative m, MonadError SomeException m)
 type (~>)  a b = forall e m . (MonadReader ConvScope m, E e m) => Kleisli' m a b
 type (~>.) a b = forall e m . (MonadReader ConvScope m, E e m, MonadNameGen m) => Kleisli' m a b
 
@@ -61,7 +75,7 @@ lookupName :: Bool -> S.Name ~> D.Name
 lookupName ct name = do
     names <- views csNames (M.! ct)
     let mname = M.lookup name names
-    throwMaybe (errorNoAccess name (M.keys names)) mname
+    (throwMaybe.SomeException) (ErrorNoAccess name (M.keys names)) mname
 
 alias :: (Applicative m, MonadNameGen m) => Kleisli' m S.Name D.Name
 alias name = D.NameGen <$> mkname (Just name)
@@ -162,7 +176,7 @@ instance Conv S.Type where
         S.TypeChar    -> return D.TypeChar
         S.TypeString  -> return D.TypeString
         S.TypeArray t -> D.TypeApp1 D.TypeList <$> conv t
-        S.TypeCustom _  -> throwError (errorNotImplemented "Custom types")
+        S.TypeCustom _  -> (throwError.SomeException) (ErrorNotImplemented "Custom types")
 
 binary op a b = D.Call op [] [a,b]
 
@@ -171,7 +185,7 @@ convSetLength [S.Access name', lenExpr'] = do
     lenExpr <- typecastConv (==S.TypeInteger) lenExpr'
     return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpSetLength) []
         [D.expression name, lenExpr]
-convSetLength _ = throwError (errorArgumentMismatch "SetLength")
+convSetLength _ = (throwError.SomeException) (ErrorArgumentMismatch "SetLength")
 
 convReadLn [e@(S.Access name')] = do
     name <- nameV name'
@@ -180,14 +194,14 @@ convReadLn [e@(S.Access name')] = do
         ty' -> do
             ty <- conv ty'
             return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpReadLn) [ty] []
-convReadLn _ = throwError (errorArgumentMismatch "ReadLn")
+convReadLn _ = (throwError.SomeException) (ErrorArgumentMismatch "ReadLn")
 
 convRead [e@(S.Access name')] = do
     name <- nameV name'
     typecheck e >>= \case
         S.TypeChar -> return $ D.Exec (D.PAccess name) (D.NameSpecial D.OpGetChar) [] []
-        _ -> throwError errorTypecheck
-convRead _ = throwError (errorArgumentMismatch "Read")
+        _ -> (throwError.SomeException) ErrorTypecheck
+convRead _ = (throwError.SomeException) (ErrorArgumentMismatch "Read")
 
 convWriteLn ln exprs = do
     arg <- traverse convArg exprs <&> \case
@@ -206,7 +220,7 @@ convWriteLn ln exprs = do
                     e <- convExpr tc
                     return $ D.Call (D.NameSpecial D.OpSingleton) [] [e]
                 [] -> case listToMaybe (map snd tcs) of
-                    Nothing -> throwError errorTypecheck
+                    Nothing -> (throwError.SomeException) ErrorTypecheck
                     Just expr' -> do
                         e <- convExpr expr'
                         return $ D.Call (D.NameSpecial D.OpShow) [] [e]
@@ -223,7 +237,7 @@ typeOfAccess :: S.Name ~> S.Type
 typeOfAccess name = do
     types <- view (csTypes.tsVariables)
     let mtype = M.lookup name types
-    throwMaybe (errorNoAccess name (M.keys types)) mtype
+    (throwMaybe.SomeException) (ErrorNoAccess name (M.keys types)) mtype
 
 typecasts :: S.Expression ~> Pairs S.Type S.Expression
 typecasts expr = case expr of
@@ -251,7 +265,7 @@ typecasting ty expr = expr : [op1App tc expr | tc <- tcs]
             _ -> []
 
 typecheck :: S.Expression ~> S.Type
-typecheck expr = typecheck' expr >>= throwMaybe errorTypecheck
+typecheck expr = typecheck' expr >>= (throwMaybe.SomeException) ErrorTypecheck
 
 typecheck' :: S.Expression ~> Maybe S.Type
 typecheck' = runMaybeT . \case
@@ -273,7 +287,7 @@ typecheck' = runMaybeT . \case
     S.Call (Right name) args -> do
         mfuncsig <- views (csTypes.tsFunctions) (M.lookup name)
         case mfuncsig of
-            Nothing -> throwError (errorNoFunction name)
+            Nothing -> (throwError.SomeException) (ErrorNoFunction name)
             Just (S.FuncSig params mtype) -> case mtype of
                 Nothing -> badType
                 Just t -> do
@@ -318,7 +332,7 @@ typecastConv :: (S.Type -> Bool) -> S.Expression ~>. D.Expression
 typecastConv p expr = do
     tcs <- typecasts expr
     tc <- case keepByFst p tcs of
-        [] -> throwError errorTypecheck
+        [] -> (throwError.SomeException) ErrorTypecheck
         tc:_ -> return tc
     convExpr tc
 
@@ -342,9 +356,11 @@ instance Conv S.Statement where
                     ixExpr <- typecastConv (==S.TypeInteger) ixExpr'
                     name <- nameV name'
                     tyW <- typecheck (S.Access name') >>= \case
-                        S.TypeString -> throwError (errorNotImplemented "String indexing")
+                        S.TypeString ->
+                            (throwError.SomeException)
+                            (ErrorNotImplemented "String indexing")
                         S.TypeArray ty -> return ty
-                        _ -> throwError errorTypecheck
+                        _ -> (throwError.SomeException) ErrorTypecheck
                     elemExpr <- typecastConv (==tyW) expr'
                     let expr = D.Call (D.NameSpecial D.OpIxSet) []
                                 [ ixExpr, elemExpr

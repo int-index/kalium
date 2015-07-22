@@ -26,7 +26,6 @@ flag build-js
 library
   exposed-modules:     Kalium
                        Kalium.Util
-                       Kalium.Error
                        Kalium.Pascal.Program
                        Kalium.Pascal.Parse
                        Kalium.Pascal.Tokenize

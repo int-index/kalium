@@ -8,6 +8,7 @@ module Kalium.Nucleus.Scalar.Typecheck where
 import Kalium.Prelude
 import Kalium.Util
 
+import Control.Exception
 import Control.Monad.Reader
 import Control.Monad.Except
 
@@ -16,10 +17,17 @@ import qualified Data.Map as M
 import Kalium.Nucleus.Scalar.Program
 import qualified Kalium.Nucleus.Scalar.Operator as Op
 
-class Error e where
-    errorNoAccess :: Name -> Vars -> e
-    errorNoFunction :: Name -> e
-    errorTypeMismatch :: Name -> [Type] -> e
+instance Exception ErrorNoAccess
+data ErrorNoAccess = ErrorNoAccess Name Vars
+    deriving (Show)
+
+instance Exception ErrorNoFunction
+data ErrorNoFunction = ErrorNoFunction Name
+    deriving (Show)
+
+instance Exception ErrorTypeMismatch
+data ErrorTypeMismatch = ErrorTypeMismatch Name [Type]
+    deriving (Show)
 
 declareLenses [d|
 
@@ -35,7 +43,7 @@ instance Monoid TypeScope where
     mappend (TypeScope funs1 vars1) (TypeScope funs2 vars2)
         = TypeScope (mappend funs1 funs2) (mappend vars1 vars2)
 
-type TypeEnv e m = (MonadReader TypeScope m, MonadError e m, Error e)
+type TypeEnv e m = (MonadReader TypeScope m, MonadError SomeException m)
 
 class Typecheck a where
     typecheck :: TypeEnv e m => a -> m Type
@@ -50,12 +58,12 @@ instance Typecheck Atom where
     typecheck (Primary lit) = typecheck lit
     typecheck (Access name) = do
         vars <- asks (view tsVariables)
-        M.lookup name vars & throwMaybe (errorNoAccess name vars)
+        M.lookup name vars & (throwMaybe.SomeException) (ErrorNoAccess name vars)
 
 lookupFuncSig :: TypeEnv e m => Name -> m FuncSig
 lookupFuncSig name = do
     funcSigs <- asks (view tsFunctions)
-    M.lookup name funcSigs & throwMaybe (errorNoFunction name)
+    M.lookup name funcSigs & (throwMaybe.SomeException) (ErrorNoFunction name)
 
 instance Typecheck Expression where
     typecheck (Atom atom) = typecheck atom
@@ -63,7 +71,9 @@ instance Typecheck Expression where
         case M.lookup name Op.operators of
             Just op -> do
                 argTys <- traverse typecheck args
-                Op.tc op tyArgs argTys & throwMaybe (errorTypeMismatch name argTys)
+                Op.tc op tyArgs argTys
+                    & (throwMaybe.SomeException)
+                      (ErrorTypeMismatch name argTys)
             Nothing -> funcSigType <$> lookupFuncSig name
 
 class TypeIntro a where
