@@ -1,0 +1,7 @@
+flags:
+  kalium:
+    build-js: false
+packages:
+- '.'
+extra-deps: []
+resolver: nightly-2015-07-24

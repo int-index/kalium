@@ -2,6 +2,7 @@ dist
 .cabal-sandbox
 cabal.config
 cabal.sandbox.config
+.stack-work
 docs/*.aux
 docs/*.log
 docs/*.pdf
