@@ -11,7 +11,7 @@ sanity_nameUniqueness program
     = liftA2 (==) nub id . execWriter
     $ itraverse fnsnu (view programFuncs program)
 
-type W m = (Applicative m, MonadWriter [Name] m)
+type W m = MonadWriter [Name] m
 
 snu :: W m => Expression -> m ()
 snu = \case

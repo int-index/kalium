@@ -57,11 +57,11 @@ instance Exception ErrorArgumentMismatch
 data ErrorArgumentMismatch = ErrorArgumentMismatch String
     deriving (Show)
 
-type E e m = (Applicative m, MonadError SomeException m)
-type (~>)  a b = forall e m . (MonadReader ConvScope m, E e m) => Kleisli' m a b
-type (~>.) a b = forall e m . (MonadReader ConvScope m, E e m, MonadNameGen m) => Kleisli' m a b
+type E m = MonadError SomeException m
+type (~>)  a b = forall m . (MonadReader ConvScope m, E m) => Kleisli' m a b
+type (~>.) a b = forall m . (MonadReader ConvScope m, E m, MonadNameGen m) => Kleisli' m a b
 
-convert :: (E e m, MonadNameGen m) => S.Program -> m (D.Complex D.Program)
+convert :: (E m, MonadNameGen m) => S.Program -> m (D.Complex D.Program)
 convert program = do
     let initScope = ConvScope (TypeScope mempty mempty)
                               (M.fromList (liftA2(,)[True,False][mempty]))
@@ -77,7 +77,7 @@ lookupName ct name = do
     let mname = M.lookup name names
     (throwMaybe.SomeException) (ErrorNoAccess name (M.keys names)) mname
 
-alias :: (Applicative m, MonadNameGen m) => Kleisli' m S.Name D.Name
+alias :: MonadNameGen m => Kleisli' m S.Name D.Name
 alias name = D.NameGen <$> mkname (Just name)
 
 opUnit  = D.Call (D.NameSpecial D.OpUnit)  [] []

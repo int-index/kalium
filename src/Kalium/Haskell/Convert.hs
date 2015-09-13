@@ -31,11 +31,10 @@ data Config = Config
     } deriving (Eq)
 
 type T m =
-    ( Applicative m
-    , Ether '[ Scope --> Set Vec.Name
+    ( Ether '[ Scope --> Set Vec.Name
              , ReifiedNames <-> Map Integer (Either String H.Name)
              ] m )
-type C m = (Applicative m, I.MonadReader Config m)
+type C m = I.MonadReader Config m
 
 convProgram :: Config -> Map Integer String -> Vec.Program -> H.Module
 convProgram config nameTags (Vec.Program funcs) = run $ do

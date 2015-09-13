@@ -49,14 +49,14 @@ instance Exception ErrorUpdateImmutable
 data ErrorUpdateImmutable = ErrorUpdateImmutable Name
     deriving (Show)
 
-type E e m = (Applicative m, MonadError SomeException m, MonadNameGen m)
-type (~>) a b = forall e m . (MonadReader VectorizeScope m, E e m) => Kleisli' m a b
+type E m = (MonadError SomeException m, MonadNameGen m)
+type (~>) a b = forall m . (MonadReader VectorizeScope m, E m) => Kleisli' m a b
 
-alias :: E e m => Name -> m Vec.Name
+alias :: E m => Name -> m Vec.Name
 alias (NameGen m) = Vec.NameGen <$> rename m
 alias _ = Vec.NameGen <$> mkname Nothing
 
-vectorize :: E e m => Primitive Program -> m (Vec.Program)
+vectorize :: E m => Primitive Program -> m (Vec.Program)
 vectorize program = do
     (mconcat -> names') <- for (program ^. programFuncs . to M.keys)
         $ \name -> do
@@ -125,7 +125,7 @@ vectorizeBody scope = do
     let Body statement result = scope ^. scopeElem
     vectorizeScope (const [result]) (Scope vars statement)
 
-updateLocalize :: (E e m, MonadReader VectorizeScope m) => [Name] -> m a -> m a
+updateLocalize :: (E m, MonadReader VectorizeScope m) => [Name] -> m a -> m a
 updateLocalize names action = do
     (unzip -> (names', updated)) <- for names $ \name -> do
         index <- lookupIndex name >>= \case
@@ -285,7 +285,7 @@ lookupX f name = do
     xs <- asks f
     M.lookup name xs & (throwMaybe.SomeException) (ErrorNoAccess name (M.keys xs))
 
-initIndices :: E e m => Index -> Map Name Type -> m VectorizeScope
+initIndices :: E m => Index -> Map Name Type -> m VectorizeScope
 initIndices n types = do
     scopes <- for (itoList types) $ \(name, ty) -> do
         name' <- case n of
