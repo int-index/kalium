@@ -1,12 +1,7 @@
-# https://github.com/hvr/multi-ghc-travis
 sudo: false
 
-env:
- - CABALVER=1.22 GHCVER=7.10.1
- - CABALVER=head GHCVER=head
-
 before_install:
- - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:/opt/happy/1.19.5/bin:$PATH
+ - export PATH=/opt/ghc/7.10.2/bin:/opt/cabal/1.22/bin:/opt/happy/1.19.5/bin:$PATH
  - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
  - travis_retry cabal update
@@ -29,9 +24,7 @@ addons:
     - hvr-ghc
     - deadsnakes
     packages:
-    - ghc-7.10.1
-    - ghc-head
+    - ghc-7.10.2
     - cabal-install-1.22
-    - cabal-install-head
     - happy-1.19.5
     - python3.4
