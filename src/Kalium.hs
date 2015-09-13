@@ -27,13 +27,11 @@ import qualified Kalium.Nucleus.Scalar.Program as S
 import qualified Kalium.Nucleus.Vector.Program as V
 import Kalium.Util
 
+import Kalium.Error.Insane
+
 import Control.Monad.Writer
 import Control.Monad.Except
 import Control.Monad.Rename
-
-instance Exception ErrorInsane
-data ErrorInsane = ErrorInsane String
-    deriving (Show)
 
 sanity_check name f x
     | f x = return x

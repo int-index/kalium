@@ -25,7 +25,9 @@ flag build-js
 
 library
   exposed-modules:     Kalium
+                       Kalium.Prelude
                        Kalium.Util
+                       Kalium.Error.Insane
                        Kalium.Pascal.Program
                        Kalium.Pascal.Parse
                        Kalium.Pascal.Tokenize
@@ -33,6 +35,7 @@ library
                        Kalium.Haskell.Convert
                        Kalium.Haskell.Sugar
                        Kalium.Haskell.Imports
+                       Kalium.Haskell.Common
                        Kalium.Nucleus.Scalar.Program
                        Kalium.Nucleus.Scalar.Operator
                        Kalium.Nucleus.Scalar.Build

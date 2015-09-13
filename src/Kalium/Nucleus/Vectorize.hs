@@ -11,6 +11,8 @@ import Control.Monad.Except
 import Control.Monad.Rename
 import Control.Exception
 
+import Kalium.Error.Insane
+
 import qualified Data.Map as M
 import Kalium.Nucleus.Scalar.Program
 import qualified Kalium.Nucleus.Scalar.Operator as Op
@@ -45,10 +47,6 @@ data ErrorNoAccess = ErrorNoAccess Name [Name]
 
 instance Exception ErrorUpdateImmutable
 data ErrorUpdateImmutable = ErrorUpdateImmutable Name
-    deriving (Show)
-
-instance Exception ErrorInsane
-data ErrorInsane = ErrorInsane String
     deriving (Show)
 
 type E e m = (Applicative m, MonadError SomeException m, MonadNameGen m)
