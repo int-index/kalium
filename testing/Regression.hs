@@ -3,7 +3,6 @@ module Main where
 
 import Prelude hiding (FilePath)
 import Control.Monad.Except
-import Control.Monad.Managed (with)
 import Turtle
 import Filesystem.Path.CurrentOS (encodeString)
 import System.IO.Silently (silence)
