@@ -71,7 +71,7 @@ library
                ,       containers >= 0.5
                ,       unordered-containers >= 0.2
                ,       array >= 0.5
-               ,       lens >= 4.9
+               ,       lens == 4.12.*
                ,       profunctors >= 4.4
                ,       haskell-src-exts == 1.16.*
                ,       parsec >= 3.1
