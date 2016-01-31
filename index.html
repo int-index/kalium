@@ -1,6 +1,8 @@
 <!doctype html>
 <html>
     <head>
+        <meta charset="UTF-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link href='//fonts.googleapis.com/css?family=Ubuntu:400,700&subset=latin,greek' rel='stylesheet' type='text/css'>
         <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
         <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-smooth-scroll/1.5.5/jquery.smooth-scroll.min.js"></script>
@@ -19,22 +21,22 @@
                 color: #618c9a;
             }
             nav {
+                display: -webkit-box;
                 display: -webkit-flex;
+                display: -ms-flexbox;
                 display: flex;
                 -webkit-justify-content: space-around;
-                justify-content: space-around;
+                          -ms-flex-pack: distribute;
+                        justify-content: space-around;
+                width: 100vw;
                 position: fixed;
                 top:0;
                 left:0;
-                width: 70%;
-                padding-left: 15%;
-                padding-right: 15%;
-                text-transform: uppercase;
+                text-transform: lowercase;
                 background: #444444;
                 color: white;
             }
             nav > a {
-                display: block;
                 padding: 10px;
                 text-decoration: none;
             }
