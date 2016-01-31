@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Kalium.Haskell.Sugar where
 
-import Kalium.Prelude
+import Kalium.Prelude hiding (List)
 import Kalium.Util (closureM)
 
 import Kalium.Haskell.Common
@@ -221,7 +221,7 @@ expDoMatch = \case
 
 expLetMatch = \case
     App (Lambda srcLoc [pat] a) x ->
-        let decl = PatBind srcLoc pat (UnGuardedRhs x) (BDecls [])
+        let decl = PatBind srcLoc pat (UnGuardedRhs x) Nothing
         in Let (BDecls [decl]) a
     Let (BDecls decls) (Let (BDecls decls') a)
         -> Let (BDecls (decls ++ decls')) a

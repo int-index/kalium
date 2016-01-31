@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Kalium.Haskell.Imports where
 
-import Kalium.Prelude
+import Kalium.Prelude hiding (List)
 import Kalium.Util
 import Data.Data
 import qualified Data.Set as S
@@ -23,7 +23,8 @@ imports (Module srcLoc name pragmas wtext exportSpec importDecls decls) =
 
 importDecl (moduleName, names) =
     ImportDecl noLoc moduleName
-    False False False Nothing Nothing (Just (False, IAbs <$> toList names))
+    False False False Nothing Nothing
+    (Just (False, IAbs NoNamespace <$> toList names))
 
 gcollect :: Data a => a -> Map ModuleName (Set Name)
 gcollect = (`execState` mempty) . go where

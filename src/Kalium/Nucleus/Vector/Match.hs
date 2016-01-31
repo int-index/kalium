@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Kalium.Nucleus.Vector.Match where
 
-import Kalium.Prelude
+import Kalium.Prelude hiding ((:>))
 
 import Kalium.Nucleus.Vector.Program
 import Kalium.Nucleus.Vector.Recmap

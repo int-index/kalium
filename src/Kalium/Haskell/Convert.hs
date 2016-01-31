@@ -125,7 +125,7 @@ convFunc name (Vec.Func ty expression) = do
         _ -> error "convFunc: incorrect name"
     let sig = H.TypeSig H.noLoc [hsName] (convType ty)
     hsRhs <- H.UnGuardedRhs <$> convExpression expression
-    let funBind = H.FunBind [H.Match H.noLoc hsName [] Nothing hsRhs (H.BDecls [])]
+    let funBind = H.FunBind [H.Match H.noLoc hsName [] Nothing hsRhs Nothing]
     pure [sig, funBind]
 
 convPattern :: (T m, C m) => Vec.Pattern -> m H.Pat
